@@ -1,0 +1,97 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="페이지-1" id="9HmQz_Yr8qRUIC92HR89">
+    <mxGraphModel dx="1664" dy="914" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-23" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="ckrRCt4-DTCoJK1l8i2x-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-1" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;카드&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="78" x="533" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-2" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="ckrRCt4-DTCoJK1l8i2x-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-3" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ckrRCt4-DTCoJK1l8i2x-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-4" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ckrRCt4-DTCoJK1l8i2x-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-5" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ckrRCt4-DTCoJK1l8i2x-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="은행별 카드&lt;div&gt;조회&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="70" x="373" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-7" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="ckrRCt4-DTCoJK1l8i2x-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-8" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="이용내역 조회" vertex="1">
+          <mxGeometry height="60" width="80" x="343" y="375" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-9" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="ckrRCt4-DTCoJK1l8i2x-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-10" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ckrRCt4-DTCoJK1l8i2x-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-11" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="요금 조회" vertex="1">
+          <mxGeometry height="60" width="70" x="223" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-12" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;결제 계좌 조회&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="95" x="533" y="305" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-13" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;실 카드 번호 조회&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="95" x="533" y="405" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-14" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;멤버십&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="533" y="505" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-15" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;명세서&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="393" y="495" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-16" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;분할&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="173" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-17" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="ckrRCt4-DTCoJK1l8i2x-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-18" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="ckrRCt4-DTCoJK1l8i2x-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-19" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="요금 결제" vertex="1">
+          <mxGeometry height="60" width="70" x="103" y="455" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-20" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;전체&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="70" y="575" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-25" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="ckrRCt4-DTCoJK1l8i2x-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-24" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=15;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="&lt;span style=&quot;font-size: 15px;&quot;&gt;적용할 패턴&lt;br&gt;- CardAgent&lt;br&gt;* 함수&lt;br&gt;- 요청 분류(분기)&lt;br&gt;- 필요 정보 확인&lt;br&gt;- 부족한 정보 질문&lt;br&gt;- 조회/결제 정보 전달(agent 전달)&lt;/span&gt;" vertex="1">
+          <mxGeometry height="155" width="161" x="82" y="115" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-26" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=20;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="* 넘겨줘야할 것들&lt;br&gt;- 조회/결제 할 계좌&lt;br&gt;- 본인 확인&lt;br&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="130" width="161" x="650" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-27" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.974;entryY=0.383;entryDx=0;entryDy=0;entryPerimeter=0;" target="ckrRCt4-DTCoJK1l8i2x-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-29" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ckrRCt4-DTCoJK1l8i2x-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-28" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=6;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="&lt;span style=&quot;font-size: 15px;&quot;&gt;적용할 패턴&lt;br&gt;-&amp;nbsp;&lt;/span&gt;CardCheckAgent&lt;br&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;* 함수&lt;br&gt;- 요청 분류(분기)&lt;br&gt;- 이용 내역 조회&lt;br&gt;- 요금 조회&lt;br&gt;- 요금 결제&lt;br&gt;&amp;nbsp;* 전체, 분할&lt;br&gt;- 결제 계좌 조회&lt;br&gt;- 카드 번호 조회&lt;br&gt;- 맴버십 조회&lt;br&gt;- 결과 반환&lt;/span&gt;" vertex="1">
+          <mxGeometry height="220" width="161" x="223" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-31" edge="1" parent="1" source="ckrRCt4-DTCoJK1l8i2x-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="ckrRCt4-DTCoJK1l8i2x-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ckrRCt4-DTCoJK1l8i2x-30" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=11;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="* 넘겨줘야할 것들&lt;br&gt;- supervisor 한테 넘겨받은 것들 포함&lt;br&gt;- 대상 카드&lt;br&gt;- 조회/결제 조건&lt;br&gt;- 결졔 계좌&lt;br&gt;- 결제 금액&lt;br&gt;- 결제 방식&lt;br&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="130" width="161" x="590" y="645" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

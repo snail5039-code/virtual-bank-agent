@@ -1,0 +1,72 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="페이지-1" id="dekwCoITQg0NUv0D4FTG">
+    <mxGraphModel dx="1414" dy="777" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-1" edge="1" parent="1" source="hTEe4sk86dXc_tWAAQMp-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="hTEe4sk86dXc_tWAAQMp-7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="340" y="315" />
+              <mxPoint x="340" y="315" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-2" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;카드&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="70" x="190" y="285" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-3" edge="1" parent="1" source="hTEe4sk86dXc_tWAAQMp-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="hTEe4sk86dXc_tWAAQMp-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-4" edge="1" parent="1" source="hTEe4sk86dXc_tWAAQMp-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="hTEe4sk86dXc_tWAAQMp-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-6" edge="1" parent="1" source="hTEe4sk86dXc_tWAAQMp-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="hTEe4sk86dXc_tWAAQMp-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-13" edge="1" parent="1" source="hTEe4sk86dXc_tWAAQMp-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="hTEe4sk86dXc_tWAAQMp-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="설정" vertex="1">
+          <mxGeometry height="60" width="70" x="370" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-8" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;비밀번호 변경&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="95" x="490" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-9" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;별칭 변경&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="640" y="285" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-10" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;분실신고/&lt;/div&gt;&lt;div&gt;재발급&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="95" x="490" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-11" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;align=left;" value="&lt;div style=&quot;text-align: center;&quot;&gt;카드&amp;nbsp; &lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;등록&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: center;&quot;&gt;/해지&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="120" x="345" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-15" edge="1" parent="1" source="hTEe4sk86dXc_tWAAQMp-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="hTEe4sk86dXc_tWAAQMp-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-14" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=15;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="&lt;span style=&quot;font-size: 15px;&quot;&gt;적용할 패턴&lt;br&gt;- CardAgent&lt;br&gt;* 함수&lt;br&gt;- 요청 분류(분기)&lt;br&gt;- 필요 정보 확인&lt;br&gt;- 부족한 정보 질문&lt;br&gt;- 설정 정보 전달(agent 전달)&lt;/span&gt;" vertex="1">
+          <mxGeometry height="155" width="161" x="20" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-17" edge="1" parent="1" source="hTEe4sk86dXc_tWAAQMp-16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="hTEe4sk86dXc_tWAAQMp-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-16" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=20;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="* 넘겨줘야할 것들&lt;br&gt;- 설정할 카드&lt;br&gt;- 본인 확인&lt;br&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="130" width="161" x="29" y="110" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-19" edge="1" parent="1" source="hTEe4sk86dXc_tWAAQMp-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="hTEe4sk86dXc_tWAAQMp-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-18" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=16;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="&lt;span style=&quot;font-size: 15px;&quot;&gt;적용할 패턴&lt;br&gt;- CardSetting&lt;/span&gt;Agent&lt;br&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;* 함수&lt;br&gt;- 요청 분류(분기)&lt;br&gt;- 카드 등록/ 해지&lt;br&gt;- 비밀번호 변경&lt;br&gt;- 분실/신고/ 재발급(분기)&lt;br&gt;* 각 기능 구현&lt;br&gt;- 별칭 변경&lt;br&gt;- 결과 반환&lt;/span&gt;" vertex="1">
+          <mxGeometry height="220" width="161" x="230" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-21" edge="1" parent="1" source="hTEe4sk86dXc_tWAAQMp-20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="hTEe4sk86dXc_tWAAQMp-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="hTEe4sk86dXc_tWAAQMp-20" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=21;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="* 넘겨줘야할 것들&lt;br&gt;- supervisor 한테 넘겨받은 것들 포함&lt;br&gt;- 대상 카드&lt;br&gt;- 설정 유형&lt;br&gt;- 변경 내용&lt;br&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="190" width="200" x="450" y="560" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

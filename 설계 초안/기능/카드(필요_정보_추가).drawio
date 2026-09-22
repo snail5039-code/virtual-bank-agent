@@ -1,0 +1,138 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="페이지-1" id="7AW16NCYg3PWK49oVS6A">
+    <mxGraphModel dx="2241" dy="777" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="d-0lJsY20urCyQpwh-M0-1" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="d-0lJsY20urCyQpwh-M0-7">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="343" y="225" />
+              <mxPoint x="343" y="225" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-2" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;카드&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="70" x="193" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-3" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-4" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="d-0lJsY20urCyQpwh-M0-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-5" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-6" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="d-0lJsY20urCyQpwh-M0-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="설정" vertex="1">
+          <mxGeometry height="60" width="70" x="373" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-8" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="d-0lJsY20urCyQpwh-M0-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-9" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-10" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-11" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-12" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="은행별 카드&lt;div&gt;조회&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="70" x="143" y="295" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-13" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-14" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="이용내역 조회" vertex="1">
+          <mxGeometry height="60" width="80" x="113" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-15" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="d-0lJsY20urCyQpwh-M0-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-16" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-17" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="요금 조회" vertex="1">
+          <mxGeometry height="60" width="70" x="-7" y="415" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-18" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;align=left;" value="&lt;div style=&quot;text-align: center;&quot;&gt;카드&amp;nbsp; &lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;등록&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: center;&quot;&gt;/해지&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="120" x="353" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-19" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;비밀번호 변경&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="95" x="493" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-20" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;별칭 변경&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="553" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-21" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;분실신고/&lt;/div&gt;&lt;div&gt;재발급&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="95" x="493" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-22" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;결제 계좌 조회&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="95" x="303" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-23" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;실 카드 번호 조회&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="95" x="303" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-24" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;멤버십&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="303" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-25" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;명세서&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="163" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-26" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;분할&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="-57" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-27" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-28" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-30">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-29" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="요금 결제" vertex="1">
+          <mxGeometry height="60" width="70" x="-127" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-30" parent="1" style="rhombus;whiteSpace=wrap;html=1;shapeInside=1;" value="&lt;div&gt;전체&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="70" x="-160" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-31" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.614;entryY=0.033;entryDx=0;entryDy=0;entryPerimeter=0;" target="d-0lJsY20urCyQpwh-M0-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-33" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-32" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=18;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="필요 정보&amp;nbsp;&lt;br&gt;- 대상 카드&lt;br&gt;- 설정 유형&lt;br&gt;- 변경할 내용&lt;br&gt;- 본인 확인" vertex="1">
+          <mxGeometry height="120" width="160" x="118" y="25" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-35" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-34" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=21;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="필요 정보&amp;nbsp;&lt;br&gt;- 은행명&lt;br&gt;- 카드 종류(선택)&lt;br&gt;- 카드 상태(선택)" vertex="1">
+          <mxGeometry height="120" width="160" x="-160" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-37" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-36" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-36" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=23;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="필요 정보&amp;nbsp;&lt;br&gt;- 대상 카드&lt;br&gt;- 조회 기간&lt;br&gt;- 검색어(선택)" vertex="1">
+          <mxGeometry height="120" width="160" x="163" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-39" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-38" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=21;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="필요 정보&amp;nbsp;&lt;br&gt;- 대상 카드&lt;br&gt;- 조회 월&lt;br&gt;- 요금 종류(선택)" vertex="1">
+          <mxGeometry height="120" width="160" x="-360" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-41" edge="1" parent="1" source="d-0lJsY20urCyQpwh-M0-40" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="d-0lJsY20urCyQpwh-M0-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="d-0lJsY20urCyQpwh-M0-40" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;autosizeText=1;fontColor=#000000;darkOpacity=0.05;fillColor=#FFF9B2;strokeColor=none;fillStyle=solid;fontSize=18;direction=west;gradientDirection=north;gradientColor=#FFF2A1;shadow=1;size=20;pointerEvents=1;align=left;" value="필요 정보&amp;nbsp;&lt;br&gt;- 대상 카드&lt;br&gt;- 결제 계좌&lt;br&gt;- 결제 금액&lt;br&gt;- 결제 방식" vertex="1">
+          <mxGeometry height="120" width="160" x="-370" y="510" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
