@@ -1,0 +1,46 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="카드 상태 전이" id="d1">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="920" pageHeight="450" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ac" value="active&lt;br&gt;사용 가능 (초기값)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#c6e0b4;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="70" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lk" value="locked&lt;br&gt;일시 잠금" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cbad;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="90" y="220" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ls" value="lost&lt;br&gt;분실 및 정지" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f4b6b6;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="590" y="220" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cc" value="cancelled&lt;br&gt;해지됨" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="340" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="nt" value="불가 (불가 안내로 빠짐)&lt;br&gt;lost -&gt; active  분실 정지는 해제 불가&lt;br&gt;lost -&gt; locked&lt;br&gt;cancelled -&gt; 무엇이든&lt;br&gt;이미 같은 상태" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="20" y="330" width="280" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="nt2" value="lost 상태에서만 재발급을 신청할 수 있다&lt;br&gt;해지는 목록에서 지우지 않고 cancelled로 둔다&lt;br&gt;(지우면 이용 내역이 참조를 잃는다)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="560" y="340" width="320" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="일시 잠금" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="ac" target="lk">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="분실 신고" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="ac" target="ls">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="해지" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="ac" target="cc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="잠금 해제" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="lk" target="ac">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="분실 신고" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="lk" target="ls">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="해지" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="lk" target="cc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

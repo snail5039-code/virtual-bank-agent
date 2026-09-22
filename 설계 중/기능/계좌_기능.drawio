@@ -1,0 +1,100 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="계좌 기능" id="d1">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1090" pageHeight="535" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="acc" value="계좌&lt;br&gt;AccountAgent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2e75b6;fontColor=#ffffff;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="tr" value="이체" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bdd7ee;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="60" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="qy" value="조회" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bdd7ee;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="245" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="st" value="설정" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bdd7ee;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="375" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" value="즉시 이체" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="45" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" value="조건부 이체 (남길 금액)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="90" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" value="여러 계좌로 나눠 이체" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="135" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="t4" value="이체 예약 / 예약 조회·취소" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="180" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="ax" value="축 (유형과 함께 붙는 값)&lt;br&gt;본인 / 타인&lt;br&gt;자행 / 타행&lt;br&gt;즉시 / 예약&lt;br&gt;&lt;br&gt;처리 규칙&lt;br&gt;거래 내역에 출금 1건 + 입금 1건 기록&lt;br&gt;나눠 이체는 전부 아니면 전무" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="760" y="45" width="290" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="q1" value="계좌 목록 + 잔액" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="230" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="q2" value="잔액 합산 (총액)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="275" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="q3" value="거래 내역 (기간/금액/유형)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="320" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="qn" value="규칙&lt;br&gt;기준일은 상수로 정한다&lt;br&gt;이번 달 = 기준일이 속한 달&lt;br&gt;이번 주 = 월 ~ 일&lt;br&gt;기간은 시작일·종료일 포함&lt;br&gt;카드 결제 건은 사용 카드도 표시" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="760" y="230" width="290" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="이름(별명) 변경" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="370" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="용도 변경 (자유 입력)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="415" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="계좌 등록 / 조회 / 삭제" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="460" width="210" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="sn" value="분기 조건&lt;br&gt;이름 길이 초과·미달 -&gt; 불가&lt;br&gt;같은 소유자 내 이름 중복 -&gt; 불가&lt;br&gt;은행명+계좌번호 이미 등록 -&gt; 기존 안내&lt;br&gt;&lt;br&gt;등록 시 은행명을 함께 받는다&lt;br&gt;(자행·타행 같은 방식)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="760" y="370" width="290" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="acc" target="tr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="acc" target="qy">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="acc" target="st">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="tr" target="t1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="tr" target="t2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="tr" target="t3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="tr" target="t4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="qy" target="q1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="qy" target="q2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="qy" target="q3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="st" target="s1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="st" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="st" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

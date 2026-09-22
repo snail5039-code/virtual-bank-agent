@@ -1,0 +1,145 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="실행 흐름 (분기 0~4)" id="d1">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1180" pageHeight="1210" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="in" value="입력 (자연어)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="360" y="55" width="240" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="b0" value="[분기 0]&lt;br&gt;승인 대기 중인 업무가 있는가?" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cbad;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="120" width="280" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="rsm" value="있음 -&gt; 응답 해석 (승인 / 거절 / 취소 / 수정)&lt;br&gt;승인 : 멈춘 자리에서 재개&lt;br&gt;거절·취소 : 변경 없이 종료&lt;br&gt;수정 : 처리안 갱신 -&gt; 전체 내용 다시 제시 -&gt; 재승인" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#c6e0b4;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="720" y="105" width="400" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="sup" value="Supervisor&lt;br&gt;1단 분류 : 계좌 / 카드" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f4e79;fontColor=#ffffff;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="360" y="215" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="dom" value="도메인 Agent (2단 분류)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2e75b6;fontColor=#ffffff;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="300" width="280" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="rrt" value="내 도메인 아님&lt;br&gt;-&gt; Supervisor 반송 후 재분류 (1회까지)&lt;br&gt;-&gt; 재분류도 실패하면 불가 안내" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f4b6b6;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="720" y="295" width="340" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="fn" value="기능 Agent (3단 분류)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bdd7ee;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="360" y="385" width="240" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" value="[분기 1]&lt;br&gt;필요한 정보가 모두 있는가?" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cbad;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="465" width="280" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ask" value="없음 -&gt; 부족 정보 질문&lt;br&gt;후보가 여러 개면 목록 제시 후 선택&lt;br&gt;답변 -&gt; 분기 1로 복귀" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="720" y="460" width="340" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="[분기 2]&lt;br&gt;실행 가능한 요청인가?" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cbad;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="550" width="280" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="rej" value="불가 -&gt; 사유 안내 후 종료&lt;br&gt;(데이터 변경 없음)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f4b6b6;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="720" y="550" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" value="[분기 3]&lt;br&gt;데이터를 변경하는 업무인가?" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cbad;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="635" width="280" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="read" value="아니오 (조회)&lt;br&gt;-&gt; 실행 -&gt; 결과 반환" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#c6e0b4;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="720" y="635" width="340" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="au" value="인증 (세션 단위)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="380" y="720" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="pr" value="처리안 제시" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="380" y="785" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ap" value="승인 요청 (interrupt)&lt;br&gt;* 이 노드에는 부작용을 두지 않는다" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="360" y="850" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="rv" value="실행 직전 재검증&lt;br&gt;달라졌으면 재승인 / 재요청 안내" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="360" y="935" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ex" value="실행" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bdd7ee;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="380" y="1020" width="200" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="sv" value="저장" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="380" y="1075" width="200" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" value="[분기 4] 실행 / 저장 실패&lt;br&gt;-&gt; 변경 전 상태 유지&lt;br&gt;-&gt; 사유 안내&lt;br&gt;(저장 실패에만 retry)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f4b6b6;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="720" y="1020" width="340" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="out" value="Supervisor 최종 문장 정리 -&gt; 출력" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f4e79;fontColor=#ffffff;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="1130" width="280" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="in" target="b0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="있음" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="b0" target="rsm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="없음" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="b0" target="sup">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="sup" target="dom">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="dom" target="rrt">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="dom" target="fn">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="fn" target="b1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="없음" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="b1" target="ask">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="답변" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;dashed=1;" edge="1" parent="1" source="ask" target="b1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="있음" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="b1" target="b2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="불가" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="b2" target="rej">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="가능" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="b2" target="b3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="아니오" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="b3" target="read">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="예 (변경)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="b3" target="au">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="au" target="pr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="pr" target="ap">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" value="승인" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="ap" target="rv">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="rv" target="ex">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="ex" target="sv">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="ex" target="b4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="sv" target="out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="read" target="out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e22" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="rsm" target="out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e23" value="다음 입력은 분기 0으로 돌아온다" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;dashed=1;" edge="1" parent="1" source="ap" target="b0">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

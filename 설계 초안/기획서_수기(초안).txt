@@ -1,0 +1,209 @@
+virtual-bank-agent 설계 기획서
+
+기본 설계 원칙
+- supervisor 패턴으로 각 Agent로 나누어서 노드 및 그래프를 구현한다.
+- subgraph를 이용하여 각 Agent안에 노드 및 그래프를 invoke 하여 supervisor 그래프에 넣는다.
+- 이체 및 개인정보 변경 같은 민감정보, 돈과 관련된 사항에는 Human in the Loop를 통하여 승인을 받고 실행한다.
+- 공통 부분은 agent를 적용하지 않고 공통 노드로 만든다.
+
+흐름
+입력(자연어) -> Virtual_Bank_Supervisor_Agent -> 각 supervisorAgent(계좌, 카드, 공통) -> 맞는 기능 실행 -> 결과 반환 -> Virtual_Bank_Supervisor_Agent에서 최종 검토(llm이 보기 좋은 말로) 후 출력
+* 각 기능별 공통 노드를 두어 승인, 맥락확인, 사용자 확인, 오류, 복구 등을 담당한다.
+
+1. 계좌
+* 계좌 : AcoountAgent
+- 요청을 받아 분류하고 기능에 맞는 agent에 전달한다.
+** 필요 함수
+- 요청 분류(acoount_router)
+- 필요 정보 확인(check_information)
+- 부족한 정보 질문(check_missing_information)
+- 정보 전달(tool 사용 -> 각 에이전트)
+
+
+* 이체 : TransferAgent
+** state
+- 보내는 계좌
+- 받는 계좌
+- 비밀번호
+- 보낼/받을 은행명
+- 이체 금액
+- 계좌 잔고
+- 예약 시간(선택)
+
+** 필요 함수
+- 계좌 확인(transfer_account_verification)
+- 비밀번호 확인(transfer_check_password)
+- 잔액 확인(transfer_check_balance)
+- 이체 유형 분기/ 요청 분류(transfer_router) -> 타인, 본인, 금융 종류, 예약 설정
+- 예약 여부 확인(transfer_check_reservation)
+- 승인 요청(transfer_request_approval)
+- 이체 실행(transfer_execution)
+- 결과 반환(transfer_result)
+
+** 기능
+- 타인 이체
+- 본인 이체
+- 같은/ 다른 금융 이체
+- 이체 에약 설정
+
+
+* 조회 : AccountQueryAgent
+** state
+- 조회할 계좌
+- 조회 조건
+- 본인 확인
+
+** 필요 함수
+- 요청 분류(account_query_router) 분기
+- 키워드 검색(account_query_keyword_search)
+- 날짜 검색(account_query_date_search)
+- 잔액 확인(account_query_check_balance)
+- 결과 반환(account_query_result)
+
+** 기능
+- 날짜 조회
+- 검색어 조회
+
+
+* 설정 : SettingAgent
+** state
+- 설정할 계좌
+- 본인 확인
+- 이름
+- 용도
+
+** 필요 함수
+- 요청 분류(setting_router)
+- 이름 변경(setting_change_name)
+- 용도 변경(setting_change_use)
+- 결과 반환(setting_result)
+
+** 기능
+- 이름/용도 변경
+
+
+2. 카드
+* 카드 : CardAgent
+** 필요 함수
+- 요청 분류(card_router)
+- 필요 정보 확인(check_information)
+- 부족한 정보 질문(check_missing_information)
+- 조회/결제 정보 전달(tool 사용 -> 각 에이전트)
+
+* 조회/결제 : CardCheckAgent
+** state
+- 조회/결제 할 계좌
+- 본인 확인
+- 대상 카드
+- 조회/ 결제 조건
+- 결제 계좌
+- 결제 금액
+- 결제 방식
+
+** 필요 함수
+- 요청 분류(cardcheck_router)
+- 이용 내역 조회(cardcheck_list_search)
+- 요금 조회(cardcheck_charge_search)
+- 요금 결제(cardcheck_charge_payment)
+- 결제 계좌 조회(cardcheck_card_search)
+- 카드 번호 조회(cardcheck_card_number_search)
+- 맴버십 조회(cardcheck_membership_search)
+- 결과 반환(cardcheck_result)
+
+** 기능
+- 은행별 카드 조회
+* 결제 계좌 조회, 실 카드 번호 조회, 맴버십
+- 이용내역 조회
+- 요금 조회
+* 명세서
+- 요금 결제
+* 전체, 분할 결제
+
+
+
+* 설정 : CardSettingAgent
+** state
+- 설정할 카드
+- 본인 확인
+- 설정 유형
+- 변경 내용
+
+** 필요 함수
+- 요청 분류(card_setting_router)
+- 카드 등록/해지(card_setting_regester)
+- 비밀번호 변경(card_setting_change_password)
+- 분실/신고/재발급(분기, card_setting_state_router)
+-> 분실
+-> 신고
+-> 재발급
+- 별칭 변경(card_setting_change_nickname)
+- 결과 반환(card_setting_result)
+
+** 기능
+- 카드 등록/ 해지
+- 비밀번호 변경
+- 분실 신고/ 재발급 
+- 별칭 변경
+
+
+3. 공통
+* 적용할 패턴
+- CommonWorkflow
+- HITL
+ * interrupt/resume
+- checkpoint/recovery/retry
+
+** 필요 함수
+- 맥락 확인(common_check_context)
+- 부족 정보 질문(common_check_missing_information))
+- 승인/거절/취소(common_response)
+- 오류/복구(common_error)
+- 결과/변경 내용 저장(common_result)
+
+** 기능
+- 추가 질문
+- 대화 확인
+- 승인/거절
+- 불가 안내
+- 사용자 확인
+- 결과 확인
+- 내용 저장
+- 오류 복구
+
+
+## 설계 순서
+1.
+- 계좌 노드 및 그래프 생성
+* 하위 기능 구현
+- 공통 노드 생성
+
+2.
+- 카드 노드 및 그래프 생성
+* 하위 기능 구현
+
+3. 전체 노드 및 그래프 통합
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

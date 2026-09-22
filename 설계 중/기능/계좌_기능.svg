@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1090" height="535" viewBox="0 0 1090 535" font-family="Malgun Gothic, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#555"/></marker></defs>
+<text x="20" y="28" font-size="17" font-weight="bold" fill="#1f4e79">계좌 기능</text>
+<path d="M210.0,85.0 L280.0,82.5" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M135.0,110.0 V177.5 H355.0 V177.5 L355.0,245.0" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M135.0,110.0 V242.5 H355.0 V242.5 L355.0,375.0" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M430.0,82.5 V72.5 H500.0 V72.5 L500.0,62.5" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M430.0,82.5 V95.0 H500.0 V95.0 L500.0,107.5" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M355.0,105.0 V120.0 H605.0 V120.0 L605.0,135.0" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M355.0,105.0 V142.5 H605.0 V142.5 L605.0,180.0" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M430.0,267.5 V257.5 H500.0 V257.5 L500.0,247.5" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M430.0,267.5 V280.0 H500.0 V280.0 L500.0,292.5" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M355.0,290.0 V305.0 H605.0 V305.0 L605.0,320.0" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M430.0,397.5 V392.5 H500.0 V392.5 L500.0,387.5" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M430.0,397.5 V415.0 H500.0 V415.0 L500.0,432.5" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<path d="M355.0,420.0 V440.0 H605.0 V440.0 L605.0,460.0" fill="none" stroke="#555" stroke-width="1.3" marker-end="url(#ar)"/>
+<rect x="60" y="60" width="150" height="50" rx="8" fill="#2e75b6" stroke="#333" stroke-width="1"/>
+<text x="135.0" y="82.0" font-size="11" fill="#ffffff" text-anchor="middle" font-weight="bold">계좌</text>
+<text x="135.0" y="96.0" font-size="11" fill="#ffffff" text-anchor="middle">AccountAgent</text>
+<rect x="280" y="60" width="150" height="45" rx="2" fill="#bdd7ee" stroke="#333" stroke-width="1"/>
+<text x="355.0" y="86.5" font-size="11" fill="#000000" text-anchor="middle">이체</text>
+<rect x="280" y="245" width="150" height="45" rx="2" fill="#bdd7ee" stroke="#333" stroke-width="1"/>
+<text x="355.0" y="271.5" font-size="11" fill="#000000" text-anchor="middle">조회</text>
+<rect x="280" y="375" width="150" height="45" rx="2" fill="#bdd7ee" stroke="#333" stroke-width="1"/>
+<text x="355.0" y="401.5" font-size="11" fill="#000000" text-anchor="middle">설정</text>
+<rect x="500" y="45" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="66.5" font-size="11" fill="#000000" text-anchor="middle">즉시 이체</text>
+<rect x="500" y="90" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="111.5" font-size="11" fill="#000000" text-anchor="middle">조건부 이체 (남길 금액)</text>
+<rect x="500" y="135" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="156.5" font-size="11" fill="#000000" text-anchor="middle">여러 계좌로 나눠 이체</text>
+<rect x="500" y="180" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="201.5" font-size="11" fill="#000000" text-anchor="middle">이체 예약 / 예약 조회·취소</text>
+<rect x="760" y="45" width="290" height="170" rx="2" fill="#f2f2f2" stroke="#333" stroke-width="1"/>
+<text x="905.0" y="85.0" font-size="11" fill="#000000" text-anchor="middle" font-weight="bold">축 (유형과 함께 붙는 값)</text>
+<text x="905.0" y="99.0" font-size="11" fill="#000000" text-anchor="middle">본인 / 타인</text>
+<text x="905.0" y="113.0" font-size="11" fill="#000000" text-anchor="middle">자행 / 타행</text>
+<text x="905.0" y="127.0" font-size="11" fill="#000000" text-anchor="middle">즉시 / 예약</text>
+<text x="905.0" y="141.0" font-size="11" fill="#000000" text-anchor="middle"></text>
+<text x="905.0" y="155.0" font-size="11" fill="#000000" text-anchor="middle">처리 규칙</text>
+<text x="905.0" y="169.0" font-size="11" fill="#000000" text-anchor="middle">거래 내역에 출금 1건 + 입금 1건 기록</text>
+<text x="905.0" y="183.0" font-size="11" fill="#000000" text-anchor="middle">나눠 이체는 전부 아니면 전무</text>
+<rect x="500" y="230" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="251.5" font-size="11" fill="#000000" text-anchor="middle">계좌 목록 + 잔액</text>
+<rect x="500" y="275" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="296.5" font-size="11" fill="#000000" text-anchor="middle">잔액 합산 (총액)</text>
+<rect x="500" y="320" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="341.5" font-size="11" fill="#000000" text-anchor="middle">거래 내역 (기간/금액/유형)</text>
+<rect x="760" y="230" width="290" height="125" rx="2" fill="#f2f2f2" stroke="#333" stroke-width="1"/>
+<text x="905.0" y="261.5" font-size="11" fill="#000000" text-anchor="middle" font-weight="bold">규칙</text>
+<text x="905.0" y="275.5" font-size="11" fill="#000000" text-anchor="middle">기준일은 상수로 정한다</text>
+<text x="905.0" y="289.5" font-size="11" fill="#000000" text-anchor="middle">이번 달 = 기준일이 속한 달</text>
+<text x="905.0" y="303.5" font-size="11" fill="#000000" text-anchor="middle">이번 주 = 월 ~ 일</text>
+<text x="905.0" y="317.5" font-size="11" fill="#000000" text-anchor="middle">기간은 시작일·종료일 포함</text>
+<text x="905.0" y="331.5" font-size="11" fill="#000000" text-anchor="middle">카드 결제 건은 사용 카드도 표시</text>
+<rect x="500" y="370" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="391.5" font-size="11" fill="#000000" text-anchor="middle">이름(별명) 변경</text>
+<rect x="500" y="415" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="436.5" font-size="11" fill="#000000" text-anchor="middle">용도 변경 (자유 입력)</text>
+<rect x="500" y="460" width="210" height="35" rx="2" fill="#ffffff" stroke="#333" stroke-width="1"/>
+<text x="605.0" y="481.5" font-size="11" fill="#000000" text-anchor="middle">계좌 등록 / 조회 / 삭제</text>
+<rect x="760" y="370" width="290" height="125" rx="2" fill="#f2f2f2" stroke="#333" stroke-width="1"/>
+<text x="905.0" y="394.5" font-size="11" fill="#000000" text-anchor="middle" font-weight="bold">분기 조건</text>
+<text x="905.0" y="408.5" font-size="11" fill="#000000" text-anchor="middle">이름 길이 초과·미달 -&gt; 불가</text>
+<text x="905.0" y="422.5" font-size="11" fill="#000000" text-anchor="middle">같은 소유자 내 이름 중복 -&gt; 불가</text>
+<text x="905.0" y="436.5" font-size="11" fill="#000000" text-anchor="middle">은행명+계좌번호 이미 등록 -&gt; 기존 안내</text>
+<text x="905.0" y="450.5" font-size="11" fill="#000000" text-anchor="middle"></text>
+<text x="905.0" y="464.5" font-size="11" fill="#000000" text-anchor="middle">등록 시 은행명을 함께 받는다</text>
+<text x="905.0" y="478.5" font-size="11" fill="#000000" text-anchor="middle">(자행·타행 같은 방식)</text>
+</svg>

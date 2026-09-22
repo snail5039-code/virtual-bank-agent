@@ -1,0 +1,154 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="카드 기능" id="d1">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="846" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="crd" value="카드&lt;br&gt;CardAgent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2e75b6;fontColor=#ffffff;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="60" y="60" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cq" value="조회" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bdd7ee;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="60" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="cb" value="결제" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bdd7ee;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="290" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="cs" value="설정" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bdd7ee;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="530" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="cr" value="재발급" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bdd7ee;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="280" y="700" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" value="은행별 카드 조회" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="45" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="결제 계좌 조회" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="88" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="실 카드 번호 조회 (전체)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="131" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" value="멤버십 조회" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="174" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" value="이용 내역 조회" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="217" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="an" value="규칙&lt;br&gt;조회 결과에 반드시 상태를 포함한다&lt;br&gt;카드 번호는 마스킹하지 않는다&lt;br&gt;(본인 인증을 거친 세션)&lt;br&gt;인증 안 됐으면 인증 먼저&lt;br&gt;&lt;br&gt;이용 내역은 계좌 거래내역 함수를&lt;br&gt;카드 필터만 추가해 재사용" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="780" y="45" width="280" height="205" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" value="요금 조회" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="275" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="명세서 조회" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="318" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" value="전체 결제" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="361" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" value="부분 결제 (금액 지정)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="404" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="b5" value="분할 결제 (할부)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="447" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="b6" value="일괄 결제 (여러 장)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="490" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="bn" value="결제 방식 4가지&lt;br&gt;전체 : 총액 전부&lt;br&gt;부분 : 지금 일부만 (회차 없음)&lt;br&gt;분할 : 앞으로 N개월 (회차 생김)&lt;br&gt;일괄 : 여러 장 한 번에&lt;br&gt;&lt;br&gt;저장 규칙&lt;br&gt;전체·부분·분할 : 한 번에 저장&lt;br&gt;  하나 실패하면 전부 롤백&lt;br&gt;일괄 : 건별 저장&lt;br&gt;  2건째 실패해도 1건째는 유지&lt;br&gt;* 나눠 이체와 정확히 반대" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="780" y="275" width="280" height="248" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" value="카드 등록 / 해지" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="515" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="비밀번호 변경" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="558" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="분실 신고 (분실 및 정지)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="601" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="일시 잠금 / 잠금 해제" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="644" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" value="별칭 변경" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="687" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" value="재발급 신청 / 신청 조회" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="730" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" value="배송지 수정 / 신청 취소" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="500" y="773" width="230" height="33" as="geometry" />
+        </mxCell>
+        <mxCell id="cn" value="카드 상태&lt;br&gt;active 사용가능 / locked 일시잠금&lt;br&gt;lost 분실정지 / cancelled 해지&lt;br&gt;* 분실·도난·부정사용은 모두 lost&lt;br&gt;  사유만 따로 기록&lt;br&gt;&lt;br&gt;신청 상태&lt;br&gt;received 접수 - 수정·취소 가능&lt;br&gt;making 제작중 / shipping 배송중&lt;br&gt;  - 수정·취소 불가&lt;br&gt;&lt;br&gt;정지 후 재발급은 승인을 따로 두 번 받는다" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f2f2f2;fontColor=#000000;strokeColor=#333333;align=center;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="780" y="555" width="280" height="218" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="crd" target="cq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="crd" target="cb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="crd" target="cs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="crd" target="cr">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cq" target="a1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cq" target="a2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cq" target="a3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cq" target="a4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cq" target="a5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cb" target="b1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cb" target="b2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cb" target="b3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cb" target="b4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cb" target="b5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cb" target="b6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cs" target="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cs" target="c2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cs" target="c3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cs" target="c4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cs" target="c5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cr" target="d1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#555555;fontSize=10;" edge="1" parent="1" source="cr" target="d2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
