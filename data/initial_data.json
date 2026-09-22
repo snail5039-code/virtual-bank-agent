@@ -1,34 +1,102 @@
 {
+  "users": [
+    {
+      "owner_id": "user-001",
+      "name": "김도윤",
+      "phone": "010-1234-5678",
+      "ssn_tail": "1234567",
+      "pin": "1234"
+    },
+    {
+      "owner_id": "user-002",
+      "name": "김서연",
+      "phone": "010-2345-6789",
+      "ssn_tail": "2345678",
+      "pin": "2345"
+    },
+    {
+      "owner_id": "user-003",
+      "name": "박지호",
+      "phone": "010-3456-7890",
+      "ssn_tail": "3456789",
+      "pin": "3456"
+    }
+  ],
   "accounts": [
     {
       "account_id": "acc-001",
       "owner_id": "user-001",
       "nickname": "생활비",
-      "balance": 1431800
+      "purpose": "생활비",
+      "balance": 1431800,
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "account_number": "110-001-100001",
+      "account_password": "1234"
     },
     {
       "account_id": "acc-002",
       "owner_id": "user-001",
       "nickname": "저축",
-      "balance": 2280000
+      "purpose": "비상금 저축",
+      "balance": 2280000,
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "account_number": "110-001-100002",
+      "account_password": "1234"
     },
     {
       "account_id": "acc-003",
       "owner_id": "user-001",
       "nickname": "여행 자금",
-      "balance": 390000
+      "purpose": "여행 경비",
+      "balance": 390000,
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "account_number": "110-001-100003",
+      "account_password": "1234"
     },
     {
       "account_id": "acc-004",
       "owner_id": "user-002",
       "nickname": "생활비",
-      "balance": 850000
+      "purpose": "생활비",
+      "balance": 850000,
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "account_number": "110-001-100004",
+      "account_password": "2345"
     },
     {
       "account_id": "acc-005",
       "owner_id": "user-003",
       "nickname": "저축",
-      "balance": 1200000
+      "purpose": "저축",
+      "balance": 1200000,
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "account_number": "110-001-100005",
+      "account_password": "3456"
+    }
+  ],
+  "registered_accounts": [
+    {
+      "registered_id": "reg-001",
+      "owner_id": "user-001",
+      "bank_name": "가상은행",
+      "account_number": "110-001-100004",
+      "holder_name": "김서연",
+      "nickname": "동생 생활비",
+      "account_id": "acc-004"
+    },
+    {
+      "registered_id": "reg-002",
+      "owner_id": "user-001",
+      "bank_name": "미래은행",
+      "account_number": "210-55-778899",
+      "holder_name": "박민수",
+      "nickname": "친구 민수",
+      "account_id": null
     }
   ],
   "cards": [
@@ -39,7 +107,13 @@
       "account_id": "acc-001",
       "status": "active",
       "card_number": "0000-0000-0000-0001",
-      "card_type": "debit"
+      "card_type": "debit",
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "card_password": "1111",
+      "credit_limit": null,
+      "report_reason": null,
+      "reported_at": null
     },
     {
       "card_id": "card-002",
@@ -48,7 +122,13 @@
       "account_id": "acc-003",
       "status": "active",
       "card_number": "0000-0000-0000-0002",
-      "card_type": "debit"
+      "card_type": "debit",
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "card_password": "2222",
+      "credit_limit": null,
+      "report_reason": null,
+      "reported_at": null
     },
     {
       "card_id": "card-003",
@@ -57,7 +137,13 @@
       "account_id": "acc-004",
       "status": "active",
       "card_number": "0000-0000-0000-0003",
-      "card_type": "debit"
+      "card_type": "debit",
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "card_password": "3333",
+      "credit_limit": null,
+      "report_reason": null,
+      "reported_at": null
     },
     {
       "card_id": "card-004",
@@ -66,7 +152,73 @@
       "account_id": "acc-005",
       "status": "active",
       "card_number": "0000-0000-0000-0004",
-      "card_type": "debit"
+      "card_type": "debit",
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "card_password": "4444",
+      "credit_limit": null,
+      "report_reason": null,
+      "reported_at": null
+    },
+    {
+      "card_id": "card-005",
+      "owner_id": "user-001",
+      "name": "생활비 신용카드",
+      "account_id": "acc-001",
+      "status": "active",
+      "card_number": "0000-0000-0000-0005",
+      "card_type": "credit",
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "card_password": "5555",
+      "credit_limit": 3000000,
+      "report_reason": null,
+      "reported_at": null
+    },
+    {
+      "card_id": "card-006",
+      "owner_id": "user-001",
+      "name": "여행 신용카드",
+      "account_id": "acc-003",
+      "status": "active",
+      "card_number": "0000-0000-0000-0006",
+      "card_type": "credit",
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "card_password": "6666",
+      "credit_limit": 2000000,
+      "report_reason": null,
+      "reported_at": null
+    },
+    {
+      "card_id": "card-007",
+      "owner_id": "user-001",
+      "name": "구 생활비 카드",
+      "account_id": "acc-001",
+      "status": "lost",
+      "card_number": "0000-0000-0000-0007",
+      "card_type": "debit",
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "card_password": "7777",
+      "credit_limit": null,
+      "report_reason": "분실",
+      "reported_at": "2026-09-14T10:00:00+09:00"
+    },
+    {
+      "card_id": "card-008",
+      "owner_id": "user-001",
+      "name": "구 여행 카드",
+      "account_id": "acc-003",
+      "status": "lost",
+      "card_number": "0000-0000-0000-0008",
+      "card_type": "debit",
+      "bank_code": "001",
+      "bank_name": "가상은행",
+      "card_password": "8888",
+      "credit_limit": null,
+      "report_reason": "도난",
+      "reported_at": "2026-09-09T14:00:00+09:00"
     }
   ],
   "transactions": [
@@ -271,6 +423,204 @@
       "merchant": "편의점"
     }
   ],
+  "card_usages": [
+    {
+      "usage_id": "use-001",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "amount": 78000,
+      "occurred_at": "2026-07-06T11:00:00+09:00",
+      "merchant": "마트"
+    },
+    {
+      "usage_id": "use-002",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "amount": 110000,
+      "occurred_at": "2026-07-14T19:00:00+09:00",
+      "merchant": "주유소"
+    },
+    {
+      "usage_id": "use-003",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "amount": 92000,
+      "occurred_at": "2026-07-25T12:00:00+09:00",
+      "merchant": "식당"
+    },
+    {
+      "usage_id": "use-004",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "amount": 150000,
+      "occurred_at": "2026-08-05T15:00:00+09:00",
+      "merchant": "백화점"
+    },
+    {
+      "usage_id": "use-005",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "amount": 88000,
+      "occurred_at": "2026-08-18T11:00:00+09:00",
+      "merchant": "마트"
+    },
+    {
+      "usage_id": "use-006",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "amount": 82000,
+      "occurred_at": "2026-08-26T19:00:00+09:00",
+      "merchant": "식당"
+    },
+    {
+      "usage_id": "use-007",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "amount": 250000,
+      "occurred_at": "2026-09-03T16:00:00+09:00",
+      "merchant": "백화점"
+    },
+    {
+      "usage_id": "use-008",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "amount": 96000,
+      "occurred_at": "2026-09-11T11:00:00+09:00",
+      "merchant": "마트"
+    },
+    {
+      "usage_id": "use-009",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "amount": 106000,
+      "occurred_at": "2026-09-17T19:00:00+09:00",
+      "merchant": "식당"
+    },
+    {
+      "usage_id": "use-010",
+      "owner_id": "user-001",
+      "card_id": "card-006",
+      "amount": 95000,
+      "occurred_at": "2026-08-15T09:00:00+09:00",
+      "merchant": "항공사"
+    },
+    {
+      "usage_id": "use-011",
+      "owner_id": "user-001",
+      "card_id": "card-006",
+      "amount": 138000,
+      "occurred_at": "2026-09-08T14:00:00+09:00",
+      "merchant": "호텔"
+    }
+  ],
+  "card_statements": [
+    {
+      "statement_id": "stmt-001",
+      "card_id": "card-005",
+      "owner_id": "user-001",
+      "billing_month": "2026-07",
+      "total_amount": 280000,
+      "paid_amount": 280000,
+      "remaining_amount": 0,
+      "due_date": "2026-08-15",
+      "status": "paid",
+      "items": [
+        "use-001",
+        "use-002",
+        "use-003"
+      ],
+      "paid_at": "2026-08-14T10:00:00+09:00",
+      "paid_account": "acc-001"
+    },
+    {
+      "statement_id": "stmt-002",
+      "card_id": "card-005",
+      "owner_id": "user-001",
+      "billing_month": "2026-08",
+      "total_amount": 320000,
+      "paid_amount": 0,
+      "remaining_amount": 320000,
+      "due_date": "2026-09-15",
+      "status": "unpaid",
+      "items": [
+        "use-004",
+        "use-005",
+        "use-006"
+      ],
+      "paid_at": null,
+      "paid_account": null
+    },
+    {
+      "statement_id": "stmt-003",
+      "card_id": "card-005",
+      "owner_id": "user-001",
+      "billing_month": "2026-09",
+      "total_amount": 452000,
+      "paid_amount": 0,
+      "remaining_amount": 452000,
+      "due_date": "2026-10-15",
+      "status": "unpaid",
+      "items": [
+        "use-007",
+        "use-008",
+        "use-009"
+      ],
+      "paid_at": null,
+      "paid_account": null
+    },
+    {
+      "statement_id": "stmt-004",
+      "card_id": "card-006",
+      "owner_id": "user-001",
+      "billing_month": "2026-08",
+      "total_amount": 95000,
+      "paid_amount": 50000,
+      "remaining_amount": 45000,
+      "due_date": "2026-09-15",
+      "status": "partial",
+      "items": [
+        "use-010"
+      ],
+      "paid_at": "2026-09-12T10:00:00+09:00",
+      "paid_account": "acc-003"
+    },
+    {
+      "statement_id": "stmt-005",
+      "card_id": "card-006",
+      "owner_id": "user-001",
+      "billing_month": "2026-09",
+      "total_amount": 138000,
+      "paid_amount": 0,
+      "remaining_amount": 138000,
+      "due_date": "2026-10-15",
+      "status": "unpaid",
+      "items": [
+        "use-011"
+      ],
+      "paid_at": null,
+      "paid_account": null
+    }
+  ],
+  "card_installments": [],
+  "scheduled_transfers": [],
+  "memberships": [
+    {
+      "membership_id": "mb-001",
+      "owner_id": "user-001",
+      "card_id": "card-005",
+      "name": "가상포인트",
+      "grade": "골드",
+      "points": 32400
+    },
+    {
+      "membership_id": "mb-002",
+      "owner_id": "user-001",
+      "card_id": "card-006",
+      "name": "여행 마일리지",
+      "grade": "실버",
+      "points": 8700
+    }
+  ],
   "addresses": [
     {
       "address_id": "addr-home",
@@ -285,8 +635,24 @@
       "address": "가상시 가상구 회사로 20"
     }
   ],
-  "requests": [],
-  "reissue_applications": [],
+  "reissue_applications": [
+    {
+      "application_id": "app-001",
+      "owner_id": "user-001",
+      "card_id": "card-007",
+      "address_id": "addr-home",
+      "status": "making",
+      "created_at": "2026-09-15T11:00:00+09:00"
+    },
+    {
+      "application_id": "app-002",
+      "owner_id": "user-001",
+      "card_id": "card-008",
+      "address_id": "addr-work",
+      "status": "shipping",
+      "created_at": "2026-09-10T09:00:00+09:00"
+    }
+  ],
   "bills": [
     {
       "bill_id": "bill-001",
@@ -328,5 +694,6 @@
       "due_date": "2026-09-18",
       "status": "unpaid"
     }
-  ]
+  ],
+  "requests": []
 }
