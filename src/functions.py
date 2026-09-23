@@ -1,3 +1,13 @@
-# 선택한 계좌·이체·카드·청구서 업무를 Python 함수로 구현합니다.
-# 대상과 처리 조건을 검증하고 데이터를 조회하거나 변경합니다.
-# 필요한 함수를 에이전트가 호출할 Tool로 제공합니다.
+# 계좌·카드 업무를 처리하는 Python 함수들입니다.
+# 금액 같은 숫자는 여기서 낸 값을 그대로 씁니다. LLM 이 만들지 않습니다.
+
+import data_store
+
+# 로그인한 사용자입니다. 인증(3-5 단계)을 만들기 전까지는 고정해 둡니다.
+CURRENT_USER = "user-001"
+
+
+def get_accounts(owner_id):
+    # 이 사용자의 계좌만 골라 돌려줍니다. 다른 사람 계좌는 빼야 합니다.
+    data = data_store.load()
+    return [account for account in data["accounts"] if account["owner_id"] == owner_id]
