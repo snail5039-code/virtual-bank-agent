@@ -2,7 +2,8 @@
 #
 #   account_router : 계좌 요청이 조회 / 이체 / 설정 중 무엇인지 고릅니다
 #   account_query  : 계좌 목록과 잔액을 보여줍니다
-#   account_todo   : 이체·설정은 아직 준비 중이라고 안내합니다
+#   account_todo   : 설정은 아직 준비 중이라고 안내합니다
+#   (이체는 이체 에이전트 그래프로 넘깁니다)
 
 from typing import Literal
 
@@ -62,4 +63,6 @@ def route_by_task(state: BankState):
     # 고른 업무에 따라 다음 노드를 정합니다.
     if state["task"] == "조회":
         return "account_query"
+    if state["task"] == "이체":
+        return "transfer"
     return "account_todo"
