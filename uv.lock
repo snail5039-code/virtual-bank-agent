@@ -948,7 +948,7 @@ wheels = [
 [[package]]
 name = "virtual-bank-agent"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "google-genai" },
     { name = "langchain" },

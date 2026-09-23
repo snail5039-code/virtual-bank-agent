@@ -11,3 +11,6 @@ wheels/
 
 # 실행 로그
 logs/
+
+# API 키
+.env

@@ -16,10 +16,3 @@ dependencies = [
     "python-dotenv>=1.2.3",
     "requests>=2.34.2",
 ]
-
-[project.scripts]
-virtual-bank-agent = "virtual_bank_agent:main"
-
-[build-system]
-requires = ["uv_build>=0.12.17,<0.13.0"]
-build-backend = "uv_build"
