@@ -117,32 +117,36 @@ def transfer_confirm_node(state: BankState):
 
 def transfer_ask_node(state: BankState):
     if not state.get("from_account"):
-        question = "어느 계좌에서 보낼까요?"
+        ask = "[출금] 돈을 보낼 계좌를 알려주세요."
     elif not state.get("to_account"):
-        question = "어느 계좌로 보낼까요?"
+        ask = "[입금] 돈을 받을 계좌를 알려주세요."
     else:
-        question = "얼마를 보낼까요?"
+        ask = "[금액] 얼마를 보낼까요?"
 
     # 지금까지 알아낸 것을 같이 보여줍니다. 그래야 무엇을 알아들었는지 알 수 있습니다.
-    known = []
-    if state.get("from_account"):
-        known.append("출금: " + state["from_name"])
-    if state.get("to_account"):
-        known.append("입금: " + state["to_name"])
-    if state.get("amount"):
-        known.append("금액: %s원" % format(state["amount"], ","))
-    if known:
-        question = "(" + " / ".join(known) + ")\n" + question
+    from_text = state["from_name"] if state.get("from_account") else "?"
+    to_text = state["to_name"] if state.get("to_account") else "?"
+    amount_text = format(state["amount"], ",") + "원" if state.get("amount") else "?"
+
+    question = "\n".join([
+        "=" * 40,
+        "  출금 : " + from_text,
+        "  입금 : " + to_text,
+        "  금액 : " + amount_text,
+        "-" * 40,
+        "  " + ask,
+        "=" * 40,
+    ])
 
     with logger.get_logger().node("transfer_ask"):
-        logger.get_logger().interrupt_pause("질문: " + question)
+        logger.get_logger().interrupt_pause("질문: " + ask)
 
     answer = interrupt(question).strip()
 
     if answer == "취소":
         return {"error": "이체를 취소했습니다."}
     # 답을 새 입력으로 삼아 extract 로 돌아갑니다. 무엇을 물었는지도 같이 넘깁니다.
-    return {"query": answer, "question": question}
+    return {"query": answer, "question": ask}
 
 
 def transfer_ready_node(state: BankState):
