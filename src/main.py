@@ -9,6 +9,7 @@ from datetime import datetime
 
 import data_store
 import logger
+from agents.supervisor.graph import bank_graph
 
 # 프로그램을 켤 때 세션 아이디를 하나 만들고, 끝날 때까지 이것만 씁니다.
 thread_id = "session-" + datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -16,8 +17,8 @@ config = {"configurable": {"thread_id": thread_id}}
 
 
 def respond(user_input):
-    # 지금은 받은 말을 그대로 돌려줍니다. 1-2 단계에서 그래프 호출로 바꿉니다.
-    return "받은 입력: " + user_input
+    result = bank_graph.invoke({"query": user_input}, config=config)
+    return result["answer"]
 
 
 def main():
