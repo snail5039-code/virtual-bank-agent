@@ -9,6 +9,7 @@ import sys
 from datetime import datetime
 
 from langgraph.types import Command
+from rich.console import Console
 
 import data_store
 import logger
@@ -18,6 +19,7 @@ from state import new_request
 # 프로그램을 켤 때 세션 아이디를 하나 만들고, 끝날 때까지 이것만 씁니다.
 thread_id = "session-" + datetime.now().strftime("%Y%m%d-%H%M%S")
 config = {"configurable": {"thread_id": thread_id}}
+console = Console()
 
 
 def is_waiting():
@@ -57,7 +59,8 @@ def main():
 
         log.turn_start(user_input, thread_id)
         try:
-            answer = respond(user_input)
+            with console.status("[bold green]에이전트가 작업 중입니다...[/bold green]", spinner="dots"):
+                answer = respond(user_input)
             log.turn_end("질문 대기" if is_waiting() else "완료")
         except Exception as e:
             log.error(e)
