@@ -22,3 +22,11 @@ def find_accounts(owner_id, name):
         return []
     return [account for account in get_accounts(owner_id)
             if name in account["nickname"] or name in account["bank_name"]]
+
+
+def get_account(owner_id, account_id):
+    # ID 로 계좌 하나를 찾습니다. 없거나 다른 사람 계좌면 None 입니다.
+    for account in get_accounts(owner_id):
+        if account["account_id"] == account_id:
+            return account
+    return None

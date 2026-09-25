@@ -4,8 +4,11 @@
 #   transfer_check   : 계좌 이름을 ID 로 바꾸고, 무엇이 부족한지 봅니다 (Python)
 #   transfer_confirm : 후보가 여러 개면 번호를 고르게 합니다 (interrupt)
 #   transfer_ask     : 부족한 정보를 묻습니다 (interrupt)
-#   transfer_ready   : 정보가 다 모였다고 알려줍니다 (실제 이체는 2-4 단계)
+#   transfer_propose : 처리안을 만듭니다. 계산만 하고 저장하지 않습니다 (Python)
+#   transfer_revise  : 승인 전에 바꾼 내용을 반영합니다 (LLM)
+#   transfer_approved: 승인되었다고 알려줍니다 (실제 이체는 2-4 단계)
 #   transfer_fail    : 진행할 수 없는 사유를 알려줍니다
+#   (승인·응답 해석·거절은 공통 노드를 씁니다)
 #
 # interrupt() 로 멈췄다가 답을 받으면 그 노드를 처음부터 다시 실행합니다.
 # 그래서 interrupt 가 있는 노드에서는 묻고 답을 받는 일만 합니다.
@@ -18,7 +21,8 @@ from pydantic import BaseModel, Field
 
 import functions
 import logger
-from agents.transfer.prompts import extract_prompt
+from agents.common.nodes import question
+from agents.transfer.prompts import extract_prompt, revise_prompt
 from model import llm
 from state import BankState
 
@@ -100,12 +104,12 @@ def transfer_confirm_node(state: BankState):
     lines = ["'%s' 에 맞는 계좌가 여러 개입니다. 번호를 골라 주세요." % state[slot + "_name"]]
     for number, account in enumerate(candidates, start=1):
         lines.append("%d. %s (%s)" % (number, account["nickname"], account["account_number"]))
-    question = "\n".join(lines)
+    text = "\n".join(lines)
 
     with logger.get_logger().node("transfer_confirm"):
         logger.get_logger().interrupt_pause("사용자 확인 (후보 %d개)" % len(candidates))
 
-    answer = interrupt(question).strip()
+    answer = interrupt(question(text)).strip()
 
     if answer == "취소":
         return {"error": "이체를 취소했습니다."}
@@ -128,7 +132,7 @@ def transfer_ask_node(state: BankState):
     to_text = state["to_name"] if state.get("to_account") else "?"
     amount_text = format(state["amount"], ",") + "원" if state.get("amount") else "?"
 
-    question = "\n".join([
+    text = "\n".join([
         "=" * 40,
         "  출금 : " + from_text,
         "  입금 : " + to_text,
@@ -141,7 +145,7 @@ def transfer_ask_node(state: BankState):
     with logger.get_logger().node("transfer_ask"):
         logger.get_logger().interrupt_pause("질문: " + ask)
 
-    answer = interrupt(question).strip()
+    answer = interrupt(question(text)).strip()
 
     if answer == "취소":
         return {"error": "이체를 취소했습니다."}
@@ -149,9 +153,59 @@ def transfer_ask_node(state: BankState):
     return {"query": answer, "question": ask}
 
 
-def transfer_ready_node(state: BankState):
-    with logger.get_logger().node("transfer_ready"):
-        answer = "%s → %s  %s원\n이체 정보가 모두 모였습니다. (실제 이체는 2-4 단계에서 연결합니다)" % (
+def transfer_propose_node(state: BankState):
+    # 처리안을 만듭니다. 잔액은 읽기만 합니다. 저장은 승인된 뒤에만 합니다.
+    log = logger.get_logger()
+    with log.node("transfer_propose"):
+        from_account = functions.get_account(functions.CURRENT_USER, state["from_account"])
+        to_account = functions.get_account(functions.CURRENT_USER, state["to_account"])
+        amount = state["amount"]
+
+        proposal = {
+            "task": "이체",
+            "rows": [
+                ["출금", "%s (%s)" % (from_account["nickname"], from_account["account_number"])],
+                ["입금", "%s (%s)" % (to_account["nickname"], to_account["account_number"])],
+                ["금액", format(amount, ",") + "원"],
+                ["출금 후 잔액", format(from_account["balance"] - amount, ",") + "원"],
+            ],
+        }
+        log.detail("처리안  %s → %s  %s원  (출금 잔액 %s)" % (
+            from_account["account_id"], to_account["account_id"],
+            format(amount, ","), format(from_account["balance"], ",")))
+
+    return {"proposal": proposal, "approval": "대기"}
+
+
+def transfer_revise_node(state: BankState):
+    # "아니, 5만원만" 처럼 바꾼 칸만 새 값으로 덮어씁니다.
+    # 계좌 이름이 바뀌면 찾아 둔 ID 를 비워서 check 가 다시 찾게 합니다.
+    log = logger.get_logger()
+    with log.node("transfer_revise"):
+        prompt = revise_prompt.format(
+            from_name=state["from_name"], to_name=state["to_name"], amount=state["amount"])
+        result = llm_with_transfer_output.invoke([
+            SystemMessage(content=prompt),
+            HumanMessage(content=state["query"]),
+        ])
+        log.detail("수정  출금=%s  입금=%s  금액=%s" % (result.from_name, result.to_name, result.amount))
+
+        update = {}
+        if result.from_name and result.from_name != state["from_name"]:
+            update["from_name"] = result.from_name
+            update["from_account"] = None
+        if result.to_name and result.to_name != state["to_name"]:
+            update["to_name"] = result.to_name
+            update["to_account"] = None
+        if result.amount and result.amount != state["amount"]:
+            update["amount"] = result.amount
+
+    return update
+
+
+def transfer_approved_node(state: BankState):
+    with logger.get_logger().node("transfer_approved"):
+        answer = "%s → %s  %s원\n승인되었습니다. (실제 이체는 2-4 단계에서 연결합니다)" % (
             state["from_name"], state["to_name"], format(state["amount"], ","))
         last_transfer = "출금=%s, 입금=%s" % (state["from_name"], state["to_name"])
     return {"answer": answer, "last_transfer": last_transfer}
@@ -171,7 +225,7 @@ def route_after_check(state: BankState):
         return "transfer_confirm"
     if not state.get("from_account") or not state.get("to_account") or not state.get("amount"):
         return "transfer_ask"
-    return "transfer_ready"
+    return "transfer_propose"
 
 
 def route_after_confirm(state: BankState):
@@ -184,3 +238,14 @@ def route_after_ask(state: BankState):
     if state.get("error"):
         return "transfer_fail"
     return "transfer_extract"
+
+
+def route_after_interpret(state: BankState):
+    decision = state["approval"]
+    if decision == "승인":
+        return "transfer_approved"
+    if decision in ("거절", "취소"):
+        return "common_reject"
+    if decision == "수정":
+        return "transfer_revise"
+    return "common_approve"         # 모름 : 다시 묻습니다

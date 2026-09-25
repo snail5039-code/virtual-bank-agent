@@ -26,6 +26,10 @@ class BankState(TypedDict):
     question: str           # 방금 사용자에게 한 질문 (짧은 답이 어느 칸인지 알려고)
     error: str              # 더 진행할 수 없을 때 사유
 
+    # 승인
+    proposal: dict          # 처리안. 계산만 한 결과이고 아직 저장하지 않았습니다
+    approval: str           # 대기 / 승인 / 거절 / 취소 / 수정 / 모름
+
     # 맥락 (새 요청에도 남겨 둡니다)
     last_transfer: str      # 직전 이체. 예) "출금=생활비, 입금=저축"
 
@@ -38,4 +42,5 @@ def new_request(query):
         "from_name": None, "to_name": None,
         "from_account": None, "to_account": None, "amount": None,
         "candidates": None, "confirm_for": None, "question": None, "error": None,
+        "proposal": None, "approval": None,
     }

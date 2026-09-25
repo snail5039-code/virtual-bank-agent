@@ -1,6 +1,6 @@
 # 사용자 입력을 반복해서 받고 응답을 출력합니다.
 # 같은 대화 세션(thread_id)을 유지하고, 종료 명령을 처리합니다.
-# 그래프가 질문하고 멈춰 있으면, 다음 입력을 그 질문의 답으로 넘깁니다.
+# 그래프가 질문하거나 승인을 기다리며 멈춰 있으면, 다음 입력을 그 답으로 넘깁니다. (분기 0)
 #
 # 실행 : uv run python src/main.py
 #        uv run python src/main.py --debug   (로그를 화면에도 띄웁니다)
@@ -13,6 +13,7 @@ from rich.console import Console
 
 import data_store
 import logger
+from agents.common.nodes import APPROVAL, QUESTION, common_pending_check
 from agents.supervisor.graph import bank_graph
 from state import new_request
 
@@ -22,22 +23,31 @@ config = {"configurable": {"thread_id": thread_id}}
 console = Console()
 
 
-def is_waiting():
-    # 그래프가 질문하고 멈춰 있으면 다음에 실행할 노드가 남아 있습니다.
-    return bool(bank_graph.get_state(config).next)
-
-
-def respond(user_input):
-    if is_waiting():
-        # 멈춘 자리에서 이어갑니다. 입력은 질문에 대한 답입니다.
+def respond(user_input, log):
+    # [분기 0] 멈춰 있는 업무가 있으면 입력을 그 답으로 넘기고, 없으면 새 요청으로 시작합니다.
+    pending = common_pending_check(bank_graph, config)
+    if pending == APPROVAL:
+        log.interrupt_resume()
+        result = bank_graph.invoke(Command(resume=user_input), config=config)
+    elif pending == QUESTION:
+        log.branch(0, "질문 대기 있음 → 답으로 재개")
         result = bank_graph.invoke(Command(resume=user_input), config=config)
     else:
-        # 새 요청입니다.
+        log.branch(0, "대기 중인 업무 없음 → 새 요청")
         result = bank_graph.invoke(new_request(user_input), config=config)
 
     if "__interrupt__" in result:
-        return result["__interrupt__"][0].value     # 그래프가 던진 질문
+        return result["__interrupt__"][0].value["text"]     # 그래프가 던진 질문이나 처리안
     return result["answer"]
+
+
+def turn_result():
+    pending = common_pending_check(bank_graph, config)
+    if pending == APPROVAL:
+        return "승인 대기"
+    if pending == QUESTION:
+        return "질문 대기"
+    return "완료"
 
 
 def main():
@@ -60,8 +70,8 @@ def main():
         log.turn_start(user_input, thread_id)
         try:
             with console.status("[bold green]에이전트가 작업 중입니다...[/bold green]", spinner="dots"):
-                answer = respond(user_input)
-            log.turn_end("질문 대기" if is_waiting() else "완료")
+                answer = respond(user_input, log)
+            log.turn_end(turn_result())
         except Exception as e:
             log.error(e)
             log.turn_end("오류")
