@@ -30,10 +30,12 @@ class BankState(TypedDict):
     error: str              # 더 진행할 수 없을 때 사유
 
     # 계좌 설정에 필요한 정보
+    setting_action: str     # 할 일 (변경 / 등록 / 삭제 / 조회)
     target_name: str        # 사용자가 말한 바꿀 계좌 이름
-    target_account: str     # 찾아낸 바꿀 계좌 ID
+    target_account: str     # 찾아낸 대상 ID (내 계좌 account_id / 등록 계좌 registered_id)
     setting_field: str      # 바꿀 항목 (별명 / 용도)
     new_value: str          # 새 값
+    reg_info: dict          # 등록할 상대 계좌 {bank_name, account_number, holder_name, nickname}
 
     # 승인
     proposal: dict          # 처리안. 계산만 한 결과이고 아직 저장하지 않았습니다
@@ -59,7 +61,8 @@ def new_request(query):
         "from_name": None, "to_name": None,
         "from_account": None, "to_account": None, "amount": None, "keep_amount": None,
         "splits": None, "targets": None,
-        "target_name": None, "target_account": None, "setting_field": None, "new_value": None,
+        "setting_action": None, "target_name": None, "target_account": None,
+        "setting_field": None, "new_value": None, "reg_info": None,
         "candidates": None, "confirm_for": None, "question": None, "error": None,
         "proposal": None, "approval": None, "new_data": None, "result": None,
         "auth_tries": 0,

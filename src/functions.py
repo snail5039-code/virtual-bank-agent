@@ -214,6 +214,52 @@ def change_setting(data, account_id, field, value):
     account[SETTING_FIELDS[field]] = value.strip()
 
 
+def get_registered(owner_id):
+    # 등록 계좌(돈을 보낼 상대 계좌 주소록)를 돌려줍니다. 잔액은 없습니다.
+    data = data_store.load()
+    return [r for r in data["registered_accounts"] if r["owner_id"] == owner_id]
+
+
+def find_registered(owner_id, name):
+    # 별명이나 예금주 이름으로 등록 계좌를 찾습니다. 0개 없음 / 1개 확정 / 2개 이상 고르게 합니다.
+    name = name.replace("계좌", "").strip()
+    return [r for r in get_registered(owner_id) if name and (name in r["nickname"] or name in r["holder_name"])]
+
+
+def check_register(owner_id, info):
+    # 계좌를 등록할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
+    if not info.get("bank_name") or not info.get("account_number") or not info.get("holder_name"):
+        return "등록하려면 은행, 계좌번호, 예금주 이름이 필요합니다. (예: 미래은행 210-11-223344 이영희 계좌 등록해줘)"
+    if not 1 <= len(info["nickname"].strip()) <= MAX_SETTING_LEN:
+        return "별명은 1~%d자로 정해 주세요." % MAX_SETTING_LEN
+    for r in get_registered(owner_id):
+        if r["account_number"] == info["account_number"]:
+            return "이미 등록한 계좌입니다. (%s)" % r["nickname"]
+    return None
+
+
+def register_account(data, owner_id, info):
+    # data 에 등록 계좌를 한 줄 덧붙입니다. 파일에 저장하지는 않습니다.
+    # 가상은행 계좌면 그 계좌 ID 를 이어 둡니다. 다른 은행이면 None 입니다.
+    linked = next((a["account_id"] for a in data["accounts"]
+                   if a["bank_name"] == info["bank_name"] and a["account_number"] == info["account_number"]), None)
+    numbers = [int(r["registered_id"].split("-")[1]) for r in data["registered_accounts"]]
+    data["registered_accounts"].append({
+        "registered_id": "reg-%03d" % (max(numbers, default=0) + 1),
+        "owner_id": owner_id,
+        "bank_name": info["bank_name"],
+        "account_number": info["account_number"],
+        "holder_name": info["holder_name"],
+        "nickname": info["nickname"].strip(),
+        "account_id": linked,
+    })
+
+
+def delete_registered(data, registered_id):
+    # data 에서 등록 계좌를 뺍니다. 파일에 저장하지는 않습니다.
+    data["registered_accounts"] = [r for r in data["registered_accounts"] if r["registered_id"] != registered_id]
+
+
 def get_account(owner_id, account_id):
     # ID 로 계좌 하나를 찾습니다. 없거나 다른 사람 계좌면 None 입니다.
     for account in get_accounts(owner_id):
