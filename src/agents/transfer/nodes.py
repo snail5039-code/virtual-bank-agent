@@ -110,49 +110,18 @@ def transfer_check_node(state: BankState):
         if from_account and from_account == to_account:
             update["error"] = "출금 계좌와 입금 계좌가 같습니다."
 
-        # 조건부 이체 : 이체액 = 잔액 - 남길 금액. Python 이 계산합니다 (원칙 6).
-        keep = state.get("keep_amount")
-        if keep is not None and from_account:
-            balance = functions.get_account(functions.CURRENT_USER, from_account)["balance"]
-            update["amount"] = balance - keep
-            log.detail("조건부  잔액 %s - 남길 %s = 이체 %s" % (
-                format(balance, ","), format(keep, ","), format(balance - keep, ",")))
-
-        # 입금 목록(targets)을 만듭니다. 한 곳이면 1개, 나눠 이체면 여러 개입니다.
-        # 처리안과 실행은 이 목록만 봅니다.
-        amount = update.get("amount", state.get("amount"))
-        targets = None
-        if state.get("splits") and from_account:
-            targets = []
-            for split in state["splits"]:
-                found = functions.find_accounts(functions.CURRENT_USER, split["to_name"])
-                log.resolve(split["to_name"], len(found), found[0]["account_id"] if found else None)
-                if len(found) != 1:
-                    update["error"] = "'%s' 계좌를 하나로 정할 수 없습니다. 정확한 이름으로 다시 요청해 주세요." % split["to_name"]
-                    return update
-                targets.append({"to_account": found[0]["account_id"], "to_name": found[0]["nickname"],
-                                "amount": split["amount"] or 0})
-        elif from_account and to_account and amount is not None:
-            targets = [{"to_account": to_account, "to_name": update.get("to_name") or state["to_name"],
-                        "amount": amount}]
-
-        # [분기 2] 실행할 수 있는지 봅니다.
-        if keep is not None and keep < 0:
-            update["error"] = "남길 금액은 0원 이상이어야 합니다."
-        elif keep is not None and amount is not None and amount <= 0:
-            update["error"] = "잔액이 %s원이라 %s원을 남기면 보낼 금액이 없습니다." % (
-                format(amount + keep, ","), format(keep, ","))
-        elif targets:
-            total = sum(target["amount"] for target in targets)
-            balance = functions.get_account(functions.CURRENT_USER, from_account)["balance"]
-            if any(target["amount"] <= 0 for target in targets):
-                update["error"] = "이체 금액은 0원보다 커야 합니다."
-            elif any(target["to_account"] == from_account for target in targets):
-                update["error"] = "출금 계좌와 입금 계좌가 같습니다."
-            elif balance < total:
-                update["error"] = "잔액이 부족합니다. (잔액 %s원 / 보낼 금액 %s원)" % (
-                    format(balance, ","), format(total, ","))
+        # 입금 목록을 만들고, 실행할 수 있는지 봅니다. 계산은 functions 가 합니다 (원칙 6).
+        targets, error = functions.build_targets(
+            functions.CURRENT_USER, from_account, to_account,
+            update.get("to_name") or state.get("to_name"), state.get("amount"),
+            state.get("keep_amount"), state.get("splits"))
+        if targets and not error:
+            error = functions.check_transfer(functions.CURRENT_USER, from_account, targets, state.get("keep_amount"))
+        if error:
+            update["error"] = error
         update["targets"] = targets
+        if targets:
+            log.detail("입금 목록  %s" % ", ".join("%s %s원" % (t["to_name"], format(t["amount"], ",")) for t in targets))
 
     return update
 
@@ -274,33 +243,14 @@ def transfer_execute_node(state: BankState):
     with log.node("transfer_execute"):
         data = data_store.load()
 
-        # 조건부 이체 : 승인한 뒤 잔액이 바뀌면 이체액도 바뀝니다. 그러면 실행하지 않고 다시 요청하게 합니다.
-        keep = state.get("keep_amount")
-        if keep is not None:
-            balance = next(a["balance"] for a in data["accounts"] if a["account_id"] == state["from_account"])
-            if balance - keep != state["amount"]:
-                log.detail("재검증 실패  이체액 %s → %s" % (format(state["amount"], ","), format(balance - keep, ",")))
-                return {"result": "실패", "error": "잔액이 바뀌어 이체할 금액이 달라졌습니다. "
-                        "이체하지 않았습니다. 다시 요청해 주세요."}
+        # 하나라도 안 되면 new_data 를 넘기지 않으므로 아무것도 저장되지 않습니다 (전부 아니면 전무).
+        error = functions.transfer_all(data, state["from_account"], state["targets"], state.get("keep_amount"))
+        if error:
+            log.detail("재검증 실패  " + error)
+            return {"result": "실패", "error": "이체하지 않았습니다. " + error}
 
-        # 반복하기 전에 총액을 먼저 봅니다. 하나씩 보내다 중간에 멈추지 않게 합니다.
-        total = sum(target["amount"] for target in state["targets"])
-        balance = next(a["balance"] for a in data["accounts"] if a["account_id"] == state["from_account"])
-        if balance < total:
-            log.detail("재검증 실패  잔액 %s < 총액 %s" % (format(balance, ","), format(total, ",")))
-            return {"result": "실패", "error": "잔액이 부족합니다. (잔액 %s원 / 보낼 금액 %s원) 이체하지 않았습니다." % (
-                format(balance, ","), format(total, ","))}
-
-        # 목록을 돌며 한 곳씩 이체합니다. 하나라도 안 되면 new_data 를 넘기지 않으므로
-        # 아무것도 저장되지 않습니다 (전부 아니면 전무).
-        lines = []
-        for target in state["targets"]:
-            error = functions.transfer(data, state["from_account"], target["to_account"], target["amount"])
-            if error:
-                log.detail("재검증 실패  " + error)
-                return {"result": "실패", "error": error + " 이체하지 않았습니다."}
-            lines.append("%s → %s  %s원" % (state["from_name"], target["to_name"], format(target["amount"], ",")))
-
+        lines = ["%s → %s  %s원" % (state["from_name"], target["to_name"], format(target["amount"], ","))
+                 for target in state["targets"]]
         balance = next(a["balance"] for a in data["accounts"] if a["account_id"] == state["from_account"])
         log.detail("재검증 OK / 거래 내역 +%d" % (len(state["targets"]) * 2))
         answer = "\n".join(lines) + "\n이체했습니다. %s 잔액 %s원" % (state["from_name"], format(balance, ","))

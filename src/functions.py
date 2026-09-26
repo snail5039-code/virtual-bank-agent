@@ -1,9 +1,16 @@
 # 계좌·카드 업무를 처리하는 Python 함수들입니다.
 # 금액 같은 숫자는 여기서 낸 값을 그대로 씁니다. LLM 이 만들지 않습니다.
+#
+# 계산 로직은 전부 이 파일로 뺍니다. (기획서 원칙 7)
+#   노드(agents/*/nodes.py) : 흐름만 맡습니다. 여기 함수를 부르고 결과를 State 에 넣습니다.
+#   이 파일                 : 계산만 맡습니다. 조회, 금액 계산, 검사, 데이터 변경.
+#   data_store.py           : 파일 읽기·쓰기만 맡습니다.
+# 노드 안에 계산이 길어지면 여기로 옮깁니다.
 
 from datetime import date, datetime, timedelta
 
 import data_store
+import logger
 
 # 로그인한 사용자입니다. 인증(3-5 단계)을 만들기 전까지는 고정해 둡니다.
 CURRENT_USER = "user-001"
@@ -105,6 +112,69 @@ def transfer(data, from_id, to_id, amount):
             "card_id": None,
             "merchant": None,
         })
+    return None
+
+
+def build_targets(owner_id, from_account, to_account, to_name, amount, keep, splits):
+    # 입금 목록(targets)을 만듭니다. 한 곳이면 1개, 나눠 이체면 여러 개입니다.
+    # 조건부 이체면 이체액 = 잔액 - 남길 금액 으로 계산합니다.
+    # (targets, 사유) 를 돌려줍니다. 아직 정보가 모자라면 (None, None) 입니다.
+    if not from_account:
+        return None, None
+
+    if splits:
+        targets = []
+        for split in splits:
+            found = find_accounts(owner_id, split["to_name"])
+            logger.get_logger().resolve(split["to_name"], len(found), found[0]["account_id"] if found else None)
+            if len(found) != 1:
+                return None, "'%s' 계좌를 하나로 정할 수 없습니다. 정확한 이름으로 다시 요청해 주세요." % split["to_name"]
+            targets.append({"to_account": found[0]["account_id"], "to_name": found[0]["nickname"],
+                            "amount": split["amount"] or 0})
+        return targets, None
+
+    if keep is not None:
+        amount = get_account(owner_id, from_account)["balance"] - keep
+    if to_account and amount is not None:
+        return [{"to_account": to_account, "to_name": to_name, "amount": amount}], None
+    return None, None
+
+
+def check_transfer(owner_id, from_account, targets, keep):
+    # [분기 2] 실행할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
+    balance = get_account(owner_id, from_account)["balance"]
+    total = sum(target["amount"] for target in targets)
+    if keep is not None and keep < 0:
+        return "남길 금액은 0원 이상이어야 합니다."
+    if keep is not None and total <= 0:
+        return "잔액이 %s원이라 %s원을 남기면 보낼 금액이 없습니다." % (format(balance, ","), format(keep, ","))
+    if any(target["amount"] <= 0 for target in targets):
+        return "이체 금액은 0원보다 커야 합니다."
+    if any(target["to_account"] == from_account for target in targets):
+        return "출금 계좌와 입금 계좌가 같습니다."
+    if balance < total:
+        return "잔액이 부족합니다. (잔액 %s원 / 보낼 금액 %s원)" % (format(balance, ","), format(total, ","))
+    return None
+
+
+def transfer_all(data, from_id, targets, keep):
+    # 승인된 목록을 data 안에서 한꺼번에 이체합니다. 파일에 저장하지는 않습니다.
+    # 실행 직전에 다시 봅니다. 승인한 뒤에 잔액이 바뀌었을 수 있기 때문입니다.
+    # 진행할 수 없으면 사유를, 성공하면 None 을 돌려줍니다.
+    balance = next(a["balance"] for a in data["accounts"] if a["account_id"] == from_id)
+    total = sum(target["amount"] for target in targets)
+
+    # 조건부 이체 : 잔액이 바뀌면 이체액도 바뀝니다. 그러면 실행하지 않고 다시 요청하게 합니다.
+    if keep is not None and balance - keep != total:
+        return "잔액이 바뀌어 이체할 금액이 달라졌습니다. 다시 요청해 주세요."
+    # 반복하기 전에 총액을 먼저 봅니다. 하나씩 보내다 중간에 멈추지 않게 합니다.
+    if balance < total:
+        return "잔액이 부족합니다. (잔액 %s원 / 보낼 금액 %s원)" % (format(balance, ","), format(total, ","))
+
+    for target in targets:
+        error = transfer(data, from_id, target["to_account"], target["amount"])
+        if error:
+            return error
     return None
 
 
