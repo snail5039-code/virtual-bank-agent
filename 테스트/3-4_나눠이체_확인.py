@@ -77,6 +77,7 @@ while "요청을 입력하세요" not in "".join(out):
 
 print("===== 1) 나눠 이체 + 승인 전 수정 =====")
 send(proc, out, "생활비에서 저축으로 20만원, 여행 자금으로 10만원 보내줘")
+send(proc, out, "1234")                   # 본인 확인 (세션에서 한 번만)
 send(proc, out, "저축은 5만원으로 해줘")
 send(proc, out, "승인")
 show()

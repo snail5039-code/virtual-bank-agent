@@ -1,6 +1,7 @@
 # 여러 업무가 같이 쓰는 공통 노드입니다. 기획서 6장을 따릅니다.
 #
 #   common_pending_check : [분기 0] 멈춰 있는 업무가 있는지 봅니다 (main.py 에서 부릅니다)
+#   common_authenticate  : 본인 확인을 받습니다. 세션 동안 한 번만 (interrupt)
 #   common_approve       : 처리안을 보여주고 승인을 기다립니다 (interrupt)
 #   common_interpret     : 승인 질문에 대한 답을 승인 / 거절 / 취소 / 수정 / 모름 으로 가릅니다 (LLM)
 #   common_reject        : 거절·취소를 안내합니다
@@ -30,10 +31,15 @@ from state import BankState
 # kind 를 보고 main.py 가 승인 대기인지, 부족 정보 질문인지 구분합니다.
 APPROVAL = "approval"
 QUESTION = "question"
+SECRET = "secret"           # 비밀번호처럼 로그에 남기면 안 되는 답을 묻는 질문
 
 
 def question(text):
     return {"kind": QUESTION, "text": text}
+
+
+def secret(text):
+    return {"kind": SECRET, "text": text}
 
 
 def approval(text):
@@ -50,6 +56,41 @@ def common_pending_check(graph, config):
     for item in snapshot.interrupts:
         return item.value["kind"]
     return QUESTION
+
+
+# ---------------------------------------------------------------- 인증
+AUTH_TRIES = 3
+
+
+def common_authenticate_node(state: BankState):
+    # 처리안을 보여주기 전에 본인 확인을 받습니다. 승인 뒤에 두면 틀렸을 때 처리안을 다시 만들어야 합니다.
+    # 한 번 맞히면 세션(프로그램을 끌 때까지) 동안 다시 묻지 않습니다.
+    log = logger.get_logger()
+    if state.get("authenticated"):
+        with log.node("common_authenticate"):
+            log.detail("세션 인증 있음 → 건너뜀")
+        return {}
+
+    tries = state.get("auth_tries") or 0
+    lines = ["[본인 확인] 계좌 비밀번호, PIN, 휴대전화번호, 주민번호 뒷자리 중 하나를 입력해 주세요."]
+    if tries:
+        lines.insert(0, "일치하지 않습니다. (%d/%d)" % (tries, AUTH_TRIES))
+
+    with log.node("common_authenticate"):
+        log.interrupt_pause("본인 확인")
+
+    answer = interrupt(secret("\n".join(lines))).strip()
+
+    if answer == "취소":
+        return {"error": "본인 확인을 취소했습니다."}
+    if functions.authenticate(functions.CURRENT_USER, answer):
+        log.note("본인 확인 성공")
+        return {"authenticated": True, "auth_tries": 0}
+    tries += 1
+    log.note("본인 확인 실패 %d/%d" % (tries, AUTH_TRIES))
+    if tries >= AUTH_TRIES:
+        return {"error": "본인 확인에 %d번 실패했습니다. 처음부터 다시 요청해 주세요." % AUTH_TRIES, "auth_tries": 0}
+    return {"auth_tries": tries}
 
 
 # ---------------------------------------------------------------- 승인

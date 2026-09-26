@@ -3,7 +3,7 @@
 #
 # checkpointer 가 thread_id 별로 State 를 저장하므로, 턴이 바뀌어도 값이 남아 있습니다.
 # 그래서 새 요청을 시작할 때는 new_request() 로 이번 업무 칸을 비웁니다.
-# last_transfer 는 비우지 않습니다. "아까 그 계좌" 를 찾을 때 쓰는 맥락이기 때문입니다.
+# last_transfer 와 authenticated 는 비우지 않습니다. 맥락과 세션 인증이라 요청이 바뀌어도 남아야 합니다.
 
 from typing import TypedDict
 
@@ -37,8 +37,12 @@ class BankState(TypedDict):
     new_data: dict          # 저장할 데이터. 저장이 끝나면 비웁니다
     result: str             # 완료 / 거절 / 실패 (처리 기록에 남깁니다)
 
+    # 인증
+    auth_tries: int         # 이번 업무에서 본인 확인을 틀린 횟수
+
     # 맥락 (새 요청에도 남겨 둡니다)
     last_transfer: str      # 직전 이체. 예) "출금=생활비, 입금=저축"
+    authenticated: bool     # 본인 확인을 마쳤는지. 세션(thread_id) 동안 유지, 재시작하면 풀립니다
 
 
 def new_request(query):
@@ -51,4 +55,5 @@ def new_request(query):
         "splits": None, "targets": None,
         "candidates": None, "confirm_for": None, "question": None, "error": None,
         "proposal": None, "approval": None, "new_data": None, "result": None,
+        "auth_tries": 0,
     }

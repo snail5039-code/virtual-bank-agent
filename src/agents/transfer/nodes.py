@@ -274,7 +274,15 @@ def route_after_check(state: BankState):
         return "transfer_confirm"
     if not state.get("from_account") or not state.get("targets"):
         return "transfer_ask"
-    return "transfer_propose"
+    return "common_authenticate"
+
+
+def route_after_authenticate(state: BankState):
+    if state.get("error"):
+        return "transfer_fail"
+    if state.get("authenticated"):
+        return "transfer_propose"
+    return "common_authenticate"        # 틀렸으면 다시 묻습니다
 
 
 def route_after_confirm(state: BankState):

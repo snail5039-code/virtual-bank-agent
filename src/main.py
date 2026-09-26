@@ -13,7 +13,7 @@ from rich.console import Console
 
 import data_store
 import logger
-from agents.common.nodes import APPROVAL, QUESTION, common_pending_check
+from agents.common.nodes import APPROVAL, QUESTION, SECRET, common_pending_check
 from agents.supervisor.graph import bank_graph
 from state import new_request
 
@@ -29,7 +29,7 @@ def respond(user_input, log):
     if pending == APPROVAL:
         log.interrupt_resume()
         result = bank_graph.invoke(Command(resume=user_input), config=config)
-    elif pending == QUESTION:
+    elif pending in (QUESTION, SECRET):
         log.branch(0, "질문 대기 있음 → 답으로 재개")
         result = bank_graph.invoke(Command(resume=user_input), config=config)
     else:
@@ -45,7 +45,7 @@ def turn_result():
     pending = common_pending_check(bank_graph, config)
     if pending == APPROVAL:
         return "승인 대기"
-    if pending == QUESTION:
+    if pending in (QUESTION, SECRET):
         return "질문 대기"
     return "완료"
 
@@ -67,7 +67,9 @@ def main():
             print("시스템을 종료합니다.")
             break
 
-        log.turn_start(user_input, thread_id)
+        # 본인 확인 답(비밀번호 등)은 로그 파일에 그대로 남기지 않습니다.
+        secret = common_pending_check(bank_graph, config) == SECRET
+        log.turn_start("****" if secret else user_input, thread_id)
         try:
             with console.status("[bold green]에이전트가 작업 중입니다...[/bold green]", spinner="dots"):
                 answer = respond(user_input, log)

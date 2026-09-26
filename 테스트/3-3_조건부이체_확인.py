@@ -64,6 +64,7 @@ while "요청을 입력하세요" not in "".join(out):
 
 print("===== 1) 조건부 이체 =====")
 send(proc, out, "생활비에 40만원 남기고 나머지 저축해줘")
+send(proc, out, "1234")                   # 본인 확인 (세션에서 한 번만)
 send(proc, out, "응, 진행해")
 
 print("===== 2) 불가 =====")

@@ -45,14 +45,14 @@ def show_requests():
 shutil.copy("data/initial_data.json", DATA)
 
 print("===== 1) 승인, 2) 거절 =====")
-run(["생활비에서 저축으로 10만원 보내줘", "응, 진행해",
+run(["생활비에서 저축으로 10만원 보내줘", "1234", "응, 진행해",
      "생활비에서 저축으로 3만원 보내줘", "아니 안 할래"])
 show_requests()
 
 print("===== 3) 저장 실패 (data.json 읽기 전용) =====")
 os.chmod(DATA, stat.S_IREAD)
 try:
-    run(["생활비에서 저축으로 5만원 보내줘", "승인"])
+    run(["생활비에서 저축으로 5만원 보내줘", "1234", "승인"])
 finally:
     os.chmod(DATA, stat.S_IREAD | stat.S_IWRITE)
 show_requests()

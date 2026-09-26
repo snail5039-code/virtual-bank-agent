@@ -38,6 +38,16 @@ def find_accounts(owner_id, name):
             if name in account["nickname"] or name in account["bank_name"]]
 
 
+def authenticate(owner_id, value):
+    # 본인 확인. 계좌 비밀번호 / PIN / 휴대전화번호 / 주민번호 뒷자리 중 하나가 맞으면 True 입니다.
+    data = data_store.load()
+    user = next(u for u in data["users"] if u["owner_id"] == owner_id)
+    value = value.replace("-", "").strip()
+    answers = {user["pin"], user["phone"].replace("-", ""), user["ssn_tail"]}
+    answers |= {a["account_password"] for a in data["accounts"] if a["owner_id"] == owner_id}
+    return value in answers
+
+
 def get_cards(owner_id):
     data = data_store.load()
     return [card for card in data["cards"] if card["owner_id"] == owner_id]
