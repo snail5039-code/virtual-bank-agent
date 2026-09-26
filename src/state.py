@@ -21,6 +21,7 @@ class BankState(TypedDict):
     from_account: str       # 찾아낸 출금 계좌 ID
     to_account: str         # 찾아낸 입금 계좌 ID
     amount: int             # 이체 금액
+    keep_amount: int        # 조건부 이체 : 출금 계좌에 남길 금액. 있으면 amount = 잔액 - keep_amount
     candidates: list        # 이름에 맞는 계좌가 여러 개일 때 후보 목록
     confirm_for: str        # 후보를 고르는 칸 (from / to)
     question: str           # 방금 사용자에게 한 질문 (짧은 답이 어느 칸인지 알려고)
@@ -44,7 +45,7 @@ def new_request(query):
         "query": query,
         "domain": None, "reason": None, "task": None, "answer": None,
         "from_name": None, "to_name": None,
-        "from_account": None, "to_account": None, "amount": None,
+        "from_account": None, "to_account": None, "amount": None, "keep_amount": None,
         "candidates": None, "confirm_for": None, "question": None, "error": None,
         "proposal": None, "approval": None, "new_data": None, "result": None,
     }

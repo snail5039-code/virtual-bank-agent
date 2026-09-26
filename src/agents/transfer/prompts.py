@@ -7,6 +7,8 @@ extract_prompt = """
 - from_name: 돈을 보내는 계좌 이름 (예: 생활비)
 - to_name: 돈을 받는 계좌 이름 (예: 저축)
 - amount: 보낼 금액. 원 단위 정수로 바꾼다 (예: 10만원 → 100000)
+- keep_amount: 출금 계좌에 남길 금액. "~ 남기고 나머지" 라고 할 때만 채운다
+  (예: 40만원 남기고 나머지 → keep_amount=400000, amount 는 비운다 / 전부 보내줘 → keep_amount=0)
 
 지금까지 알아낸 정보:
 - 출금 계좌: {from_name}

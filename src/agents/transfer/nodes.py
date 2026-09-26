@@ -32,6 +32,7 @@ class TransferInfo(BaseModel):
     from_name: Optional[str] = Field(default=None, description="돈을 보내는 계좌 이름")
     to_name: Optional[str] = Field(default=None, description="돈을 받는 계좌 이름")
     amount: Optional[int] = Field(default=None, description="보낼 금액 (원)")
+    keep_amount: Optional[int] = Field(default=None, description="출금 계좌에 남길 금액 (원). 조건부 이체일 때만")
 
 
 llm_with_transfer_output = llm.with_structured_output(TransferInfo)
@@ -51,7 +52,8 @@ def transfer_extract_node(state: BankState):
             SystemMessage(content=prompt),
             HumanMessage(content=state["query"]),
         ])
-        log.detail("추출  출금=%s  입금=%s  금액=%s" % (result.from_name, result.to_name, result.amount))
+        log.detail("추출  출금=%s  입금=%s  금액=%s  남길 금액=%s" % (
+            result.from_name, result.to_name, result.amount, result.keep_amount))
 
         # 비어 있는 칸만 채웁니다. 이미 정해진 값은 바꾸지 않습니다.
         update = {}
@@ -61,6 +63,9 @@ def transfer_extract_node(state: BankState):
             update["to_name"] = result.to_name
         if result.amount and not state.get("amount"):
             update["amount"] = result.amount
+        # 남길 금액은 0 원도 됩니다 ("전부 보내줘" = 0 원 남기기).
+        if result.keep_amount is not None and state.get("keep_amount") is None:
+            update["keep_amount"] = result.keep_amount
 
     return update
 
@@ -95,9 +100,22 @@ def transfer_check_node(state: BankState):
         if from_account and from_account == to_account:
             update["error"] = "출금 계좌와 입금 계좌가 같습니다."
 
+        # 조건부 이체 : 이체액 = 잔액 - 남길 금액. Python 이 계산합니다 (원칙 6).
+        keep = state.get("keep_amount")
+        if keep is not None and from_account:
+            balance = functions.get_account(functions.CURRENT_USER, from_account)["balance"]
+            update["amount"] = balance - keep
+            log.detail("조건부  잔액 %s - 남길 %s = 이체 %s" % (
+                format(balance, ","), format(keep, ","), format(balance - keep, ",")))
+
         # [분기 2] 실행할 수 있는 금액인지 봅니다.
-        amount = state.get("amount")
-        if amount is not None and amount <= 0:
+        amount = update.get("amount", state.get("amount"))
+        if keep is not None and keep < 0:
+            update["error"] = "남길 금액은 0원 이상이어야 합니다."
+        elif keep is not None and amount is not None and amount <= 0:
+            update["error"] = "잔액이 %s원이라 %s원을 남기면 보낼 금액이 없습니다." % (
+                format(amount + keep, ","), format(keep, ","))
+        elif amount is not None and amount <= 0:
             update["error"] = "이체 금액은 0원보다 커야 합니다."
         elif amount and from_account:
             balance = functions.get_account(functions.CURRENT_USER, from_account)["balance"]
@@ -180,6 +198,8 @@ def transfer_propose_node(state: BankState):
                 ["출금 후 잔액", format(from_account["balance"] - amount, ",") + "원"],
             ],
         }
+        if state.get("keep_amount") is not None:
+            proposal["rows"].insert(2, ["남길 금액", format(state["keep_amount"], ",") + "원"])
         log.detail("처리안  %s → %s  %s원  (출금 잔액 %s)" % (
             from_account["account_id"], to_account["account_id"],
             format(amount, ","), format(from_account["balance"], ",")))
@@ -209,6 +229,7 @@ def transfer_revise_node(state: BankState):
             update["to_account"] = None
         if result.amount and result.amount != state["amount"]:
             update["amount"] = result.amount
+            update["keep_amount"] = None        # 금액을 직접 말했으면 조건부가 아니라 즉시이체입니다
 
     return update
 
@@ -218,6 +239,16 @@ def transfer_execute_node(state: BankState):
     log = logger.get_logger()
     with log.node("transfer_execute"):
         data = data_store.load()
+
+        # 조건부 이체 : 승인한 뒤 잔액이 바뀌면 이체액도 바뀝니다. 그러면 실행하지 않고 다시 요청하게 합니다.
+        keep = state.get("keep_amount")
+        if keep is not None:
+            balance = next(a["balance"] for a in data["accounts"] if a["account_id"] == state["from_account"])
+            if balance - keep != state["amount"]:
+                log.detail("재검증 실패  이체액 %s → %s" % (format(state["amount"], ","), format(balance - keep, ",")))
+                return {"result": "실패", "error": "잔액이 바뀌어 이체할 금액이 달라졌습니다. "
+                        "이체하지 않았습니다. 다시 요청해 주세요."}
+
         error = functions.transfer(data, state["from_account"], state["to_account"], state["amount"])
         if error:
             log.detail("재검증 실패  " + error)
