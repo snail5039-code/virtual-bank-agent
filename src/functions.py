@@ -260,6 +260,87 @@ def delete_registered(data, registered_id):
     data["registered_accounts"] = [r for r in data["registered_accounts"] if r["registered_id"] != registered_id]
 
 
+# ---------------------------------------------------------------- 예약 이체
+# 상태 : 예약 → 완료 / 실패 / 취소. 목록에서 지우지 않고 상태만 바꿉니다 (나중에 결과를 물을 수 있게).
+
+def parse_time(text):
+    # "2026-09-27T09:00" 같은 문자열을 시각으로 바꿉니다. 시간대가 없으면 이 컴퓨터 시간대로 봅니다.
+    return datetime.fromisoformat(text).astimezone()
+
+
+def check_schedule(scheduled_at, targets, keep):
+    # 예약할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
+    if keep is not None or len(targets) != 1:
+        return "예약은 금액을 정한 한 곳 이체만 됩니다. (예: 내일 9시에 생활비에서 저축으로 10만원 보내줘)"
+    try:
+        parse_time(scheduled_at)
+    except ValueError:
+        return "예약 시각을 알아듣지 못했습니다. (예: 내일 오전 9시에)"
+    if parse_time(scheduled_at) <= datetime.now().astimezone():
+        return "예약 시각이 이미 지났습니다. (%s)" % parse_time(scheduled_at).strftime("%m월 %d일 %H:%M")
+    return None
+
+
+def add_schedule(data, owner_id, from_id, target, scheduled_at):
+    # data 에 예약을 한 줄 덧붙입니다. 돈은 옮기지 않습니다. 파일에 저장하지는 않습니다.
+    numbers = [int(s["schedule_id"].split("-")[1]) for s in data["scheduled_transfers"]]
+    data["scheduled_transfers"].append({
+        "schedule_id": "sch-%03d" % (max(numbers, default=0) + 1),
+        "owner_id": owner_id,
+        "from_account": from_id,
+        "to_account": target["to_account"],
+        "amount": target["amount"],
+        "scheduled_at": parse_time(scheduled_at).isoformat(timespec="seconds"),
+        "status": "예약",
+    })
+
+
+def get_schedules(owner_id):
+    data = data_store.load()
+    return [s for s in data["scheduled_transfers"] if s["owner_id"] == owner_id]
+
+
+def find_schedules(owner_id, name):
+    # 취소할 예약을 찾습니다. 아직 실행 전(예약)인 것만 봅니다.
+    # 예약 번호(sch-001), 입금 계좌 이름, 날짜(09-27) 중 하나가 맞으면 후보입니다.
+    nicknames = {a["account_id"]: a["nickname"] for a in get_accounts(owner_id)}
+    pending = [s for s in get_schedules(owner_id) if s["status"] == "예약"]
+    if not name:
+        return pending
+    return [s for s in pending
+            if name in s["schedule_id"] or name in nicknames.get(s["to_account"], "") or name in s["scheduled_at"]]
+
+
+def cancel_schedule(data, schedule_id):
+    # data 안에서 예약을 취소 상태로 바꿉니다. 파일에 저장하지는 않습니다.
+    schedule = next(s for s in data["scheduled_transfers"] if s["schedule_id"] == schedule_id)
+    schedule["status"] = "취소"
+
+
+def run_due_schedules():
+    # 시각이 지난 예약을 이체합니다. main.py 가 켤 때와 입력을 받을 때마다 부릅니다.
+    # 승인은 예약할 때 받았으므로 다시 묻지 않습니다. 잔액이 모자라면 이체하지 않고 실패로 남깁니다.
+    # 처리한 결과를 한 줄씩 돌려줍니다. 처리할 게 없으면 빈 목록입니다.
+    data = data_store.load()
+    now = datetime.now().astimezone()
+    nicknames = {a["account_id"]: a["nickname"] for a in data["accounts"]}
+    lines = []
+    for s in data["scheduled_transfers"]:
+        if s["status"] != "예약" or parse_time(s["scheduled_at"]) > now:
+            continue
+        error = transfer(data, s["from_account"], s["to_account"], s["amount"])
+        s["status"] = "실패" if error else "완료"
+        lines.append("[예약 이체 %s] %s → %s  %s원  (%s)%s" % (
+            s["status"], nicknames[s["from_account"]], nicknames[s["to_account"]], format(s["amount"], ","),
+            parse_time(s["scheduled_at"]).strftime("%m월 %d일 %H:%M"), "  " + error if error else ""))
+    if lines:
+        try:
+            data_store.save(data)
+        except data_store.DataStoreError:
+            return ["[예약 이체] 저장에 실패해 처리하지 못했습니다. 다음 입력 때 다시 확인합니다."]
+    return lines
+
+
 def get_account(owner_id, account_id):
     # ID 로 계좌 하나를 찾습니다. 없거나 다른 사람 계좌면 None 입니다.
     for account in get_accounts(owner_id):

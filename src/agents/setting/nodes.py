@@ -1,14 +1,15 @@
 # 계좌 설정 에이전트(3단)의 노드 함수입니다.
-# 계좌 별명·용도 변경, 등록 계좌(상대 계좌 주소록) 등록·조회·삭제를 맡습니다.
+# 계좌 별명·용도 변경, 등록 계좌(상대 계좌 주소록) 등록·조회·삭제, 예약 이체 조회·취소를 맡습니다.
 #
-#   setting_extract : 사용자 말에서 할 일(변경/등록/삭제/조회)과 필요한 값을 뽑습니다 (LLM)
-#   setting_list    : 등록 계좌를 보여줍니다. 읽기만 하므로 승인 없이 끝납니다
+#   setting_extract : 사용자 말에서 할 일(변경/등록/삭제/조회/예약조회/예약취소)과 필요한 값을 뽑습니다 (LLM)
+#   setting_list    : 등록 계좌나 예약 이체 목록을 보여줍니다. 읽기만 하므로 승인 없이 끝납니다
 #   setting_check   : 대상을 ID 로 바꾸고, 할 수 있는지 봅니다 (Python)
 #   setting_propose : 처리안을 만듭니다. 계산만 하고 저장하지 않습니다
 #   setting_execute : 승인되면 데이터를 바꿉니다 (저장은 common_save)
 #   setting_fail    : 진행할 수 없는 사유를 알려줍니다
 #   (인증·승인·응답 해석·거절·기록·저장·안내는 공통 노드를 씁니다)
 
+from datetime import date
 from typing import Literal, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -23,8 +24,8 @@ from state import BankState
 
 
 class SettingInfo(BaseModel):
-    action: Optional[Literal["변경", "등록", "삭제", "조회"]] = Field(default=None, description="할 일")
-    account_name: Optional[str] = Field(default=None, description="변경·삭제할 계좌의 지금 이름")
+    action: Optional[Literal["변경", "등록", "삭제", "조회", "예약조회", "예약취소"]] = Field(default=None, description="할 일")
+    account_name: Optional[str] = Field(default=None, description="변경·삭제할 계좌의 지금 이름, 또는 취소할 예약의 단서")
     field: Optional[Literal["별명", "용도"]] = Field(default=None, description="변경할 항목")
     new_value: Optional[str] = Field(default=None, description="변경할 새 값")
     bank_name: Optional[str] = Field(default=None, description="등록할 계좌의 은행 이름")
@@ -46,6 +47,7 @@ def setting_extract_node(state: BankState):
             field=state.get("setting_field") or "모름",
             new_value=state.get("new_value") or "모름",
             reg_info=state.get("reg_info") or "없음",
+            today=date.today(),
         )
         r = llm_with_setting_output.invoke([
             SystemMessage(content=prompt),
@@ -76,8 +78,29 @@ def setting_extract_node(state: BankState):
     return update
 
 
+def schedule_text(schedule_id):
+    # 예약 한 건을 한 줄로 씁니다. 예) sch-001  09월 27일 09:00  생활비 → 저축  100,000원  [예약]
+    nicknames = {a["account_id"]: a["nickname"] for a in functions.get_accounts(functions.CURRENT_USER)}
+    s = next(s for s in functions.get_schedules(functions.CURRENT_USER) if s["schedule_id"] == schedule_id)
+    return "%s  %s  %s → %s  %s원  [%s]" % (
+        s["schedule_id"], functions.parse_time(s["scheduled_at"]).strftime("%m월 %d일 %H:%M"),
+        nicknames.get(s["from_account"], s["from_account"]), nicknames.get(s["to_account"], s["to_account"]),
+        format(s["amount"], ","), s["status"])
+
+
+def schedule_list_text():
+    schedules = functions.get_schedules(functions.CURRENT_USER)
+    if not schedules:
+        return "예약 이체가 없습니다."
+    lines = ["예약 이체 %d건입니다." % len(schedules)]
+    lines += ["- " + schedule_text(s["schedule_id"]) for s in schedules]
+    return "\n".join(lines)
+
+
 def setting_list_node(state: BankState):
     with logger.get_logger().node("setting_list"):
+        if state.get("setting_action") == "예약조회":
+            return {"answer": schedule_list_text()}
         registered = functions.get_registered(functions.CURRENT_USER)
         if not registered:
             return {"answer": "등록한 계좌가 없습니다."}
@@ -95,6 +118,14 @@ def setting_check_node(state: BankState):
         if action == "등록":
             error = functions.check_register(functions.CURRENT_USER, state.get("reg_info") or {})
             return {"error": error} if error else {}
+
+        if action == "예약취소":
+            found = functions.find_schedules(functions.CURRENT_USER, state.get("target_name"))
+            log.resolve(state.get("target_name") or "(말 안 함)", len(found), found[0]["schedule_id"] if found else None)
+            if len(found) != 1:
+                return {"error": "취소할 예약을 하나로 정할 수 없습니다. 예약 번호로 말해 주세요. (예: sch-001 예약 취소해줘)\n"
+                        + schedule_list_text()}
+            return {"target_account": found[0]["schedule_id"]}
 
         if not state.get("target_name"):
             return {"error": "어느 계좌인지 말해 주세요. (예: 여행 자금 계좌 이름을 휴가비로 바꿔줘 / 친구 민수 계좌 삭제해줘)"}
@@ -137,6 +168,8 @@ def setting_propose_node(state: BankState):
                 ["예금주", reg["holder_name"]],
                 ["별명", reg["nickname"]],
             ]}
+        elif action == "예약취소":
+            proposal = {"task": "예약 이체 취소", "rows": [["예약", schedule_text(state["target_account"])]]}
         elif action == "삭제":
             r = next(r for r in functions.get_registered(functions.CURRENT_USER)
                      if r["registered_id"] == state["target_account"])
@@ -164,6 +197,9 @@ def setting_execute_node(state: BankState):
         if action == "등록":
             functions.register_account(data, functions.CURRENT_USER, state["reg_info"])
             answer = "계좌를 등록했습니다. (%s)" % state["reg_info"]["nickname"]
+        elif action == "예약취소":
+            functions.cancel_schedule(data, state["target_account"])
+            answer = "예약 이체를 취소했습니다. (%s)" % state["target_account"]
         elif action == "삭제":
             functions.delete_registered(data, state["target_account"])
             answer = "등록 계좌를 삭제했습니다. (%s)" % state["proposal"]["rows"][0][1]
@@ -186,7 +222,7 @@ def setting_fail_node(state: BankState):
 # ---------------------------------------------------------------- 분기
 def route_after_extract(state: BankState):
     # 조회는 읽기만 하므로 인증·승인 없이 바로 보여줍니다.
-    if state.get("setting_action") == "조회":
+    if state.get("setting_action") in ("조회", "예약조회"):
         return "setting_list"
     return "setting_check"
 

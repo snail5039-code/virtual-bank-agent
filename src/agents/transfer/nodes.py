@@ -13,6 +13,7 @@
 # interrupt() 로 멈췄다가 답을 받으면 그 노드를 처음부터 다시 실행합니다.
 # 그래서 interrupt 가 있는 노드에서는 묻고 답을 받는 일만 합니다.
 
+from datetime import datetime
 from typing import Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -39,6 +40,7 @@ class TransferInfo(BaseModel):
     amount: Optional[int] = Field(default=None, description="보낼 금액 (원)")
     keep_amount: Optional[int] = Field(default=None, description="출금 계좌에 남길 금액 (원). 조건부 이체일 때만")
     splits: Optional[list[Split]] = Field(default=None, description="입금 계좌가 두 곳 이상일 때만. 계좌별 금액")
+    scheduled_at: Optional[str] = Field(default=None, description="예약 이체 시각 YYYY-MM-DDTHH:MM. 예약일 때만")
 
 
 llm_with_transfer_output = llm.with_structured_output(TransferInfo)
@@ -53,6 +55,7 @@ def transfer_extract_node(state: BankState):
             amount=state.get("amount") or "모름",
             last_transfer=state.get("last_transfer") or "없음",
             question=state.get("question") or "없음",
+            now=datetime.now().strftime("%Y-%m-%dT%H:%M (%A)"),
         )
         result = llm_with_transfer_output.invoke([
             SystemMessage(content=prompt),
@@ -76,6 +79,10 @@ def transfer_extract_node(state: BankState):
         if result.splits and len(result.splits) >= 2 and not state.get("splits"):
             update["splits"] = [split.model_dump() for split in result.splits]
             log.detail("나눠 이체  %s" % update["splits"])
+        # 예약 이체 : 시각을 말하면 지금 보내지 않고 예약만 합니다.
+        if result.scheduled_at and not state.get("scheduled_at"):
+            update["scheduled_at"] = result.scheduled_at
+            log.detail("예약 시각  %s" % result.scheduled_at)
 
     return update
 
@@ -117,6 +124,8 @@ def transfer_check_node(state: BankState):
             state.get("keep_amount"), state.get("splits"))
         if targets and not error:
             error = functions.check_transfer(functions.CURRENT_USER, from_account, targets, state.get("keep_amount"))
+        if targets and not error and state.get("scheduled_at"):
+            error = functions.check_schedule(state["scheduled_at"], targets, state.get("keep_amount"))
         if error:
             update["error"] = error
         update["targets"] = targets
@@ -202,6 +211,9 @@ def transfer_propose_node(state: BankState):
         rows.append(["출금 후 잔액", format(from_account["balance"] - total, ",") + "원"])
 
         proposal = {"task": "이체", "rows": rows}
+        if state.get("scheduled_at"):
+            proposal["task"] = "예약 이체"
+            rows.insert(0, ["예약 시각", functions.parse_time(state["scheduled_at"]).strftime("%Y-%m-%d %H:%M")])
         log.detail("처리안  %s → %d곳  총 %s원  (출금 잔액 %s)" % (
             from_account["account_id"], len(targets), format(total, ","), format(from_account["balance"], ",")))
 
@@ -242,6 +254,15 @@ def transfer_execute_node(state: BankState):
     log = logger.get_logger()
     with log.node("transfer_execute"):
         data = data_store.load()
+
+        # 예약 이체 : 돈은 옮기지 않고 예약만 남깁니다. 시각이 되면 main.py 가 실행합니다.
+        if state.get("scheduled_at"):
+            target = state["targets"][0]
+            functions.add_schedule(data, functions.CURRENT_USER, state["from_account"], target, state["scheduled_at"])
+            answer = "%s → %s  %s원\n%s 에 이체하도록 예약했습니다." % (
+                state["from_name"], target["to_name"], format(target["amount"], ","),
+                functions.parse_time(state["scheduled_at"]).strftime("%m월 %d일 %H:%M"))
+            return {"new_data": data, "answer": answer, "result": "완료"}
 
         # 하나라도 안 되면 new_data 를 넘기지 않으므로 아무것도 저장되지 않습니다 (전부 아니면 전무).
         error = functions.transfer_all(data, state["from_account"], state["targets"], state.get("keep_amount"))

@@ -12,6 +12,7 @@ from langgraph.types import Command
 from rich.console import Console
 
 import data_store
+import functions
 import logger
 from agents.common.nodes import APPROVAL, QUESTION, SECRET, common_pending_check
 from agents.supervisor.graph import bank_graph
@@ -50,12 +51,23 @@ def turn_result():
     return "완료"
 
 
+def run_schedules(log):
+    # 시각이 지난 예약 이체를 실행하고 결과를 화면에 알립니다. 그래프를 거치지 않습니다.
+    # 승인은 예약할 때 받았기 때문입니다.
+    for line in functions.run_due_schedules():
+        log.note(line)
+        print(line)
+
+
 def main():
     log = logger.setup(debug="--debug" in sys.argv)
     data_store.ensure()
 
     print("가상 금융 업무 에이전트")
     print("==== 종료하려면 exit 또는 종료를 입력하세요 ====")
+
+    # 예약 이체 : 꺼져 있던 동안 시각이 지난 예약을 먼저 처리합니다.
+    run_schedules(log)
 
     while True:
         user_input = input("요청을 입력하세요 : ").strip()
@@ -70,6 +82,8 @@ def main():
         # 본인 확인 답(비밀번호 등)은 로그 파일에 그대로 남기지 않습니다.
         secret = common_pending_check(bank_graph, config) == SECRET
         log.turn_start("****" if secret else user_input, thread_id)
+        # 예약 이체 : 요청을 처리하기 전에, 켜져 있는 동안 시각이 된 예약을 처리합니다.
+        run_schedules(log)
         try:
             with console.status("[bold green]에이전트가 작업 중입니다...[/bold green]", spinner="dots"):
                 answer = respond(user_input, log)

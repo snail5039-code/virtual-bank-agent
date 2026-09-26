@@ -24,6 +24,7 @@ class BankState(TypedDict):
     keep_amount: int        # 조건부 이체 : 출금 계좌에 남길 금액. 있으면 amount = 잔액 - keep_amount
     splits: list            # 나눠 이체 : 사용자가 말한 [{to_name, amount}, ...]
     targets: list           # 실제로 보낼 목록 [{to_account, to_name, amount}, ...]. 한 곳이면 1개
+    scheduled_at: str       # 예약 이체 시각. 있으면 지금 보내지 않고 예약만 합니다
     candidates: list        # 이름에 맞는 계좌가 여러 개일 때 후보 목록
     confirm_for: str        # 후보를 고르는 칸 (from / to)
     question: str           # 방금 사용자에게 한 질문 (짧은 답이 어느 칸인지 알려고)
@@ -60,7 +61,7 @@ def new_request(query):
         "domain": None, "reason": None, "task": None, "answer": None,
         "from_name": None, "to_name": None,
         "from_account": None, "to_account": None, "amount": None, "keep_amount": None,
-        "splits": None, "targets": None,
+        "splits": None, "targets": None, "scheduled_at": None,
         "setting_action": None, "target_name": None, "target_account": None,
         "setting_field": None, "new_value": None, "reg_info": None,
         "candidates": None, "confirm_for": None, "question": None, "error": None,
