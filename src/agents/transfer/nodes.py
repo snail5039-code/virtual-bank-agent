@@ -6,7 +6,7 @@
 #   transfer_ask     : 부족한 정보를 묻습니다 (interrupt)
 #   transfer_propose : 처리안을 만듭니다. 계산만 하고 저장하지 않습니다 (Python)
 #   transfer_revise  : 승인 전에 바꾼 내용을 반영합니다 (LLM)
-#   transfer_approved: 승인되었다고 알려줍니다 (실제 이체는 2-4 단계)
+#   transfer_execute : 승인되면 잔액을 옮기고 거래 내역을 붙입니다 (Python, 저장은 common_save)
 #   transfer_fail    : 진행할 수 없는 사유를 알려줍니다
 #   (승인·응답 해석·거절은 공통 노드를 씁니다)
 #
@@ -19,6 +19,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
+import data_store
 import functions
 import logger
 from agents.common.nodes import question
@@ -93,6 +94,15 @@ def transfer_check_node(state: BankState):
         to_account = update.get("to_account") or state.get("to_account")
         if from_account and from_account == to_account:
             update["error"] = "출금 계좌와 입금 계좌가 같습니다."
+
+        # [분기 2] 실행할 수 있는 금액인지 봅니다.
+        amount = state.get("amount")
+        if amount is not None and amount <= 0:
+            update["error"] = "이체 금액은 0원보다 커야 합니다."
+        elif amount and from_account:
+            balance = functions.get_account(functions.CURRENT_USER, from_account)["balance"]
+            if balance < amount:
+                update["error"] = "잔액이 부족합니다. (잔액 %s원)" % format(balance, ",")
 
     return update
 
@@ -203,13 +213,24 @@ def transfer_revise_node(state: BankState):
     return update
 
 
-def transfer_approved_node(state: BankState):
-    with logger.get_logger().node("transfer_approved"):
-        answer = "%s → %s  %s원\n승인되었습니다. (실제 이체는 2-4 단계에서 연결합니다)" % (
-            state["from_name"], state["to_name"], format(state["amount"], ","))
+def transfer_execute_node(state: BankState):
+    # 승인된 뒤에만 옵니다. 바꾼 데이터를 new_data 로 넘기고, 저장은 common_save 가 합니다.
+    log = logger.get_logger()
+    with log.node("transfer_execute"):
+        data = data_store.load()
+        error = functions.transfer(data, state["from_account"], state["to_account"], state["amount"])
+        if error:
+            log.detail("재검증 실패  " + error)
+            return {"result": "실패", "error": error + " 이체하지 않았습니다."}
+
+        balance = next(a["balance"] for a in data["accounts"] if a["account_id"] == state["from_account"])
+        log.detail("재검증 OK / 거래 내역 +2")
+        answer = "%s → %s  %s원 이체했습니다.\n%s 잔액 %s원" % (
+            state["from_name"], state["to_name"], format(state["amount"], ","),
+            state["from_name"], format(balance, ","))
         last_transfer = "출금=%s, 입금=%s" % (state["from_name"], state["to_name"])
-    # 2-4 에서 여기서 잔액을 바꾼 데이터를 new_data 로 넘깁니다. 지금은 처리 기록만 저장됩니다.
-    return {"answer": answer, "last_transfer": last_transfer, "result": "완료"}
+
+    return {"new_data": data, "answer": answer, "last_transfer": last_transfer, "result": "완료"}
 
 
 def transfer_fail_node(state: BankState):
@@ -244,7 +265,7 @@ def route_after_ask(state: BankState):
 def route_after_interpret(state: BankState):
     decision = state["approval"]
     if decision == "승인":
-        return "transfer_approved"
+        return "transfer_execute"
     if decision in ("거절", "취소"):
         return "common_reject"
     if decision == "수정":

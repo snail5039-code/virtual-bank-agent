@@ -1,6 +1,6 @@
 # 이체 에이전트 그래프입니다. 계좌 에이전트 그래프 안에 노드로 들어갑니다.
 #
-#   START → extract → check ─┬─ 다 모임        → propose → approve → interpret ─┬─ 승인      → approved ─┐
+#   START → extract → check ─┬─ 다 모임        → propose → approve → interpret ─┬─ 승인      → execute  ─┐
 #              ↑       ↑     ├─ 후보 여러 개   → confirm → check 로     ↑        ├─ 거절·취소 → reject   ─┤
 #              │       │     ├─ 정보 부족      → ask ───→ extract 로    └─ 모름 ─┤                        │
 #              │       │     └─ 계좌 없음·취소 → fail → END                      │                        │
@@ -14,7 +14,7 @@ from agents.common.nodes import (common_approve_node, common_interpret_node,
                                  common_log_request_node, common_reject_node,
                                  common_report_node, common_save_node)
 from agents.transfer.nodes import (route_after_ask, route_after_check, route_after_confirm,
-                                   route_after_interpret, transfer_approved_node,
+                                   route_after_interpret, transfer_execute_node,
                                    transfer_ask_node, transfer_check_node,
                                    transfer_confirm_node, transfer_extract_node,
                                    transfer_fail_node, transfer_propose_node,
@@ -31,7 +31,7 @@ builder.add_node("transfer_propose", transfer_propose_node)
 builder.add_node("common_approve", common_approve_node)
 builder.add_node("common_interpret", common_interpret_node)
 builder.add_node("transfer_revise", transfer_revise_node)
-builder.add_node("transfer_approved", transfer_approved_node)
+builder.add_node("transfer_execute", transfer_execute_node)
 builder.add_node("common_reject", common_reject_node)
 builder.add_node("common_log_request", common_log_request_node)
 builder.add_node("common_save", common_save_node)
@@ -47,9 +47,9 @@ builder.add_conditional_edges("transfer_ask", route_after_ask, ["transfer_fail",
 builder.add_edge("transfer_propose", "common_approve")
 builder.add_edge("common_approve", "common_interpret")
 builder.add_conditional_edges("common_interpret", route_after_interpret,
-                              ["transfer_approved", "common_reject", "transfer_revise", "common_approve"])
+                              ["transfer_execute", "common_reject", "transfer_revise", "common_approve"])
 builder.add_edge("transfer_revise", "transfer_check")
-builder.add_edge("transfer_approved", "common_log_request")
+builder.add_edge("transfer_execute", "common_log_request")
 builder.add_edge("common_reject", "common_log_request")
 builder.add_edge("common_log_request", "common_save")
 builder.add_edge("common_save", "common_report")
