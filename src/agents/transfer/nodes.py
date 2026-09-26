@@ -208,7 +208,8 @@ def transfer_approved_node(state: BankState):
         answer = "%s → %s  %s원\n승인되었습니다. (실제 이체는 2-4 단계에서 연결합니다)" % (
             state["from_name"], state["to_name"], format(state["amount"], ","))
         last_transfer = "출금=%s, 입금=%s" % (state["from_name"], state["to_name"])
-    return {"answer": answer, "last_transfer": last_transfer}
+    # 2-4 에서 여기서 잔액을 바꾼 데이터를 new_data 로 넘깁니다. 지금은 처리 기록만 저장됩니다.
+    return {"answer": answer, "last_transfer": last_transfer, "result": "완료"}
 
 
 def transfer_fail_node(state: BankState):

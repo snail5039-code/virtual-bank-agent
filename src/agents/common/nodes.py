@@ -3,18 +3,24 @@
 #   common_pending_check : [분기 0] 멈춰 있는 업무가 있는지 봅니다 (main.py 에서 부릅니다)
 #   common_approve       : 처리안을 보여주고 승인을 기다립니다 (interrupt)
 #   common_interpret     : 승인 질문에 대한 답을 승인 / 거절 / 취소 / 수정 / 모름 으로 가릅니다 (LLM)
-#   common_reject        : 거절·취소를 안내하고 끝냅니다
+#   common_reject        : 거절·취소를 안내합니다
+#   common_log_request   : 처리 기록을 남깁니다
+#   common_save          : 파일에 저장합니다 (실패하면 세 번까지)
+#   common_report        : 저장이 성공했을 때만 결과를 안내합니다
 #
 # 처리안(proposal)은 각 업무의 propose 노드가 만듭니다. 모양은 다음과 같습니다.
 #   {"task": "이체", "rows": [["출금", "생활비"], ["금액", "100,000원"], ...], ...}
 # 공통 노드는 task 와 rows 만 읽습니다. 나머지 칸은 업무마다 자유롭게 둡니다.
 
+from datetime import datetime
 from typing import Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
+import data_store
+import functions
 import logger
 from agents.common.prompts import interpret_prompt
 from model import llm
@@ -98,4 +104,58 @@ def common_interpret_node(state: BankState):
 def common_reject_node(state: BankState):
     with logger.get_logger().node("common_reject"):
         answer = "%s 요청을 진행하지 않았습니다. 바뀐 것은 없습니다." % state["proposal"]["task"]
-    return {"answer": answer}
+    return {"answer": answer, "result": "거절"}
+
+
+# ---------------------------------------------------------------- 마무리
+# 업무 노드가 answer 와 result 를 정해 두면, 여기서 기록 → 저장 → 안내 순서로 끝냅니다.
+#   log_request : 처리 기록을 저장할 데이터(new_data)에 덧붙입니다
+#   save        : new_data 를 파일에 씁니다. 실패하면 세 번까지 다시 해 봅니다
+#   report      : 저장이 성공했을 때만 answer 를 그대로 보여줍니다
+# 업무 변경과 처리 기록을 한 번에 저장하므로, 저장이 실패하면 둘 다 반영되지 않습니다.
+
+SAVE_TRIES = 3
+
+
+def common_log_request_node(state: BankState):
+    log = logger.get_logger()
+    with log.node("common_log_request"):
+        # 업무 노드가 바꾼 데이터가 있으면 거기에, 없으면(거절) 지금 파일 내용에 덧붙입니다.
+        data = state.get("new_data") or data_store.load()
+        record = {
+            "request_id": "req-%04d" % (len(data["requests"]) + 1),
+            "owner_id": functions.CURRENT_USER,
+            "task_type": state["proposal"]["task"],
+            "content": dict(state["proposal"]["rows"]),
+            "status": state["result"],
+            "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        }
+        data["requests"].append(record)
+        log.detail("처리 기록 %s  %s / %s" % (record["request_id"], record["task_type"], record["status"]))
+
+    return {"new_data": data}
+
+
+def common_save_node(state: BankState):
+    # retry 는 저장에만 붙입니다. 승인에 붙이면 같은 질문을 반복하게 됩니다.
+    # 저장이 실패해도 파일은 그대로 남습니다 (data_store 가 보장합니다).
+    log = logger.get_logger()
+    with log.node("common_save"):
+        for attempt in range(1, SAVE_TRIES + 1):
+            try:
+                data_store.save(state["new_data"])
+                return {"new_data": None}
+            except data_store.DataStoreError:
+                log.detail("저장 실패 %d/%d" % (attempt, SAVE_TRIES))     # 사유는 data_store 가 로그에 남깁니다
+
+    # new_data 는 비웁니다. 저장 못 한 데이터를 State 에 남겨 두지 않습니다.
+    return {"new_data": None, "result": "실패",
+            "error": "저장에 실패해 처리하지 못했습니다. 바뀐 것은 없습니다."}
+
+
+def common_report_node(state: BankState):
+    # 저장과 안내를 나눈 이유: 한 곳에 두면 저장이 실패했는데 "완료" 를 말하게 됩니다.
+    with logger.get_logger().node("common_report"):
+        if state["result"] == "실패":
+            return {"answer": state["error"]}
+    return {}

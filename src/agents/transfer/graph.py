@@ -1,14 +1,18 @@
 # 이체 에이전트 그래프입니다. 계좌 에이전트 그래프 안에 노드로 들어갑니다.
 #
-#   START → extract → check ─┬─ 다 모임        → propose → approve → interpret ─┬─ 승인      → approved → END
-#              ↑       ↑     ├─ 후보 여러 개   → confirm → check 로     ↑        ├─ 거절·취소 → reject   → END
-#              │       │     ├─ 정보 부족      → ask ───→ extract 로    └─ 모름 ─┤
-#              │       │     └─ 계좌 없음·취소 → fail → END                      │
-#              │       └──────────────────────────────── revise ←──── 수정 ─────┘
+#   START → extract → check ─┬─ 다 모임        → propose → approve → interpret ─┬─ 승인      → approved ─┐
+#              ↑       ↑     ├─ 후보 여러 개   → confirm → check 로     ↑        ├─ 거절·취소 → reject   ─┤
+#              │       │     ├─ 정보 부족      → ask ───→ extract 로    └─ 모름 ─┤                        │
+#              │       │     └─ 계좌 없음·취소 → fail → END                      │                        │
+#              │       └──────────────────────────────── revise ←──── 수정 ─────┘                        │
+#                                                                                                         │
+#              END ← report ← save ← log_request ←────────────────────────────────────────────────────────┘
 
 from langgraph.graph import END, START, StateGraph
 
-from agents.common.nodes import common_approve_node, common_interpret_node, common_reject_node
+from agents.common.nodes import (common_approve_node, common_interpret_node,
+                                 common_log_request_node, common_reject_node,
+                                 common_report_node, common_save_node)
 from agents.transfer.nodes import (route_after_ask, route_after_check, route_after_confirm,
                                    route_after_interpret, transfer_approved_node,
                                    transfer_ask_node, transfer_check_node,
@@ -29,6 +33,9 @@ builder.add_node("common_interpret", common_interpret_node)
 builder.add_node("transfer_revise", transfer_revise_node)
 builder.add_node("transfer_approved", transfer_approved_node)
 builder.add_node("common_reject", common_reject_node)
+builder.add_node("common_log_request", common_log_request_node)
+builder.add_node("common_save", common_save_node)
+builder.add_node("common_report", common_report_node)
 builder.add_node("transfer_fail", transfer_fail_node)
 
 builder.add_edge(START, "transfer_extract")
@@ -42,8 +49,11 @@ builder.add_edge("common_approve", "common_interpret")
 builder.add_conditional_edges("common_interpret", route_after_interpret,
                               ["transfer_approved", "common_reject", "transfer_revise", "common_approve"])
 builder.add_edge("transfer_revise", "transfer_check")
-builder.add_edge("transfer_approved", END)
-builder.add_edge("common_reject", END)
+builder.add_edge("transfer_approved", "common_log_request")
+builder.add_edge("common_reject", "common_log_request")
+builder.add_edge("common_log_request", "common_save")
+builder.add_edge("common_save", "common_report")
+builder.add_edge("common_report", END)
 builder.add_edge("transfer_fail", END)
 
 transfer_graph = builder.compile()

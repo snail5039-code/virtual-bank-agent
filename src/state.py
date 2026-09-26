@@ -30,6 +30,10 @@ class BankState(TypedDict):
     proposal: dict          # 처리안. 계산만 한 결과이고 아직 저장하지 않았습니다
     approval: str           # 대기 / 승인 / 거절 / 취소 / 수정 / 모름
 
+    # 마무리
+    new_data: dict          # 저장할 데이터. 저장이 끝나면 비웁니다
+    result: str             # 완료 / 거절 / 실패 (처리 기록에 남깁니다)
+
     # 맥락 (새 요청에도 남겨 둡니다)
     last_transfer: str      # 직전 이체. 예) "출금=생활비, 입금=저축"
 
@@ -42,5 +46,5 @@ def new_request(query):
         "from_name": None, "to_name": None,
         "from_account": None, "to_account": None, "amount": None,
         "candidates": None, "confirm_for": None, "question": None, "error": None,
-        "proposal": None, "approval": None,
+        "proposal": None, "approval": None, "new_data": None, "result": None,
     }
