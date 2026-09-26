@@ -1,12 +1,17 @@
 # 계좌·카드 업무를 처리하는 Python 함수들입니다.
 # 금액 같은 숫자는 여기서 낸 값을 그대로 씁니다. LLM 이 만들지 않습니다.
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import data_store
 
 # 로그인한 사용자입니다. 인증(3-5 단계)을 만들기 전까지는 고정해 둡니다.
 CURRENT_USER = "user-001"
+
+# 기준일. "오늘", "이번 주", "이번 달" 을 이 날짜로 계산합니다. 프로그램을 켠 날짜입니다.
+BASE_DATE = date.today()
+
+TYPES = {"입금": "deposit", "출금": "withdrawal"}
 
 
 def get_accounts(owner_id):
@@ -24,6 +29,56 @@ def find_accounts(owner_id, name):
         return []
     return [account for account in get_accounts(owner_id)
             if name in account["nickname"] or name in account["bank_name"]]
+
+
+def get_cards(owner_id):
+    data = data_store.load()
+    return [card for card in data["cards"] if card["owner_id"] == owner_id]
+
+
+def period_range(period):
+    # 기간 이름을 (시작일, 종료일) 로 바꿉니다. 둘 다 포함입니다. 전체면 (None, None).
+    if period == "오늘":
+        return BASE_DATE, BASE_DATE
+    if period == "어제":
+        day = BASE_DATE - timedelta(days=1)
+        return day, day
+    if period in ("이번 주", "지난 주"):   # 월요일 ~ 일요일
+        start = BASE_DATE - timedelta(days=BASE_DATE.weekday())
+        if period == "지난 주":
+            start -= timedelta(days=7)
+        return start, start + timedelta(days=6)
+    if period == "이번 달":
+        start = BASE_DATE.replace(day=1)
+    elif period == "지난 달":
+        start = (BASE_DATE.replace(day=1) - timedelta(days=1)).replace(day=1)
+    else:
+        return None, None
+    next_month = (start + timedelta(days=32)).replace(day=1)
+    return start, next_month - timedelta(days=1)
+
+
+def get_transactions(owner_id, account_ids=None, start=None, end=None,
+                     kind=None, min_amount=None, max_amount=None):
+    # 조건을 조합해 거래 내역을 거릅니다. 비워 둔 조건은 보지 않습니다. 최근순으로 돌려줍니다.
+    # kind : 입금 / 출금 / 결제 (결제 = 카드를 써서 나간 거래)
+    result = []
+    for tx in data_store.load()["transactions"]:
+        day = date.fromisoformat(tx["occurred_at"][:10])
+        if tx["owner_id"] != owner_id:
+            continue
+        if account_ids and tx["account_id"] not in account_ids:
+            continue
+        if (start and day < start) or (end and day > end):
+            continue
+        if kind == "결제" and not tx["card_id"]:
+            continue
+        if kind in TYPES and tx["type"] != TYPES[kind]:
+            continue
+        if (min_amount and tx["amount"] < min_amount) or (max_amount and tx["amount"] > max_amount):
+            continue
+        result.append(tx)
+    return sorted(result, key=lambda tx: tx["occurred_at"], reverse=True)
 
 
 def transfer(data, from_id, to_id, amount):
