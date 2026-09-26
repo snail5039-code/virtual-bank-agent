@@ -3,8 +3,7 @@
 #   account_router : 계좌 요청이 조회 / 거래내역 / 이체 / 설정 중 무엇인지 고릅니다
 #   account_query  : 계좌 목록과 잔액, 총액을 보여줍니다
 #   account_history: 거래 내역을 조건(기간·계좌·종류·금액)으로 걸러 보여줍니다
-#   account_todo   : 설정은 아직 준비 중이라고 안내합니다
-#   (이체는 이체 에이전트 그래프로 넘깁니다)
+#   (이체는 이체 에이전트 그래프로, 설정은 설정 에이전트 그래프로 넘깁니다)
 
 from datetime import date
 from typing import Literal, Optional
@@ -45,11 +44,12 @@ def account_query_node(state: BankState):
 
         lines = ["보유 계좌 %d개입니다." % len(accounts)]
         for account in accounts:
-            lines.append("- %s (%s %s) : %s원" % (
+            lines.append("- %s (%s %s) : %s원  [%s]" % (
                 account["nickname"],
                 account["bank_name"],
                 account["account_number"],
                 format(account["balance"], ","),
+                account["purpose"],
             ))
         # 합계는 Python 이 더합니다. LLM 이 계산하지 않습니다 (원칙 6).
         lines.append("총 잔액 : %s원" % format(sum(account["balance"] for account in accounts), ","))
@@ -118,12 +118,6 @@ def account_history_node(state: BankState):
     return {"answer": "\n".join(lines)}
 
 
-def account_todo_node(state: BankState):
-    with logger.get_logger().node("account_todo"):
-        answer = "계좌 %s 업무는 아직 준비 중입니다." % state["task"]
-    return {"answer": answer}
-
-
 def route_by_task(state: BankState):
     # 고른 업무에 따라 다음 노드를 정합니다.
     if state["task"] == "조회":
@@ -132,4 +126,4 @@ def route_by_task(state: BankState):
         return "account_history"
     if state["task"] == "이체":
         return "transfer"
-    return "account_todo"
+    return "account_setting"

@@ -188,6 +188,32 @@ def transfer_all(data, from_id, targets, keep):
     return None
 
 
+SETTING_FIELDS = {"별명": "nickname", "용도": "purpose"}
+MAX_SETTING_LEN = 20
+
+
+def check_setting(owner_id, account_id, field, value):
+    # 계좌 별명·용도를 바꿀 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
+    # 별명은 같은 사용자의 다른 계좌와 겹치면 안 됩니다. 용도는 겹쳐도 됩니다.
+    value = value.strip()
+    account = get_account(owner_id, account_id)
+    if not 1 <= len(value) <= MAX_SETTING_LEN:
+        return "새 %s: 1~%d자로 정해 주세요." % (field, MAX_SETTING_LEN)
+    if account[SETTING_FIELDS[field]] == value:
+        return "바뀌는 것이 없습니다. (지금 %s : %s)" % (field, value)
+    if field == "별명":
+        for other in get_accounts(owner_id):
+            if other["account_id"] != account_id and other["nickname"] == value:
+                return "다른 계좌가 이미 '%s' 별명을 쓰고 있습니다." % value
+    return None
+
+
+def change_setting(data, account_id, field, value):
+    # data 안에서 계좌 별명·용도를 바꿉니다. 파일에 저장하지는 않습니다.
+    account = next(a for a in data["accounts"] if a["account_id"] == account_id)
+    account[SETTING_FIELDS[field]] = value.strip()
+
+
 def get_account(owner_id, account_id):
     # ID 로 계좌 하나를 찾습니다. 없거나 다른 사람 계좌면 None 입니다.
     for account in get_accounts(owner_id):
