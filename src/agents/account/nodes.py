@@ -49,6 +49,8 @@ def account_query_node(state: BankState):
                 account["account_number"],
                 format(account["balance"], ","),
             ))
+        # 합계는 Python 이 더합니다. LLM 이 계산하지 않습니다 (원칙 6).
+        lines.append("총 잔액 : %s원" % format(sum(account["balance"] for account in accounts), ","))
 
     return {"answer": "\n".join(lines)}
 
