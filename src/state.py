@@ -38,6 +38,9 @@ class BankState(TypedDict):
     new_value: str          # 새 값
     reg_info: dict          # 등록할 상대 계좌 {bank_name, account_number, holder_name, nickname}
 
+    # 카드 조회
+    card_filter: dict       # 무엇을 볼지(info)와 조건. 카드 번호는 본인 확인을 거치므로 노드 사이에 남겨 둡니다
+
     # 승인
     proposal: dict          # 처리안. 계산만 한 결과이고 아직 저장하지 않았습니다
     approval: str           # 대기 / 승인 / 거절 / 취소 / 수정 / 모름
@@ -63,7 +66,7 @@ def new_request(query):
         "from_account": None, "to_account": None, "amount": None, "keep_amount": None,
         "splits": None, "targets": None, "scheduled_at": None,
         "setting_action": None, "target_name": None, "target_account": None,
-        "setting_field": None, "new_value": None, "reg_info": None,
+        "setting_field": None, "new_value": None, "reg_info": None, "card_filter": None,
         "candidates": None, "confirm_for": None, "question": None, "error": None,
         "proposal": None, "approval": None, "new_data": None, "result": None,
         "auth_tries": 0,

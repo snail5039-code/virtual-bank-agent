@@ -78,6 +78,28 @@ def find_cards(owner_id, bank_name=None, card_name=None, card_type=None, status=
     return cards
 
 
+def get_card_history(owner_id, card_ids, start=None, end=None):
+    # 카드 이용 내역. 두 곳을 합칩니다. (기획서 8장)
+    #   체크카드 : transactions 에 출금으로 남아 있으므로 거래내역 함수에 카드 필터만 줘서 재사용합니다
+    #   신용카드 : card_usages 에 따로 있습니다
+    # 둘 다 {card_id, amount, occurred_at, merchant} 가 있어서 그대로 합쳐 최근순으로 돌려줍니다.
+    result = get_transactions(owner_id, start=start, end=end, card_ids=card_ids)
+    for usage in data_store.load()["card_usages"]:
+        day = date.fromisoformat(usage["occurred_at"][:10])
+        if usage["owner_id"] != owner_id or usage["card_id"] not in card_ids:
+            continue
+        if (start and day < start) or (end and day > end):
+            continue
+        result.append(usage)
+    return sorted(result, key=lambda item: item["occurred_at"], reverse=True)
+
+
+def get_memberships(owner_id, card_ids):
+    # 이 카드들에 붙은 멤버십을 돌려줍니다.
+    return [m for m in data_store.load()["memberships"]
+            if m["owner_id"] == owner_id and m["card_id"] in card_ids]
+
+
 def period_range(period):
     # 기간 이름을 (시작일, 종료일) 로 바꿉니다. 둘 다 포함입니다. 전체면 (None, None).
     today = base_date()
@@ -102,9 +124,10 @@ def period_range(period):
 
 
 def get_transactions(owner_id, account_ids=None, start=None, end=None,
-                     kind=None, min_amount=None, max_amount=None):
+                     kind=None, min_amount=None, max_amount=None, card_ids=None):
     # 조건을 조합해 거래 내역을 거릅니다. 비워 둔 조건은 보지 않습니다. 최근순으로 돌려줍니다.
     # kind : 입금 / 출금 / 결제 (결제 = 카드를 써서 나간 거래)
+    # card_ids : 이 카드로 결제한 거래만 봅니다 (카드 이용 내역에서 씁니다)
     result = []
     for tx in data_store.load()["transactions"]:
         day = date.fromisoformat(tx["occurred_at"][:10])
@@ -115,6 +138,8 @@ def get_transactions(owner_id, account_ids=None, start=None, end=None,
         if (start and day < start) or (end and day > end):
             continue
         if kind == "결제" and not tx["card_id"]:
+            continue
+        if card_ids and tx["card_id"] not in card_ids:
             continue
         if kind in TYPES and tx["type"] != TYPES[kind]:
             continue
