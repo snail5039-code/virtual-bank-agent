@@ -3,7 +3,7 @@
 #   common_pending_check : [분기 0] 멈춰 있는 업무가 있는지 봅니다 (main.py 에서 부릅니다)
 #   common_authenticate  : 본인 확인을 받습니다. 세션 동안 한 번만 (interrupt)
 #   common_approve       : 처리안을 보여주고 승인을 기다립니다 (interrupt)
-#   common_interpret     : 승인 질문에 대한 답을 승인 / 거절 / 취소 / 수정 / 모름 으로 가릅니다 (LLM)
+#   common_interpret     : 승인 질문에 대한 답을 승인 / 거절 / 취소 / 수정 / 다른요청 / 모름 으로 가릅니다 (LLM)
 #   common_reject        : 거절·취소를 안내합니다
 #   common_log_request   : 처리 기록을 남깁니다
 #   common_save          : 파일에 저장합니다 (실패하면 세 번까지)
@@ -48,14 +48,26 @@ def approval(text):
 
 # ---------------------------------------------------------------- 분기 0
 def common_pending_check(graph, config):
-    # 멈춰 있는 업무가 있으면 그 종류(approval / question)를, 없으면 None 을 돌려줍니다.
+    # 멈춰 있는 업무가 있으면 그 종류(approval / question / secret)를, 없으면 None 을 돌려줍니다.
     # 이 판정이 없으면 승인 대기 중에 친 "응, 진행해" 가 새 요청으로 분류됩니다.
+    #
+    # 사용자에게 무언가를 물어본(interrupt) 경우만 대기로 봅니다.
+    # 노드에서 예외가 나도 그래프는 그 노드 앞에 멈춘 채로 남는데(next 가 남음),
+    # 그걸 대기로 보면 다음 입력이 "답" 으로 들어가 이전 요청을 다시 실행합니다.
     snapshot = graph.get_state(config)
-    if not snapshot.next:
-        return None
     for item in snapshot.interrupts:
         return item.value["kind"]
-    return QUESTION
+    return None
+
+
+# ---------------------------------------------------------------- 취소
+CANCEL_WORDS = ["취소", "그만", "안 할래", "안할래", "관둘래", "됐어"]
+
+
+def is_cancel(answer):
+    # 질문(부족 정보·후보 고르기·본인 확인)에 대한 답이 "그만두겠다" 는 뜻인지 봅니다.
+    # "취소할게", "그만할래" 처럼 말해도 알아듣게 한 곳에서 판단합니다.
+    return any(word in answer for word in CANCEL_WORDS)
 
 
 # ---------------------------------------------------------------- 인증
@@ -81,7 +93,7 @@ def common_authenticate_node(state: BankState):
 
     answer = interrupt(secret("\n".join(lines))).strip()
 
-    if answer == "취소":
+    if is_cancel(answer):
         return {"error": "본인 확인을 취소했습니다."}
     if functions.authenticate(functions.CURRENT_USER, answer):
         log.note("본인 확인 성공")
@@ -123,7 +135,7 @@ def common_approve_node(state: BankState):
 
 # ---------------------------------------------------------------- 응답 해석
 class ApprovalDecision(BaseModel):
-    decision: Literal["승인", "거절", "취소", "수정", "모름"] = Field(description="사용자 답의 종류")
+    decision: Literal["승인", "거절", "취소", "수정", "다른요청", "모름"] = Field(description="사용자 답의 종류")
     reason: str = Field(description="그렇게 고른 이유")
 
 
@@ -145,6 +157,9 @@ def common_interpret_node(state: BankState):
 def common_reject_node(state: BankState):
     with logger.get_logger().node("common_reject"):
         answer = "%s 요청을 진행하지 않았습니다. 바뀐 것은 없습니다." % state["proposal"]["task"]
+        if state["approval"] == "다른요청":
+            # 승인 대기 중에 다른 요청을 치면 지금 업무를 멈추고 다시 요청하게 합니다.
+            answer += "\n진행 중이던 요청을 멈췄습니다. 새 요청을 다시 입력해 주세요."
     return {"answer": answer, "result": "거절"}
 
 

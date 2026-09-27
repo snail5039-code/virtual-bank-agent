@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 import data_store
 import functions
 import logger
-from agents.common.nodes import question
+from agents.common.nodes import is_cancel, question
 from agents.transfer.prompts import extract_prompt, revise_prompt
 from model import llm
 from state import BankState
@@ -149,7 +149,7 @@ def transfer_confirm_node(state: BankState):
 
     answer = interrupt(question(text)).strip()
 
-    if answer == "취소":
+    if is_cancel(answer):
         return {"error": "이체를 취소했습니다."}
     if answer.isdigit() and 1 <= int(answer) <= len(candidates):
         picked = candidates[int(answer) - 1]
@@ -177,6 +177,7 @@ def transfer_ask_node(state: BankState):
         "  금액 : " + amount_text,
         "-" * 40,
         "  " + ask,
+        "  (그만두려면 '취소')",
         "=" * 40,
     ])
 
@@ -185,7 +186,7 @@ def transfer_ask_node(state: BankState):
 
     answer = interrupt(question(text)).strip()
 
-    if answer == "취소":
+    if is_cancel(answer):
         return {"error": "이체를 취소했습니다."}
     # 답을 새 입력으로 삼아 extract 로 돌아갑니다. 무엇을 물었는지도 같이 넘깁니다.
     return {"query": answer, "question": ask}
@@ -322,7 +323,7 @@ def route_after_interpret(state: BankState):
     decision = state["approval"]
     if decision == "승인":
         return "transfer_execute"
-    if decision in ("거절", "취소"):
+    if decision in ("거절", "취소", "다른요청"):
         return "common_reject"
     if decision == "수정":
         return "transfer_revise"

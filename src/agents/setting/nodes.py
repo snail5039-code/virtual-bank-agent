@@ -245,7 +245,7 @@ def route_after_interpret(state: BankState):
     decision = state["approval"]
     if decision == "승인":
         return "setting_execute"
-    if decision in ("거절", "취소"):
+    if decision in ("거절", "취소", "다른요청"):
         return "common_reject"
     if decision == "수정":
         return "setting_extract"        # 바꾼 말로 다시 뽑고 처리안을 새로 만듭니다
