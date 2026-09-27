@@ -8,8 +8,9 @@
 from datetime import date
 from typing import Literal, Optional
 
+from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 import functions
 import logger
@@ -61,8 +62,9 @@ class HistoryFilter(BaseModel):
     account_name: Optional[str] = Field(default=None, description="계좌 이름")
     period: Literal["오늘", "어제", "이번 주", "지난 주", "이번 달", "지난 달", "전체"] = Field(
         default="전체", description="기간")
-    start_date: Optional[str] = Field(default=None, description="직접 말한 시작일 YYYY-MM-DD")
-    end_date: Optional[str] = Field(default=None, description="직접 말한 종료일 YYYY-MM-DD")
+    # 타입을 date 로 고정합니다. 형식이 틀린 값은 pydantic 이 받지 않아 코드 안으로 들어오지 못합니다.
+    start_date: Optional[date] = Field(default=None, description="직접 말한 시작일 YYYY-MM-DD")
+    end_date: Optional[date] = Field(default=None, description="직접 말한 종료일 YYYY-MM-DD")
     kind: Optional[Literal["입금", "출금", "결제"]] = Field(default=None, description="거래 종류")
     min_amount: Optional[int] = Field(default=None, description="이 금액 이상")
     max_amount: Optional[int] = Field(default=None, description="이 금액 이하")
@@ -75,10 +77,15 @@ def account_history_node(state: BankState):
     # 조건은 LLM 이 뽑고, 날짜 계산과 거르기는 Python 이 합니다.
     log = logger.get_logger()
     with log.node("account_history"):
-        f = llm_with_history_output.invoke([
-            SystemMessage(content=history_prompt.format(year=functions.BASE_DATE.year, today=functions.BASE_DATE)),
-            HumanMessage(content=state["query"]),
-        ])
+        # 그래도 LLM 이 형식을 어기면 검증 오류가 나므로, 오류 대신 안내로 끝냅니다.
+        try:
+            f = llm_with_history_output.invoke([
+                SystemMessage(content=history_prompt.format(year=functions.base_date().year, today=functions.base_date())),
+                HumanMessage(content=state["query"]),
+            ])
+        except (ValidationError, OutputParserException) as e:
+            log.detail("조건 형식 오류  %s" % type(e).__name__)
+            return {"answer": "날짜를 알아듣지 못했습니다. (예: 9월 1일부터 10일까지 / 이번 달 / 지난 주)"}
         log.detail("조건  계좌=%s 기간=%s %s~%s 종류=%s 금액=%s~%s" % (
             f.account_name, f.period, f.start_date, f.end_date, f.kind, f.min_amount, f.max_amount))
 
@@ -89,10 +96,9 @@ def account_history_node(state: BankState):
                 return {"answer": "'%s' 계좌를 찾을 수 없습니다." % f.account_name}
 
         start, end = functions.period_range(f.period)
-        if f.start_date:
-            start = date.fromisoformat(f.start_date)
-        if f.end_date:
-            end = date.fromisoformat(f.end_date)
+        # 직접 말한 날짜가 있으면 그걸 씁니다. 이미 date 라서 바꿀 필요가 없습니다.
+        start = f.start_date or start
+        end = f.end_date or end
 
         found = functions.get_transactions(
             functions.CURRENT_USER, [a["account_id"] for a in accounts],

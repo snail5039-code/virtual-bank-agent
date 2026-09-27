@@ -27,7 +27,9 @@ history_prompt = """
 - period: 오늘 / 어제 / 이번 주 / 지난 주 / 이번 달 / 지난 달 / 전체 중 하나.
   날짜를 직접 말하지 않았고 기간도 없으면 전체.
   이 중에 없는 기간(예: 그저께, 3일 전)은 오늘({today})을 기준으로 start_date, end_date 를 채운다.
-- start_date, end_date: 날짜를 직접 말했을 때만 YYYY-MM-DD 로 채운다 (예: 9월 1일부터 10일까지).
+- start_date, end_date: 날짜를 직접 말했을 때만 채운다. 반드시 YYYY-MM-DD 형식이다.
+  (예: 9월 1일부터 10일까지 → start_date={year}-09-01, end_date={year}-09-10 / 9월 5일 → 둘 다 {year}-09-05)
+  "9월 1일", "09/01" 처럼 쓰지 않는다.
   연도를 말하지 않았으면 {year} 년이다.
 - kind: 입금 / 출금 / 결제 중 하나. 결제는 카드를 써서 쓴 돈이다. 말하지 않았으면 비운다.
 - min_amount, max_amount: 금액 조건. 원 단위 정수 (예: 5만원 이상 → min_amount=50000).

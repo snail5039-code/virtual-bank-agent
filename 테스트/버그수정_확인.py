@@ -11,6 +11,11 @@
 #      1) 승인 대기 중 다른 요청 : 처리안에 "내 계좌 잔액 보여줘" → 진행 중이던 요청을 멈췄다고 안내 → 다음 입력은 새 요청
 #      2) 부족 정보 질문에 "취소할게" → 이체를 취소했습니다 (예전에는 "취소" 한 단어만 알아들음)
 #      3) 본인 확인에 "그만할래"   → 본인 확인을 취소했습니다
+#      4) 부족 정보 질문에 다른 요청 : "[출금] 돈을 보낼 계좌" 에 "내 계좌 잔액 보여줘"
+#         → 진행 중이던 이체를 멈췄다고 안내 (예전에는 그 말을 답으로 처리해 다시 물음)
+#   C) 거래 내역 날짜 형식
+#      1) 타입 고정 : start_date 가 date 타입이라 "9월 1일" 은 들어오지 못하고 "2026-09-01" 만 받는다
+#      2) 그래도 LLM 이 형식을 어겨 검증 오류가 나면(가짜 LLM) → 오류 대신 "날짜를 알아듣지 못했습니다" 안내
 #
 # 시작과 끝에 data.json 을 원본으로 되돌립니다.
 
@@ -50,6 +55,39 @@ for text in ["생활비에서 저축으로 10만원 보내줘", "내 계좌 잔�
     print("   처리한 요청(query) =", main.bank_graph.get_state(main.config).values.get("query"))
 '''
 
+C = r'''
+import os, sys
+os.environ.setdefault("GOOGLE_API_KEY", "fake")
+sys.path.insert(0, "src")
+from types import SimpleNamespace as NS
+import agents.supervisor.nodes as sn, agents.account.nodes as an
+from langchain_core.exceptions import OutputParserException
+from pydantic import ValidationError
+class Fixed:
+    def __init__(self, value): self.value = value
+    def invoke(self, msgs): return self.value
+class BadDate:
+    # structured output 이 날짜 형식 검증에 실패한 상황을 흉내 냅니다.
+    def invoke(self, msgs): raise OutputParserException("날짜 형식 오류 (가짜)")
+
+# 1) 타입 고정 : "9월 1일" 은 date 칸에 들어가지 못한다
+try:
+    an.HistoryFilter(start_date="9월 1일")
+    print("   타입 고정 : 통과됨 (문제)")
+except ValidationError:
+    print("   타입 고정 : '9월 1일' 은 받지 않음 (ValidationError)")
+print("   타입 고정 : '2026-09-01' 은 →", an.HistoryFilter(start_date="2026-09-01").start_date)
+
+# 2) 검증 실패 → 오류 대신 안내
+sn.llm_with_supervisor_output = Fixed(NS(domain="계좌", reason="t"))
+an.llm_with_account_output = Fixed(NS(task="거래내역", reason="t"))
+an.llm_with_history_output = BadDate()
+import main, logger, data_store
+log = logger.setup(); data_store.ensure()
+print(">> 9월 1일부터 내역 보여줘")
+print("  ", main.respond("9월 1일부터 내역 보여줘", log))
+'''
+
 
 def run(args, stdin=None):
     result = subprocess.run(
@@ -75,7 +113,12 @@ inputs = [
 ]
 run(["src/main.py"], "\n".join(inputs) + "\n")
 
-inputs = ["생활비에서 저축으로 1만원 보내줘", "그만할래", "종료"]      # 3) 본인 확인에 그만 (새 세션)
+inputs = ["생활비에서 저축으로 1만원 보내줘", "그만할래",              # 3) 본인 확인에 그만 (새 세션)
+          "저축으로 보내줘", "내 계좌 잔액 보여줘",                   # 4) 부족 정보 질문에 다른 요청
+          "종료"]
 run(["src/main.py"], "\n".join(inputs) + "\n")
+
+print("===== C) 거래 내역 날짜 형식 =====")
+run(["-c", C])
 
 shutil.copy("data/initial_data.json", DATA)

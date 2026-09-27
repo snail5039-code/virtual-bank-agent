@@ -16,9 +16,10 @@
 from datetime import datetime
 from typing import Optional
 
+from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.types import interrupt
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 import data_store
 import functions
@@ -40,7 +41,9 @@ class TransferInfo(BaseModel):
     amount: Optional[int] = Field(default=None, description="보낼 금액 (원)")
     keep_amount: Optional[int] = Field(default=None, description="출금 계좌에 남길 금액 (원). 조건부 이체일 때만")
     splits: Optional[list[Split]] = Field(default=None, description="입금 계좌가 두 곳 이상일 때만. 계좌별 금액")
-    scheduled_at: Optional[str] = Field(default=None, description="예약 이체 시각 YYYY-MM-DDTHH:MM. 예약일 때만")
+    # 타입을 datetime 으로 고정합니다. 형식이 틀린 값은 pydantic 이 받지 않습니다.
+    scheduled_at: Optional[datetime] = Field(default=None, description="예약 이체 시각 YYYY-MM-DDTHH:MM. 예약일 때만")
+    other_request: bool = Field(default=False, description="방금 한 질문의 답이 아니라 이체와 관계없는 다른 요청이면 true")
 
 
 llm_with_transfer_output = llm.with_structured_output(TransferInfo)
@@ -57,12 +60,22 @@ def transfer_extract_node(state: BankState):
             question=state.get("question") or "없음",
             now=datetime.now().strftime("%Y-%m-%dT%H:%M (%A)"),
         )
-        result = llm_with_transfer_output.invoke([
-            SystemMessage(content=prompt),
-            HumanMessage(content=state["query"]),
-        ])
-        log.detail("추출  출금=%s  입금=%s  금액=%s  남길 금액=%s" % (
-            result.from_name, result.to_name, result.amount, result.keep_amount))
+        # 그래도 LLM 이 형식(시각·금액)을 어기면 검증 오류가 나므로, 오류 대신 안내로 끝냅니다.
+        try:
+            result = llm_with_transfer_output.invoke([
+                SystemMessage(content=prompt),
+                HumanMessage(content=state["query"]),
+            ])
+        except (ValidationError, OutputParserException) as e:
+            log.detail("추출 형식 오류  %s" % type(e).__name__)
+            return {"error": "요청을 알아듣지 못했습니다. 다시 말해 주세요. (예약이면 '내일 오전 9시에' 처럼)"}
+        log.detail("추출  출금=%s  입금=%s  금액=%s  남길 금액=%s  다른 요청=%s" % (
+            result.from_name, result.to_name, result.amount, result.keep_amount, result.other_request))
+
+        # 질문(부족 정보)에 답하는 대신 다른 요청("잔액 보여줘")을 쳤으면 이체를 멈춥니다.
+        # 질문을 하지 않은 첫 요청에서는 보지 않습니다.
+        if state.get("question") and result.other_request:
+            return {"error": "진행 중이던 이체를 멈췄습니다. 새 요청을 다시 입력해 주세요."}
 
         # 비어 있는 칸만 채웁니다. 이미 정해진 값은 바꾸지 않습니다.
         update = {}
@@ -81,8 +94,11 @@ def transfer_extract_node(state: BankState):
             log.detail("나눠 이체  %s" % update["splits"])
         # 예약 이체 : 시각을 말하면 지금 보내지 않고 예약만 합니다.
         if result.scheduled_at and not state.get("scheduled_at"):
-            update["scheduled_at"] = result.scheduled_at
-            log.detail("예약 시각  %s" % result.scheduled_at)
+            # State 에는 문자열로 둡니다. 저장·표시하는 함수들이 문자열을 받습니다.
+            # LLM 이 시각 끝에 시간대(Z = UTC)를 붙여 주면 한국 시각으로 바꿀 때 9시간이 밀립니다.
+            # 사용자가 말한 시각은 항상 이 컴퓨터 기준이므로 시간대를 떼고 씁니다.
+            update["scheduled_at"] = result.scheduled_at.replace(tzinfo=None).isoformat(timespec="minutes")
+            log.detail("예약 시각  %s" % update["scheduled_at"])
 
     return update
 
