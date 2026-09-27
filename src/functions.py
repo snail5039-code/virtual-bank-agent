@@ -50,9 +50,32 @@ def authenticate(owner_id, value):
     return value in answers
 
 
+# 카드 상태와 종류를 화면에 보여줄 한국어로 바꾸는 표입니다.
+CARD_STATUS = {"active": "사용 가능", "locked": "일시 잠금", "lost": "분실 정지", "cancelled": "해지"}
+CARD_TYPES = {"debit": "체크", "credit": "신용"}
+
+
 def get_cards(owner_id):
     data = data_store.load()
     return [card for card in data["cards"] if card["owner_id"] == owner_id]
+
+
+def find_cards(owner_id, bank_name=None, card_name=None, card_type=None, status=None):
+    # 조건으로 카드를 거릅니다. 비어 있는(None) 조건은 거르지 않습니다.
+    # card_type 은 체크 / 신용, status 는 사용 가능 / 일시 잠금 / 분실 정지 / 해지 (한국어로 받습니다)
+    # "가상 은행", "여행 카드" 처럼 띄어 쓰거나 붙은 말이 있어도 찾도록 공백과 "카드" 를 떼고 비교합니다.
+    cards = get_cards(owner_id)
+    if bank_name:
+        bank_name = bank_name.replace(" ", "")
+        cards = [c for c in cards if bank_name in c["bank_name"].replace(" ", "")]
+    if card_name:
+        card_name = card_name.replace("카드", "").strip()
+        cards = [c for c in cards if card_name in c["name"]]
+    if card_type:
+        cards = [c for c in cards if CARD_TYPES[c["card_type"]] == card_type]
+    if status:
+        cards = [c for c in cards if CARD_STATUS[c["status"]] == status]
+    return cards
 
 
 def period_range(period):

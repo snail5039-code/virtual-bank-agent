@@ -1,7 +1,6 @@
 # 1단 Supervisor 의 노드 함수입니다.
 #
 #   supervisor  : 요청을 보고 계좌 / 카드 / 없음 중 하나를 고릅니다
-#   card        : 아직 준비 중이라고 안내합니다
 #   guide       : 은행 업무가 아닌 요청에 사용법을 안내합니다
 
 from typing import Literal
@@ -33,12 +32,6 @@ def supervisor_node(state: BankState):
         log.route(1, result.domain, result.reason)
 
     return {"domain": result.domain, "reason": result.reason}
-
-
-def card_node(state: BankState):
-    with logger.get_logger().node("card"):
-        answer = "카드 업무는 아직 준비 중입니다."
-    return {"answer": answer}
 
 
 def guide_node(state: BankState):
