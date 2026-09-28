@@ -1,0 +1,170 @@
+# 이체 함수입니다. 즉시 이체, 조건부·나눠 이체, 예약 이체.
+
+from datetime import datetime
+
+import data_store
+import logger
+from functions.account import find_accounts, get_account, get_accounts
+from functions.common import parse_time
+
+def transfer(data, from_id, to_id, amount):
+    # data 안에서 잔액을 옮기고 거래 내역을 출금 1건, 입금 1건 붙입니다. 파일에 저장하지는 않습니다.
+    # 실행 직전에 잔액을 다시 봅니다. 승인한 뒤에 잔액이 줄었을 수 있기 때문입니다.
+    # 진행할 수 없으면 사유를, 성공하면 None 을 돌려줍니다.
+    accounts = {account["account_id"]: account for account in data["accounts"]}
+    from_account, to_account = accounts[from_id], accounts[to_id]
+    if from_account["balance"] < amount:
+        return "잔액이 부족합니다. (%s 잔액 %s원)" % (from_account["nickname"], format(from_account["balance"], ","))
+
+    from_account["balance"] -= amount
+    to_account["balance"] += amount
+
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    for account, kind in [(from_account, "withdrawal"), (to_account, "deposit")]:
+        data["transactions"].append({
+            "transaction_id": "tx-%03d" % (len(data["transactions"]) + 1),
+            "owner_id": account["owner_id"],
+            "account_id": account["account_id"],
+            "type": kind,
+            "amount": amount,
+            "occurred_at": now,
+            "card_id": None,
+            "merchant": None,
+        })
+    return None
+
+
+def build_targets(owner_id, from_account, to_account, to_name, amount, keep, splits):
+    # 입금 목록(targets)을 만듭니다. 한 곳이면 1개, 나눠 이체면 여러 개입니다.
+    # 조건부 이체면 이체액 = 잔액 - 남길 금액 으로 계산합니다.
+    # (targets, 사유) 를 돌려줍니다. 아직 정보가 모자라면 (None, None) 입니다.
+    if not from_account:
+        return None, None
+
+    if splits:
+        targets = []
+        for split in splits:
+            found = find_accounts(owner_id, split["to_name"])
+            logger.get_logger().resolve(split["to_name"], len(found), found[0]["account_id"] if found else None)
+            if len(found) != 1:
+                return None, "'%s' 계좌를 하나로 정할 수 없습니다. 정확한 이름으로 다시 요청해 주세요." % split["to_name"]
+            targets.append({"to_account": found[0]["account_id"], "to_name": found[0]["nickname"],
+                            "amount": split["amount"] or 0})
+        return targets, None
+
+    if keep is not None:
+        amount = get_account(owner_id, from_account)["balance"] - keep
+    if to_account and amount is not None:
+        return [{"to_account": to_account, "to_name": to_name, "amount": amount}], None
+    return None, None
+
+
+def check_transfer(owner_id, from_account, targets, keep):
+    # [분기 2] 실행할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
+    balance = get_account(owner_id, from_account)["balance"]
+    total = sum(target["amount"] for target in targets)
+    if keep is not None and keep < 0:
+        return "남길 금액은 0원 이상이어야 합니다."
+    if keep is not None and total <= 0:
+        return "잔액이 %s원이라 %s원을 남기면 보낼 금액이 없습니다." % (format(balance, ","), format(keep, ","))
+    if any(target["amount"] <= 0 for target in targets):
+        return "이체 금액은 0원보다 커야 합니다."
+    if any(target["to_account"] == from_account for target in targets):
+        return "출금 계좌와 입금 계좌가 같습니다."
+    if balance < total:
+        return "잔액이 부족합니다. (잔액 %s원 / 보낼 금액 %s원)" % (format(balance, ","), format(total, ","))
+    return None
+
+
+def transfer_all(data, from_id, targets, keep):
+    # 승인된 목록을 data 안에서 한꺼번에 이체합니다. 파일에 저장하지는 않습니다.
+    # 실행 직전에 다시 봅니다. 승인한 뒤에 잔액이 바뀌었을 수 있기 때문입니다.
+    # 진행할 수 없으면 사유를, 성공하면 None 을 돌려줍니다.
+    balance = next(a["balance"] for a in data["accounts"] if a["account_id"] == from_id)
+    total = sum(target["amount"] for target in targets)
+
+    # 조건부 이체 : 잔액이 바뀌면 이체액도 바뀝니다. 그러면 실행하지 않고 다시 요청하게 합니다.
+    if keep is not None and balance - keep != total:
+        return "잔액이 바뀌어 이체할 금액이 달라졌습니다. 다시 요청해 주세요."
+    # 반복하기 전에 총액을 먼저 봅니다. 하나씩 보내다 중간에 멈추지 않게 합니다.
+    if balance < total:
+        return "잔액이 부족합니다. (잔액 %s원 / 보낼 금액 %s원)" % (format(balance, ","), format(total, ","))
+
+    for target in targets:
+        error = transfer(data, from_id, target["to_account"], target["amount"])
+        if error:
+            return error
+    return None
+
+
+# ---------------------------------------------------------------- 예약 이체
+# 상태 : 예약 → 완료 / 실패 / 취소. 목록에서 지우지 않고 상태만 바꿉니다 (나중에 결과를 물을 수 있게).
+
+
+def check_schedule(scheduled_at, targets, keep):
+    # 예약할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
+    if keep is not None or len(targets) != 1:
+        return "예약은 금액을 정한 한 곳 이체만 됩니다. (예: 내일 9시에 생활비에서 저축으로 10만원 보내줘)"
+    if parse_time(scheduled_at) <= datetime.now().astimezone():
+        return "예약 시각이 이미 지났습니다. (%s)" % parse_time(scheduled_at).strftime("%m월 %d일 %H:%M")
+    return None
+
+
+def add_schedule(data, owner_id, from_id, target, scheduled_at):
+    # data 에 예약을 한 줄 덧붙입니다. 돈은 옮기지 않습니다. 파일에 저장하지는 않습니다.
+    numbers = [int(s["schedule_id"].split("-")[1]) for s in data["scheduled_transfers"]]
+    data["scheduled_transfers"].append({
+        "schedule_id": "sch-%03d" % (max(numbers, default=0) + 1),
+        "owner_id": owner_id,
+        "from_account": from_id,
+        "to_account": target["to_account"],
+        "amount": target["amount"],
+        "scheduled_at": parse_time(scheduled_at).isoformat(timespec="seconds"),
+        "status": "예약",
+    })
+
+
+def get_schedules(owner_id):
+    data = data_store.load()
+    return [s for s in data["scheduled_transfers"] if s["owner_id"] == owner_id]
+
+
+def find_schedules(owner_id, name):
+    # 취소할 예약을 찾습니다. 아직 실행 전(예약)인 것만 봅니다.
+    # 예약 번호(sch-001), 입금 계좌 이름, 날짜(09-27) 중 하나가 맞으면 후보입니다.
+    nicknames = {a["account_id"]: a["nickname"] for a in get_accounts(owner_id)}
+    pending = [s for s in get_schedules(owner_id) if s["status"] == "예약"]
+    if not name:
+        return pending
+    return [s for s in pending
+            if name in s["schedule_id"] or name in nicknames.get(s["to_account"], "") or name in s["scheduled_at"]]
+
+
+def cancel_schedule(data, schedule_id):
+    # data 안에서 예약을 취소 상태로 바꿉니다. 파일에 저장하지는 않습니다.
+    schedule = next(s for s in data["scheduled_transfers"] if s["schedule_id"] == schedule_id)
+    schedule["status"] = "취소"
+
+
+def run_due_schedules():
+    # 시각이 지난 예약을 이체합니다. main.py 가 켤 때와 입력을 받을 때마다 부릅니다.
+    # 승인은 예약할 때 받았으므로 다시 묻지 않습니다. 잔액이 모자라면 이체하지 않고 실패로 남깁니다.
+    # 처리한 결과를 한 줄씩 돌려줍니다. 처리할 게 없으면 빈 목록입니다.
+    data = data_store.load()
+    now = datetime.now().astimezone()
+    nicknames = {a["account_id"]: a["nickname"] for a in data["accounts"]}
+    lines = []
+    for s in data["scheduled_transfers"]:
+        if s["status"] != "예약" or parse_time(s["scheduled_at"]) > now:
+            continue
+        error = transfer(data, s["from_account"], s["to_account"], s["amount"])
+        s["status"] = "실패" if error else "완료"
+        lines.append("[예약 이체 %s] %s → %s  %s원  (%s)%s" % (
+            s["status"], nicknames[s["from_account"]], nicknames[s["to_account"]], format(s["amount"], ","),
+            parse_time(s["scheduled_at"]).strftime("%m월 %d일 %H:%M"), "  " + error if error else ""))
+    if lines:
+        try:
+            data_store.save(data)
+        except data_store.DataStoreError:
+            return ["[예약 이체] 저장에 실패해 처리하지 못했습니다. 다음 입력 때 다시 확인합니다."]
+    return lines
