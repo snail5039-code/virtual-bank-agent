@@ -17,8 +17,9 @@ def get_cards(owner_id):
     return [card for card in data["cards"] if card["owner_id"] == owner_id]
 
 
-def find_cards(owner_id, bank_name=None, card_name=None, card_type=None, status=None):
+def find_cards(owner_id, bank_name=None, card_name=None, card_type=None, status=None, exclude_banks=None):
     # 조건으로 카드를 거릅니다. 비어 있는(None) 조건은 거르지 않습니다.
+    # exclude_banks 에 있는 은행의 카드는 뺍니다. ("우리은행 말고 다른 은행은?" → ["우리은행"])
     # card_type 은 체크 / 신용, status 는 사용 가능 / 일시 잠금 / 분실 정지 / 해지 (한국어로 받습니다)
     # "가상 은행", "여행 카드" 처럼 띄어 쓰거나 붙은 말이 있어도 찾도록 공백과 "카드" 를 떼고 비교합니다.
     # 카드 이름은 정확히 같은 카드를 먼저 봅니다. "생활비 카드" → 생활비 카드 1장 (생활비 신용카드, 구 생활비 카드는 빠짐)
@@ -27,6 +28,9 @@ def find_cards(owner_id, bank_name=None, card_name=None, card_type=None, status=
     if bank_name:
         bank_name = bank_name.replace(" ", "")
         cards = [c for c in cards if bank_name in c["bank_name"].replace(" ", "")]
+    if exclude_banks:
+        exclude = [bank.replace(" ", "") for bank in exclude_banks]
+        cards = [c for c in cards if not any(bank in c["bank_name"].replace(" ", "") for bank in exclude)]
     if card_name:
         exact = [c for c in cards if c["name"].replace(" ", "") == card_name.replace(" ", "")]
         card_name = card_name.replace("카드", "").strip()

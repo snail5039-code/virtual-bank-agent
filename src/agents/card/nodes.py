@@ -45,6 +45,7 @@ class CardFilter(BaseModel):
     info: Literal["목록", "결제 계좌", "카드 번호", "멤버십", "이용 내역"] = Field(
         default="목록", description="카드의 무엇을 볼지")
     bank_names: Optional[list[str]] = Field(default=None, description="물어본 은행 이름 목록. 여러 곳이면 모두")
+    exclude_banks: Optional[list[str]] = Field(default=None, description="'~ 말고', '~ 빼고' 로 뺀 은행 이름 목록")
     card_name: Optional[str] = Field(default=None, description="카드 이름")
     card_type: Optional[Literal["체크", "신용"]] = Field(default=None, description="카드 종류")
     status: Optional[Literal["사용 가능", "일시 잠금", "분실 정지", "해지"]] = Field(default=None, description="카드 상태")
@@ -71,8 +72,8 @@ def card_extract_node(state: BankState):
         except (ValidationError, OutputParserException) as e:
             log.detail("조건 형식 오류  %s" % type(e).__name__)
             return {"error": "조건을 알아듣지 못했습니다. (예: 가상은행 카드 / 신용카드 결제 계좌 / 이번 달 카드 이용 내역)"}
-        log.detail("조건  볼것=%s 은행=%s 이름=%s 종류=%s 상태=%s 기간=%s %s~%s" % (
-            f.info, f.bank_names, f.card_name, f.card_type, f.status, f.period, f.start_date, f.end_date))
+        log.detail("조건  볼것=%s 은행=%s 뺄은행=%s 이름=%s 종류=%s 상태=%s 기간=%s %s~%s" % (
+            f.info, f.bank_names, f.exclude_banks, f.card_name, f.card_type, f.status, f.period, f.start_date, f.end_date))
 
     return {"card_filter": f.model_dump()}
 
@@ -85,12 +86,26 @@ def card_query_node(state: BankState):
     f = state["card_filter"]
     with logger.get_logger().node("card_query"):
         # 은행을 말했으면 은행마다 따로 걸러 은행별로 나눠 보여줍니다. 카드가 없는 은행은 없다고 짚어 줍니다.
-        # 은행을 말하지 않았으면("내 카드", "다른 은행 카드는?") 은행을 거르지 않고 한 번에 보여줍니다.
-        banks = f["bank_names"] or [None]
+        # "OO은행 말고" 면 그 은행 카드를 빼고, 남은 카드를 은행별로 나눠 보여줍니다. 기준 은행은 사용자가 말한 은행입니다.
+        # 은행을 말하지 않았으면("내 카드") 은행을 거르지 않고 한 번에 보여줍니다.
+        exclude = f.get("exclude_banks") or []
         other_filter = f["card_name"] or f["card_type"] or f["status"]
         parts = []
+        if exclude and not f["bank_names"]:
+            cards = functions.find_cards(functions.CURRENT_USER, None, f["card_name"], f["card_type"], f["status"], exclude)
+            if not cards:
+                return {"answer": "%s 말고 다른 은행%s 없습니다." % (
+                    ", ".join(exclude), "에는 조건에 맞는 카드가" if other_filter else " 카드는")}
+            banks = list(dict.fromkeys(c["bank_name"] for c in cards))     # 남은 카드의 은행 (나온 순서대로, 겹치지 않게)
+            for bank in banks:
+                lines = card_lines(f, [c for c in cards if c["bank_name"] == bank])
+                lines[0] = "[%s] %s" % (bank, lines[0])
+                parts.append("\n".join(lines))
+            return {"answer": "\n\n".join(parts)}
+
+        banks = f["bank_names"] or [None]
         for bank in banks:
-            cards = functions.find_cards(functions.CURRENT_USER, bank, f["card_name"], f["card_type"], f["status"])
+            cards = functions.find_cards(functions.CURRENT_USER, bank, f["card_name"], f["card_type"], f["status"], exclude)
             if not cards:
                 if not bank:
                     parts.append("조건에 맞는 카드가 없습니다.")
