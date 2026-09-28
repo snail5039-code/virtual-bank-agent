@@ -20,13 +20,16 @@ def find_cards(owner_id, bank_name=None, card_name=None, card_type=None, status=
     # 조건으로 카드를 거릅니다. 비어 있는(None) 조건은 거르지 않습니다.
     # card_type 은 체크 / 신용, status 는 사용 가능 / 일시 잠금 / 분실 정지 / 해지 (한국어로 받습니다)
     # "가상 은행", "여행 카드" 처럼 띄어 쓰거나 붙은 말이 있어도 찾도록 공백과 "카드" 를 떼고 비교합니다.
+    # 카드 이름은 정확히 같은 카드를 먼저 봅니다. "생활비 카드" → 생활비 카드 1장 (생활비 신용카드, 구 생활비 카드는 빠짐)
+    # 정확히 같은 카드가 없을 때만 글자가 들어 있는 카드를 모두 찾습니다. "생활비" → 3장
     cards = get_cards(owner_id)
     if bank_name:
         bank_name = bank_name.replace(" ", "")
         cards = [c for c in cards if bank_name in c["bank_name"].replace(" ", "")]
     if card_name:
+        exact = [c for c in cards if c["name"].replace(" ", "") == card_name.replace(" ", "")]
         card_name = card_name.replace("카드", "").strip()
-        cards = [c for c in cards if card_name in c["name"]]
+        cards = exact or [c for c in cards if card_name in c["name"]]
     if card_type:
         cards = [c for c in cards if CARD_TYPES[c["card_type"]] == card_type]
     if status:
@@ -40,11 +43,9 @@ CARD_ACTIONS = {"분실 신고": "lost", "일시 잠금": "locked", "잠금 해�
 
 
 def pick_cards(owner_id, name):
-    # 상태를 바꿀 카드를 이름으로 찾습니다. 한 장으로 정해야 하므로 이름이 정확히 같은 카드를 먼저 봅니다.
-    # "생활비 카드" → 생활비 카드 1장 (생활비 신용카드, 구 생활비 카드는 빠짐)
-    # 정확히 같은 카드가 없으면 글자가 들어 있는 카드를 모두 돌려줍니다. (여러 장이면 노드가 후보를 보여줍니다)
-    exact = [c for c in get_cards(owner_id) if c["name"].replace(" ", "") == name.replace(" ", "")]
-    return exact or find_cards(owner_id, card_name=name)
+    # 설정·재발급·결제할 카드를 이름으로 찾습니다. 정확히 같은 이름을 먼저 보는 것은 find_cards 와 같습니다.
+    # 여러 장이면 노드가 후보를 보여주고 번호로 고르게 합니다 (common_pick_card).
+    return find_cards(owner_id, card_name=name)
 
 
 def check_card_status(card, action):

@@ -1,6 +1,7 @@
 # 여러 업무가 같이 쓰는 공통 노드입니다. 기획서 6장을 따릅니다.
 #
 #   common_pending_check : [분기 0] 멈춰 있는 업무가 있는지 봅니다 (main.py 에서 부릅니다)
+#   common_pick_card     : 이름에 맞는 카드가 여러 장이면 번호로 고르게 합니다 (interrupt)
 #   common_authenticate  : 본인 확인을 받습니다. 세션 동안 한 번만 (interrupt)
 #   common_approve       : 처리안을 보여주고 승인을 기다립니다 (interrupt)
 #   common_interpret     : 승인 질문에 대한 답을 승인 / 거절 / 취소 / 수정 / 다른요청 / 모름 으로 가릅니다 (LLM)
@@ -68,6 +69,29 @@ def is_cancel(answer):
     # 질문(부족 정보·후보 고르기·본인 확인)에 대한 답이 "그만두겠다" 는 뜻인지 봅니다.
     # "취소할게", "그만할래" 처럼 말해도 알아듣게 한 곳에서 판단합니다.
     return any(word in answer for word in CANCEL_WORDS)
+
+
+# ---------------------------------------------------------------- 카드 고르기
+def common_pick_card_node(state: BankState):
+    # 이름에 맞는 카드가 여러 장이면 번호로 고르게 합니다. 카드 설정·재발급이 같이 씁니다. (이체 transfer_confirm 과 같은 방식)
+    # 고른 카드의 정확한 이름을 target_name 에 넣고 check 로 돌아갑니다.
+    # 별칭은 내 카드끼리 겹치지 않으므로(check_card_alias) check 가 이번에는 한 장으로 정합니다.
+    candidates = state["candidates"]
+    lines = ["'%s' 에 맞는 카드가 %d장입니다. 번호를 골라 주세요." % (state["target_name"], len(candidates))]
+    for number, card in enumerate(candidates, start=1):
+        lines.append("%d. %s (%s %s)  [%s]" % (number, card["name"], card["bank_name"],
+                                              functions.CARD_TYPES[card["card_type"]], functions.CARD_STATUS[card["status"]]))
+
+    with logger.get_logger().node("common_pick_card"):
+        logger.get_logger().interrupt_pause("카드 고르기 (후보 %d장)" % len(candidates))
+
+    answer = interrupt(question("\n".join(lines))).strip()
+
+    if is_cancel(answer):
+        return {"error": "요청을 취소했습니다.", "candidates": None}
+    if answer.isdigit() and 1 <= int(answer) <= len(candidates):
+        return {"target_name": candidates[int(answer) - 1]["name"], "candidates": None}
+    return {}       # 번호가 아니면 check 로 돌아가 다시 고르게 합니다
 
 
 # ---------------------------------------------------------------- 인증

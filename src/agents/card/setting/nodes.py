@@ -121,15 +121,13 @@ def card_setting_check_node(state: BankState):
         if not state.get("target_name"):
             return {"error": "어느 카드인지 말해 주세요. (예: 여행 카드 잠가줘 / 생활비 카드 분실 신고해줘)"}
 
-        # 카드를 한 장으로 정합니다. 여러 장이면 후보를 보여주고 정확한 이름으로 다시 요청하게 합니다.
+        # 카드를 한 장으로 정합니다. 여러 장이면 후보를 넘겨 common_pick_card 가 번호로 고르게 합니다.
         found = functions.pick_cards(functions.CURRENT_USER, state["target_name"])
         log.resolve(state["target_name"], len(found), found[0]["card_id"] if found else None)
         if not found:
             return {"error": "'%s' 카드를 찾을 수 없습니다." % state["target_name"]}
         if len(found) > 1:
-            lines = ["'%s' 에 맞는 카드가 %d장입니다. 정확한 이름으로 다시 요청해 주세요." % (state["target_name"], len(found))]
-            lines += ["- %s  [%s]" % (c["name"], functions.CARD_STATUS[c["status"]]) for c in found]
-            return {"error": "\n".join(lines)}
+            return {"candidates": found}
 
         card = found[0]
         # 상태 전이 검사. 할 수 없는 변경이면 여기서 끝냅니다 (인증·승인까지 가지 않습니다).
@@ -237,7 +235,15 @@ def card_setting_fail_node(state: BankState):
 def route_after_check(state: BankState):
     if state.get("error"):
         return "card_setting_fail"
+    if state.get("candidates"):
+        return "common_pick_card"
     return "common_authenticate"
+
+
+def route_after_pick(state: BankState):
+    if state.get("error"):
+        return "card_setting_fail"
+    return "card_setting_check"
 
 
 def route_after_authenticate(state: BankState):

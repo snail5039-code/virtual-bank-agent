@@ -5,6 +5,7 @@
 #   START → extract ─┬─ 조회 → list → END                             (읽기만. 승인 없음)
 #              ↑     └─ 신청 → check ─┬─ 할 수 없음 → fail → END     (분실 정지 아님 / 기존 신청 있음 / 배송지 모름)
 #              │        배송지 수정·신청 취소도 check 로 갑니다      (접수 상태가 아님 / 같은 배송지)
+#              │                      ├─ 카드가 여러 장 → pick_card (번호 고르기) → check 로 돌아감
 #              │                      └─ 할 수 있음 → authenticate → propose → approve → interpret
 #              │                                                                 ↑         │
 #              │                                                                 └─ 모름 ──┤
@@ -14,13 +15,13 @@
 
 from langgraph.graph import END, START, StateGraph
 
-from agents.common.nodes import (common_approve_node, common_authenticate_node, common_interpret_node,
+from agents.common.nodes import (common_approve_node, common_authenticate_node, common_interpret_node, common_pick_card_node,
                                  common_log_request_node, common_reject_node,
                                  common_report_node, common_save_node)
 from agents.card.reissue.nodes import (reissue_check_node, reissue_execute_node, reissue_extract_node, reissue_fail_node,
                                   reissue_list_node, reissue_propose_node,
                                   route_after_authenticate, route_after_check, route_after_extract,
-                                  route_after_interpret, route_start)
+                                  route_after_interpret, route_after_pick, route_start)
 from state import BankState
 
 builder = StateGraph(BankState)
@@ -28,6 +29,7 @@ builder = StateGraph(BankState)
 builder.add_node("reissue_extract", reissue_extract_node)
 builder.add_node("reissue_list", reissue_list_node)
 builder.add_node("reissue_check", reissue_check_node)
+builder.add_node("common_pick_card", common_pick_card_node)
 builder.add_node("common_authenticate", common_authenticate_node)
 builder.add_node("reissue_propose", reissue_propose_node)
 builder.add_node("common_approve", common_approve_node)
@@ -42,7 +44,8 @@ builder.add_node("reissue_fail", reissue_fail_node)
 builder.add_conditional_edges(START, route_start, ["reissue_extract", "reissue_check"])   # 4-7 : 분실 신고에서 이어 오면 check 부터
 builder.add_conditional_edges("reissue_extract", route_after_extract, ["reissue_list", "reissue_check"])
 builder.add_edge("reissue_list", END)
-builder.add_conditional_edges("reissue_check", route_after_check, ["reissue_fail", "common_authenticate"])
+builder.add_conditional_edges("reissue_check", route_after_check, ["reissue_fail", "common_pick_card", "common_authenticate"])
+builder.add_conditional_edges("common_pick_card", route_after_pick, ["reissue_fail", "reissue_check"])
 builder.add_conditional_edges("common_authenticate", route_after_authenticate,
                               ["reissue_fail", "reissue_propose", "common_authenticate"])
 builder.add_edge("reissue_propose", "common_approve")

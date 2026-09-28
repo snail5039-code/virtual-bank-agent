@@ -102,15 +102,13 @@ def reissue_check_node(state: BankState):
         if not state.get("target_name"):
             return {"error": "어느 카드인지 말해 주세요. (예: 생활비 카드 재발급해줘 집으로 / 구 생활비 카드 재발급 취소해줘)"}
 
-        # 카드를 한 장으로 정합니다. (카드 설정과 같은 방식)
+        # 카드를 한 장으로 정합니다. 여러 장이면 common_pick_card 가 번호로 고르게 합니다. (카드 설정과 같은 방식)
         found = functions.pick_cards(functions.CURRENT_USER, state["target_name"])
         log.resolve(state["target_name"], len(found), found[0]["card_id"] if found else None)
         if not found:
             return {"error": "'%s' 카드를 찾을 수 없습니다." % state["target_name"]}
         if len(found) > 1:
-            lines = ["'%s' 에 맞는 카드가 %d장입니다. 정확한 이름으로 다시 요청해 주세요." % (state["target_name"], len(found))]
-            lines += ["- %s  [%s]" % (c["name"], functions.CARD_STATUS[c["status"]]) for c in found]
-            return {"error": "\n".join(lines)}
+            return {"candidates": found}
         card = found[0]
 
         if action == "신청 취소":
@@ -219,7 +217,15 @@ def route_after_extract(state: BankState):
 def route_after_check(state: BankState):
     if state.get("error"):
         return "reissue_fail"
+    if state.get("candidates"):
+        return "common_pick_card"
     return "common_authenticate"
+
+
+def route_after_pick(state: BankState):
+    if state.get("error"):
+        return "reissue_fail"
+    return "reissue_check"
 
 
 def route_after_authenticate(state: BankState):
