@@ -79,23 +79,43 @@ def transfer(data, from_id, to_id, amount):
     return None
 
 
+def resolve_splits(owner_id, splits):
+    # 나눠 이체의 입금 목록을 위 줄부터 봅니다. 한 줄이 모자라도 전체를 멈추지 않고, 그 줄만 되묻게 합니다.
+    # 계좌를 찾은 줄에는 to_account 를 적어 둡니다. 되물은 뒤 다시 볼 때 또 찾지 않게 하려는 것입니다.
+    # 계좌 이름을 먼저 전부 정하고, 그다음 빠진 금액을 봅니다.
+    # (splits, 줄 번호, 후보, 사유) 를 돌려줍니다.
+    #   이름이 애매한 줄 : (splits, 줄 번호, 후보 목록, None)  → 번호를 고르게 합니다
+    #   금액이 빠진 줄   : (splits, 줄 번호, None, None)       → 금액을 묻습니다
+    #   계좌가 없는 줄   : (splits, None, None, 사유)
+    #   다 채워짐        : (splits, None, None, None)
+    splits = [dict(split) for split in splits]      # State 의 목록을 직접 바꾸지 않게 복사합니다
+    for index, split in enumerate(splits):
+        if split.get("to_account"):
+            continue
+        found = find_targets(owner_id, split["to_name"])
+        logger.get_logger().resolve(split["to_name"], len(found), found[0]["account_id"] if found else None)
+        if not found:
+            return splits, None, None, "'%s' 계좌를 찾을 수 없습니다." % split["to_name"]
+        if len(found) > 1:
+            return splits, index, found, None
+        split["to_account"] = found[0]["account_id"]
+        split["to_name"] = found[0]["nickname"]
+    for index, split in enumerate(splits):
+        if not split.get("amount"):
+            return splits, index, None, None
+    return splits, None, None, None
+
+
 def build_targets(owner_id, from_account, to_account, to_name, amount, keep, splits):
     # 입금 목록(targets)을 만듭니다. 한 곳이면 1개, 나눠 이체면 여러 개입니다.
     # 조건부 이체면 이체액 = 잔액 - 남길 금액 으로 계산합니다.
+    # 나눠 이체는 resolve_splits 로 줄마다 계좌·금액을 다 채운 뒤에 부릅니다.
     # (targets, 사유) 를 돌려줍니다. 아직 정보가 모자라면 (None, None) 입니다.
     if not from_account:
         return None, None
 
     if splits:
-        targets = []
-        for split in splits:
-            found = find_targets(owner_id, split["to_name"])
-            logger.get_logger().resolve(split["to_name"], len(found), found[0]["account_id"] if found else None)
-            if len(found) != 1:
-                return None, "'%s' 계좌를 하나로 정할 수 없습니다. 정확한 이름으로 다시 요청해 주세요." % split["to_name"]
-            targets.append({"to_account": found[0]["account_id"], "to_name": found[0]["nickname"],
-                            "amount": split["amount"] or 0})
-        return targets, None
+        return [{"to_account": s["to_account"], "to_name": s["to_name"], "amount": s["amount"]} for s in splits], None
 
     if keep is not None:
         amount = get_account(owner_id, from_account)["balance"] - keep

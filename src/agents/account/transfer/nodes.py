@@ -81,9 +81,16 @@ def transfer_extract_node(state: BankState):
         update = {}
         if result.from_name and not state.get("from_account"):
             update["from_name"] = result.from_name
-        if result.to_name and not state.get("to_account"):
+        if result.to_name and not state.get("to_account") and not state.get("splits"):
             update["to_name"] = result.to_name
-        if result.amount and not state.get("amount"):
+        # 나눠 이체에서 빠진 금액을 물었으면(split_index), 답한 금액을 그 줄에 넣습니다. 어느 줄인지는 Python 이 정합니다.
+        if state.get("splits") and state.get("split_index") is not None:
+            if result.amount:
+                splits = [dict(split) for split in state["splits"]]
+                splits[state["split_index"]]["amount"] = result.amount
+                update["splits"] = splits
+                log.detail("나눠 이체 %d번째 줄 금액  %s" % (state["split_index"] + 1, result.amount))
+        elif result.amount and not state.get("amount"):
             update["amount"] = result.amount
         # 남길 금액은 0 원도 됩니다 ("전부 보내줘" = 0 원 남기기).
         if result.keep_amount is not None and state.get("keep_amount") is None:
@@ -131,6 +138,22 @@ def transfer_check_node(state: BankState):
             update[slot + "_account"] = found[0]["account_id"]
             update[slot + "_name"] = found[0]["nickname"]
 
+        # 나눠 이체 : 줄마다 계좌·금액을 봅니다. 모자란 줄이 있으면 그 줄만 고르게 하거나(confirm) 묻습니다(ask).
+        splits = state.get("splits")
+        update["split_index"] = None
+        if splits:
+            splits, index, candidates, error = functions.resolve_splits(functions.CURRENT_USER, splits)
+            update["splits"] = splits
+            if error:
+                update["error"] = error
+                return update
+            if candidates:
+                update.update({"candidates": candidates, "confirm_for": "split", "split_index": index})
+                return update
+            if index is not None:
+                update.update({"split_index": index, "targets": None})
+                return update
+
         # 출금과 입금이 같은 계좌면 진행할 수 없습니다.
         from_account = update.get("from_account") or state.get("from_account")
         to_account = update.get("to_account") or state.get("to_account")
@@ -141,7 +164,7 @@ def transfer_check_node(state: BankState):
         targets, error = functions.build_targets(
             functions.CURRENT_USER, from_account, to_account,
             update.get("to_name") or state.get("to_name"), state.get("amount"),
-            state.get("keep_amount"), state.get("splits"))
+            state.get("keep_amount"), splits)
         if targets and not error:
             error = functions.check_transfer(functions.CURRENT_USER, from_account, targets, state.get("keep_amount"))
         if targets and not error and state.get("scheduled_at"):
@@ -158,8 +181,13 @@ def transfer_check_node(state: BankState):
 def transfer_confirm_node(state: BankState):
     slot = state["confirm_for"]
     candidates = state["candidates"]
+    # 나눠 이체면 split_index 줄의 이름을, 아니면 출금·입금 칸의 이름을 보여줍니다.
+    if slot == "split":
+        name = state["splits"][state["split_index"]]["to_name"]
+    else:
+        name = state[slot + "_name"]
 
-    lines = ["'%s' 에 맞는 계좌가 여러 개입니다. 번호를 골라 주세요." % state[slot + "_name"]]
+    lines = ["'%s' 에 맞는 계좌가 여러 개입니다. 번호를 골라 주세요." % name]
     for number, account in enumerate(candidates, start=1):
         lines.append("%d. %s (%s)" % (number, account["nickname"], account["account_number"]))
     text = "\n".join(lines)
@@ -173,13 +201,22 @@ def transfer_confirm_node(state: BankState):
         return {"error": "이체를 취소했습니다."}
     if answer.isdigit() and 1 <= int(answer) <= len(candidates):
         picked = candidates[int(answer) - 1]
+        if slot == "split":
+            # 고른 계좌를 그 줄에 적습니다. check 가 이 줄은 다시 찾지 않습니다.
+            splits = [dict(split) for split in state["splits"]]
+            splits[state["split_index"]].update({"to_account": picked["account_id"], "to_name": picked["nickname"]})
+            return {"splits": splits}
         return {slot + "_account": picked["account_id"], slot + "_name": picked["nickname"]}
     return {}       # 번호가 아니면 check 로 돌아가 다시 고르게 합니다
 
 
 def transfer_ask_node(state: BankState):
+    splits = state.get("splits")
     if not state.get("from_account"):
         ask = "[출금] 돈을 보낼 계좌를 알려주세요."
+    elif splits:
+        # 나눠 이체 : 금액이 빠진 줄을 짚어서 묻습니다.
+        ask = "[금액] %s 계좌로 얼마를 보낼까요?" % splits[state["split_index"]]["to_name"]
     elif not state.get("to_account"):
         ask = "[입금] 돈을 받을 계좌를 알려주세요."
     else:
@@ -187,19 +224,18 @@ def transfer_ask_node(state: BankState):
 
     # 지금까지 알아낸 것을 같이 보여줍니다. 그래야 무엇을 알아들었는지 알 수 있습니다.
     from_text = state["from_name"] if state.get("from_account") else "?"
-    to_text = state["to_name"] if state.get("to_account") else "?"
-    amount_text = format(state["amount"], ",") + "원" if state.get("amount") else "?"
-
-    text = "\n".join([
-        "=" * 40,
-        "  출금 : " + from_text,
-        "  입금 : " + to_text,
-        "  금액 : " + amount_text,
-        "-" * 40,
-        "  " + ask,
-        "  (그만두려면 '취소')",
-        "=" * 40,
-    ])
+    lines = ["=" * 40, "  출금 : " + from_text]
+    if splits:
+        # 나눠 이체는 줄마다 이름과 금액을 보여줍니다. 빠진 금액은 ? 입니다.
+        for number, split in enumerate(splits, start=1):
+            amount_text = format(split["amount"], ",") + "원" if split.get("amount") else "?"
+            lines.append("  입금 %d : %s  %s" % (number, split["to_name"], amount_text))
+    else:
+        to_text = state["to_name"] if state.get("to_account") else "?"
+        amount_text = format(state["amount"], ",") + "원" if state.get("amount") else "?"
+        lines += ["  입금 : " + to_text, "  금액 : " + amount_text]
+    lines += ["-" * 40, "  " + ask, "  (그만두려면 '취소')", "=" * 40]
+    text = "\n".join(lines)
 
     with logger.get_logger().node("transfer_ask"):
         logger.get_logger().interrupt_pause("질문: " + ask)
