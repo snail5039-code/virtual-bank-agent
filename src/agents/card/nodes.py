@@ -3,7 +3,7 @@
 #   card_router : 카드 요청이 조회 / 결제 / 설정 / 재발급 중 무엇인지 고릅니다
 #   card_extract: 무엇을 볼지(목록 / 결제 계좌 / 카드 번호 / 멤버십 / 이용 내역)와 조건을 뽑습니다
 #   card_query  : 조건으로 카드를 걸러 볼 것을 보여줍니다. 카드 번호는 본인 확인 뒤에만 옵니다
-#   card_todo   : 결제 / 재발급 은 아직 준비 중이라고 안내합니다 (설정은 카드 설정 에이전트 그래프로 넘깁니다)
+#   card_todo   : 결제 는 아직 준비 중이라고 안내합니다 (설정·재발급은 각 에이전트 그래프로 넘깁니다)
 
 from datetime import date
 from typing import Literal, Optional
@@ -148,11 +148,13 @@ def card_todo_node(state: BankState):
 
 
 def route_by_task(state: BankState):
-    # 고른 업무에 따라 다음 노드를 정합니다. 결제·재발급은 아직 준비 중입니다.
+    # 고른 업무에 따라 다음 노드를 정합니다. 결제는 아직 준비 중입니다.
     if state["task"] == "조회":
         return "card_extract"
     if state["task"] == "설정":
         return "card_setting"
+    if state["task"] == "재발급":
+        return "reissue"
     return "card_todo"
 
 
