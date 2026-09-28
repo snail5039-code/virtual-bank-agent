@@ -90,10 +90,9 @@ def setting_extract_node(state: BankState):
     return update
 
 
-def schedule_text(schedule_id):
-    # 예약 한 건을 한 줄로 씁니다. 예) sch-001  09월 27일 09:00  생활비 → 저축  100,000원  [예약]
-    data = data_store.load()
-    s = next(s for s in functions.get_schedules(functions.CURRENT_USER) if s["schedule_id"] == schedule_id)
+def schedule_text(data, s):
+    # 예약 한 건(s)을 한 줄로 씁니다. 예) sch-001  09월 27일 09:00  생활비 → 저축  100,000원  [예약]
+    # 계좌 이름은 부르는 쪽이 한 번 읽어 둔 data 에서 찾습니다. (건마다 파일을 다시 읽지 않게)
     return "%s  %s  %s → %s  %s원  [%s]" % (
         s["schedule_id"], functions.when_text(s["scheduled_at"]),
         functions.target_name(data, s["from_account"]), functions.target_name(data, s["to_account"]),
@@ -101,11 +100,12 @@ def schedule_text(schedule_id):
 
 
 def schedule_list_text():
-    schedules = functions.get_schedules(functions.CURRENT_USER)
+    data = data_store.load()
+    schedules = [s for s in data["scheduled_transfers"] if s["owner_id"] == functions.CURRENT_USER]
     if not schedules:
         return "예약 이체가 없습니다."
     lines = ["예약 이체 %d건입니다." % len(schedules)]
-    lines += ["- " + schedule_text(s["schedule_id"]) for s in schedules]
+    lines += ["- " + schedule_text(data, s) for s in schedules]
     return "\n".join(lines)
 
 
@@ -152,7 +152,8 @@ def setting_check_node(state: BankState):
                     update["error"] = "취소할 예약을 찾을 수 없습니다.\n" + schedule_list_text()
                     return update
                 if len(found) > 1:
-                    update["candidates"] = [{"id": s["schedule_id"], "text": schedule_text(s["schedule_id"])} for s in found]
+                    data = data_store.load()
+                    update["candidates"] = [{"id": s["schedule_id"], "text": schedule_text(data, s)} for s in found]
                     return update
                 update["target_account"] = found[0]["schedule_id"]
             return update
@@ -256,7 +257,9 @@ def setting_propose_node(state: BankState):
                 ["별명", reg["nickname"]],
             ]}
         elif action == "예약취소":
-            proposal = {"task": "예약 이체 취소", "rows": [["예약", schedule_text(state["target_account"])]]}
+            data = data_store.load()
+            s = next(s for s in data["scheduled_transfers"] if s["schedule_id"] == state["target_account"])
+            proposal = {"task": "예약 이체 취소", "rows": [["예약", schedule_text(data, s)]]}
         elif action == "삭제":
             r = next(r for r in functions.get_registered(functions.CURRENT_USER)
                      if r["registered_id"] == state["target_account"])

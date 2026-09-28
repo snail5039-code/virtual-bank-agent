@@ -64,10 +64,9 @@ def reissue_extract_node(state: BankState):
     return update
 
 
-def application_text(app):
+def application_text(app, cards, addresses):
     # 신청 한 건을 한 줄로 씁니다. 예) app-001  구 생활비 카드  → 집 (가상시 가상구 집로 10)  [제작중]  09월 15일 신청
-    cards = {c["card_id"]: c["name"] for c in functions.get_cards(functions.CURRENT_USER)}
-    addresses = {a["address_id"]: a for a in functions.get_addresses(functions.CURRENT_USER)}
+    # cards(card_id → 이름), addresses(address_id → 배송지)는 부르는 쪽이 한 번만 만들어 넘깁니다. (건마다 파일을 다시 읽지 않게)
     address = addresses.get(app["address_id"])
     return "%s  %s  → %s  [%s]  %s 신청" % (
         app["application_id"], cards.get(app["card_id"], app["card_id"]),
@@ -86,7 +85,9 @@ def reissue_list_node(state: BankState):
         if not apps:
             return {"answer": "재발급 신청이 없습니다."}
         lines = ["재발급 신청 %d건입니다." % len(apps)]
-        lines += ["- " + application_text(a) for a in apps]
+        cards = {c["card_id"]: c["name"] for c in functions.get_cards(functions.CURRENT_USER)}
+        addresses = {a["address_id"]: a for a in functions.get_addresses(functions.CURRENT_USER)}
+        lines += ["- " + application_text(a, cards, addresses) for a in apps]
     return {"answer": "\n".join(lines)}
 
 

@@ -189,16 +189,11 @@ def add_schedule(data, owner_id, from_id, target, scheduled_at):
     })
 
 
-def get_schedules(owner_id):
-    data = data_store.load()
-    return [s for s in data["scheduled_transfers"] if s["owner_id"] == owner_id]
-
-
 def find_schedules(owner_id, name):
     # 취소할 예약을 찾습니다. 아직 실행 전(예약)인 것만 봅니다.
     # 예약 번호(sch-001), 입금 계좌 이름, 날짜(09-27) 중 하나가 맞으면 후보입니다.
     data = data_store.load()
-    pending = [s for s in get_schedules(owner_id) if s["status"] == "예약"]
+    pending = [s for s in data["scheduled_transfers"] if s["owner_id"] == owner_id and s["status"] == "예약"]
     if not name:
         return pending
     return [s for s in pending

@@ -66,8 +66,8 @@ def respond(user_input, log):
     return result["answer"]
 
 
-def turn_result():
-    pending = common_pending_check(bank_graph, config)
+def turn_result(pending):
+    # pending : 턴이 끝난 뒤의 common_pending_check 결과 (handle_turn 이 한 번 구해 넘깁니다)
     if pending == APPROVAL:
         return "승인 대기"
     if pending in (QUESTION, SECRET):
@@ -122,10 +122,9 @@ def read_input():
     return input(prompt).strip()
 
 
-def remember_pending():
-    # [재시작 복구] 턴이 끝났을 때 그래프가 승인·질문을 기다리고 있으면 진행 중 업무로 적어 두고,
+def remember_pending(kind):
+    # [재시작 복구] 턴이 끝났을 때 그래프가 승인·질문을 기다리고 있으면(kind) 진행 중 업무로 적어 두고,
     # 기다리는 것이 없으면(끝났으면) 지웁니다. 예약 이체처럼 data.json 에 남겨 켤 때 확인합니다.
-    kind = common_pending_check(bank_graph, config)
     saved = functions.get_pending()
     if kind:
         snapshot = bank_graph.get_state(config)
@@ -144,11 +143,11 @@ def remember_pending():
         functions.clear_pending()
 
 
-def remember_turn():
+def remember_turn(pending):
     # 업무가 끝난 턴(승인·질문을 기다리지 않음)이면 그 요청과 마지막 답을 최근 대화에 한 줄 남깁니다.
     # 요청은 "그거" 를 풀었으면 푼 문장(request_text)입니다. 그래야 다음 턴에서 또 가리킬 때 이름이 남아 있습니다.
     values = bank_graph.get_state(config).values
-    if common_pending_check(bank_graph, config) or not values.get("answer"):
+    if pending or not values.get("answer"):
         return
     answer = "\n".join(values["answer"].splitlines()[:HISTORY_ANSWER_LINES])
     history.append({"request": values["request_text"], "answer": answer})
@@ -167,12 +166,14 @@ def handle_turn(user_input, log):
         try:
             with console.status("[bold green]에이전트가 작업 중입니다...[/bold green]", spinner="dots"):
                 answer = respond(user_input, log)
+            # 턴이 끝난 뒤 멈춰 있는지를 한 번만 보고, 아래 세 곳에 넘깁니다.
+            pending = common_pending_check(bank_graph, config)
             try:
-                remember_pending()
+                remember_pending(pending)
             except data_store.DataStoreError:
                 pass    # 진행 중 기록을 못 남겨도 이번 답은 그대로 보여줍니다. (사유는 data_store 가 로그에 남깁니다)
-            remember_turn()
-            log.turn_end(turn_result())
+            remember_turn(pending)
+            log.turn_end(turn_result(pending))
         except Exception as e:
             log.error(e)
             log.turn_end("오류")

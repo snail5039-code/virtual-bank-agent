@@ -192,11 +192,12 @@ def billing_check_node(state: BankState):
     return {"billing_info": info}
 
 
-def target_text(target):
-    # 결제 대상 한 건의 이름과 계좌. 예) ("생활비 신용카드 2026-08분", "생활비 (110-001-100001)")
-    statement = next(s for s in functions.get_statements(functions.CURRENT_USER) if s["statement_id"] == target["statement_id"])
-    card = functions.get_card(functions.CURRENT_USER, statement["card_id"])
-    account = functions.get_account(functions.CURRENT_USER, target["account_id"])
+def target_text(data, target):
+    # 결제 대상 한 건의 청구서, 이름, 계좌. 예) (청구서, "생활비 신용카드 2026-08분", 생활비 계좌)
+    # 부르는 쪽이 한 번 읽어 둔 data 에서 찾습니다. (건마다 파일을 다시 읽지 않게)
+    statement = next(s for s in data["card_statements"] if s["statement_id"] == target["statement_id"])
+    card = next(c for c in data["cards"] if c["card_id"] == statement["card_id"])
+    account = next(a for a in data["accounts"] if a["account_id"] == target["account_id"])
     return statement, "%s %s분" % (card["name"], statement["billing_month"]), account
 
 
@@ -205,17 +206,18 @@ def billing_propose_node(state: BankState):
         info = state["billing_info"]
         method = info["method"]
         targets = info["targets"]
+        data = data_store.load()
 
         if method == "일괄":
             rows = [["방식", "일괄 결제 (%d건)" % len(targets)]]
             for i, t in enumerate(targets, 1):
-                _, name, account = target_text(t)
+                _, name, account = target_text(data, t)
                 rows.append(["청구서 %d" % i, "%s  %s원  (%s 계좌)" % (name, format(t["amount"], ","), account["nickname"])])
             rows.append(["합계", "%s원" % format(sum(t["amount"] for t in targets), ",")])
             rows.append(["안내", "건마다 따로 냅니다. 중간에 실패해도 앞에서 낸 건은 그대로입니다"])
         else:
             t = targets[0]
-            statement, name, account = target_text(t)
+            statement, name, account = target_text(data, t)
             left = statement["remaining_amount"] - t["amount"]
             rows = [
                 ["청구서", "%s (기한 %s)" % (name, statement["due_date"])],
@@ -267,8 +269,9 @@ def billing_execute_node(state: BankState):
 
         results = []    # (완료 / 실패 / 미처리, 안내)
         stopped = False
+        data = data_store.load()
         for t in info["targets"]:
-            _, name, _ = target_text(t)
+            _, name, _ = target_text(data, t)       # 이름(카드·청구 월)은 내도 바뀌지 않으므로 직전 data 로 충분합니다
             if stopped:
                 results.append(("미처리", name))
                 continue
