@@ -189,9 +189,12 @@ def card_setting_propose_node(state: BankState):
                 ["지금 상태", functions.CARD_STATUS[card["status"]]],
                 ["바뀔 상태", functions.CARD_STATUS[functions.CARD_ACTIONS[action]]],
             ]
+            # 잠금·분실 카드는 사용할 수 없다고 알려 줍니다. (카드 사용 기능은 이 프로그램에 없어서 안내만 합니다. 기획서 12장)
             if action == "분실 신고":
                 rows.append(["사유", state.get("new_value") or "분실"])
-                rows.append(["주의", "분실 정지는 해제할 수 없고 재발급만 가능합니다"])
+                rows.append(["주의", "분실 정지된 카드는 사용할 수 없습니다. 해제할 수 없고 재발급만 가능합니다"])
+            if action == "일시 잠금":
+                rows.append(["주의", "잠금을 풀기 전까지 이 카드는 사용할 수 없습니다"])
             if action == "해지":
                 rows.append(["주의", "해지하면 되돌릴 수 없습니다"])
 

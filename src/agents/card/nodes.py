@@ -157,9 +157,10 @@ def card_lines(f, cards):
                 extra = "한도 %s원" % format(card["credit_limit"], ",") if card["credit_limit"] else "한도 정보 없음"
             else:
                 extra = "연결 계좌 %s" % accounts[card["account_id"]]["nickname"]
-            lines.append("- %s (%s %s) : %s  [%s]" % (
+            # 잠금·분실·해지 카드는 사용할 수 없다고 같이 보여줍니다. (안내만 합니다. 기획서 12장)
+            lines.append("- %s (%s %s) : %s  [%s]%s" % (
                 card["name"], card["bank_name"], functions.CARD_TYPES[card["card_type"]],
-                extra, functions.CARD_STATUS[card["status"]]))
+                extra, functions.CARD_STATUS[card["status"]], "" if card["status"] == "active" else " (사용 불가)"))
 
     return lines
 
