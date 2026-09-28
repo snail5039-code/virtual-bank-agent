@@ -10,7 +10,7 @@ from typing import TypedDict
 
 class BankState(TypedDict):
     query: str              # 사용자 입력 (질문에 답하면 그 답으로 바뀝니다)
-    domain: str             # 1단 supervisor 가 고른 분야  (계좌 / 카드 / 없음)
+    domain: str             # 1단 supervisor 가 고른 분야  (계좌 / 카드 / 결과 / 없음)
     reason: str             # 그렇게 고른 이유
     task: str               # 2단 에이전트가 고른 업무    (조회 / 이체 / 설정)
     answer: str             # 사용자에게 보여줄 응답

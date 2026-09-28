@@ -47,6 +47,15 @@ def period_range(period):
     return start, next_month - timedelta(days=1)
 
 
+def find_requests(owner_id, keyword=None):
+    # 처리 기록(원장)을 최근순으로 돌려줍니다. 쓰기 업무가 끝날 때마다 common_log_request 가 한 줄씩 남깁니다.
+    # keyword 를 주면 업무 이름(task_type)에 그 글자가 든 기록만 봅니다. 예) "이체", "잠금", "결제", "재발급"
+    # "아까 이체 됐어?" 같은 후속 질문은 LLM 이 기억으로 답하지 않고 여기서 꺼낸 기록으로 답합니다. (원칙 6)
+    records = [r for r in data_store.load()["requests"] if r["owner_id"] == owner_id
+               and (not keyword or keyword.replace(" ", "") in r["task_type"].replace(" ", ""))]
+    return sorted(records, key=lambda r: r["created_at"], reverse=True)
+
+
 def parse_time(text):
     # "2026-09-27T09:00" 같은 문자열을 시각으로 바꿉니다. 시간대가 없으면 이 컴퓨터 시간대로 봅니다.
     return datetime.fromisoformat(text).astimezone()
