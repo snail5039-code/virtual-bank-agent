@@ -3,6 +3,7 @@
 #   card_router : 카드 요청이 조회 / 결제 / 설정 / 재발급 중 무엇인지 고릅니다
 #   card_extract: 무엇을 볼지(목록 / 결제 계좌 / 카드 번호 / 멤버십 / 이용 내역)와 조건을 뽑습니다
 #   card_query  : 조건으로 카드를 걸러 볼 것을 보여줍니다. 카드 번호는 본인 확인 뒤에만 옵니다
+#   card_to_reissue : 분실 신고가 끝난 뒤 재발급으로 넘어갈 때 State 를 재발급용으로 바꿉니다 (4-7)
 #   card_todo   : 결제 는 아직 준비 중이라고 안내합니다 (설정·재발급은 각 에이전트 그래프로 넘깁니다)
 
 from datetime import date
@@ -10,6 +11,7 @@ from typing import Literal, Optional
 
 from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.graph import END
 from pydantic import BaseModel, Field, ValidationError
 
 import functions
@@ -141,6 +143,15 @@ def card_query_node(state: BankState):
     return {"answer": "\n".join(lines)}
 
 
+def card_to_reissue_node(state: BankState):
+    # 정지 후 재발급 연속 처리 (4-7). 분실 신고 저장이 끝난 뒤 재발급 신청으로 넘어가기 전에 State 를 바꿔 줍니다.
+    # 두 업무가 설정 칸을 같이 쓰므로, 분실 신고 값(할 일, 사유)을 재발급 값(신청, 배송지)으로 바꾸고
+    # 처리안·승인 값은 비웁니다. 카드 이름(target_name)과 세션 인증은 그대로 둡니다.
+    with logger.get_logger().node("card_to_reissue"):
+        return {"setting_action": "신청", "new_value": state.get("reissue_address"), "target_account": None,
+                "proposal": None, "approval": None, "result": None, "error": None, "new_data": None}
+
+
 def card_todo_node(state: BankState):
     with logger.get_logger().node("card_todo"):
         answer = "카드 %s 업무는 아직 준비 중입니다." % state["task"]
@@ -156,6 +167,13 @@ def route_by_task(state: BankState):
     if state["task"] == "재발급":
         return "reissue"
     return "card_todo"
+
+
+def route_after_setting(state: BankState):
+    # 분실 신고가 저장까지 끝났고 재발급도 원했으면 이어서 재발급으로 갑니다. 거절·실패면 여기서 끝납니다.
+    if state.get("reissue_next") and state.get("result") == "완료":
+        return "card_to_reissue"
+    return END
 
 
 def route_after_extract(state: BankState):

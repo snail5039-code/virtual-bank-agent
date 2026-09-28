@@ -159,6 +159,8 @@ def reissue_propose_node(state: BankState):
                 ["배송지", "%s (%s)" % (address["label"], address["address"])],
                 ["안내", "신청해도 기존 카드의 분실 정지는 그대로입니다"],
             ]
+            if state.get("reissue_next"):
+                rows.insert(0, ["앞 단계", "분실 신고 완료 (재발급을 거절해도 분실 정지는 유지)"])
         else:
             app = functions.find_open_application(functions.CURRENT_USER, card["card_id"])
             rows = [["신청", app["application_id"]], card_row, ["신청 상태", functions.REISSUE_STATUS[app["status"]]]]
@@ -194,10 +196,19 @@ def reissue_execute_node(state: BankState):
 def reissue_fail_node(state: BankState):
     with logger.get_logger().node("reissue_fail"):
         answer = state["error"]
+        if state.get("reissue_next"):
+            answer = "분실 신고는 완료했습니다. 재발급은 진행하지 못했습니다.\n" + answer
     return {"answer": answer}
 
 
 # ---------------------------------------------------------------- 분기
+def route_start(state: BankState):
+    # 분실 신고에서 이어 온 경우(4-7)는 할 일과 카드가 이미 정해져 있으므로 뽑기를 건너뜁니다.
+    if state.get("reissue_next"):
+        return "reissue_check"
+    return "reissue_extract"
+
+
 def route_after_extract(state: BankState):
     # 조회는 읽기만 하므로 인증·승인 없이 바로 보여줍니다.
     if state.get("setting_action") == "조회":

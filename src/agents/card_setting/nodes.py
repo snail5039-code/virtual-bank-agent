@@ -40,6 +40,8 @@ class CardSettingInfo(BaseModel):
     card_number: Optional[str] = Field(default=None, description="등록할 카드 번호")
     card_type: Optional[Literal["체크", "신용"]] = Field(default=None, description="등록할 카드 종류")
     account_name: Optional[str] = Field(default=None, description="등록할 카드의 결제 계좌 이름")
+    reissue: Optional[bool] = Field(default=None, description="분실 신고와 함께 재발급도 원하는지")
+    address: Optional[str] = Field(default=None, description="재발급 카드를 받을 곳 (집 / 회사)")
 
 
 llm_with_card_setting_output = llm.with_structured_output(CardSettingInfo)
@@ -85,6 +87,11 @@ def card_setting_extract_node(state: BankState):
             update["target_account"] = None
         if action == "분실 신고" and r.reason:
             update["new_value"] = r.reason
+        # 정지 후 재발급 (4-7) : 분실 신고가 끝나면 이어서 재발급으로 넘어가도록 표시만 해 둡니다.
+        if action == "분실 신고" and r.reissue:
+            update["reissue_next"] = True
+        if action == "분실 신고" and r.address:
+            update["reissue_address"] = r.address
         if action == "별칭 변경" and r.new_name:
             update["new_value"] = r.new_name
 

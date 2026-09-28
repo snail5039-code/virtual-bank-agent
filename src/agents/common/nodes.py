@@ -157,6 +157,10 @@ def common_interpret_node(state: BankState):
 def common_reject_node(state: BankState):
     with logger.get_logger().node("common_reject"):
         answer = "%s 요청을 진행하지 않았습니다. 바뀐 것은 없습니다." % state["proposal"]["task"]
+        if state.get("reissue_next") and state.get("setting_action") == "신청":
+            # 정지 후 재발급(4-7)에서 승인 2 를 거절한 경우. 앞 단계 분실 신고는 이미 저장되었으므로 그렇게 알립니다.
+            # (승인 1 을 거절했을 때는 할 일이 아직 "분실 신고" 라서 여기 오지 않습니다)
+            answer = "%s 요청을 진행하지 않았습니다. 앞 단계의 분실 신고는 저장되어 있습니다." % state["proposal"]["task"]
         if state["approval"] == "다른요청":
             # 승인 대기 중에 다른 요청을 치면 지금 업무를 멈추고 다시 요청하게 합니다.
             answer += "\n진행 중이던 요청을 멈췄습니다. 새 요청을 다시 입력해 주세요."
