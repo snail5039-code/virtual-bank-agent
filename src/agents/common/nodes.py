@@ -71,7 +71,23 @@ def is_cancel(answer):
     return any(word in answer for word in CANCEL_WORDS)
 
 
-# ---------------------------------------------------------------- 카드 고르기
+# ---------------------------------------------------------------- 번호 고르기
+# 이체(transfer_confirm) / 카드(common_pick_card) / 계좌 설정(setting_confirm) 이 같이 씁니다.
+# 번호를 고르라고 했는데 번호가 아닌 말(다른 요청 등)을 치면, LLM 으로 무슨 뜻인지 판단하지 않습니다.
+# 같은 질문 위에 지금 하는 업무와 빠져나가는 방법을 붙여 다시 묻습니다. 다른 요청은 '취소' 후 다시 입력하게 합니다.
+
+def pick_text(state, lines):
+    # 번호가 아닌 답을 받은 뒤라면 안내(pick_warning)를 질문 맨 위에 붙입니다.
+    if state.get("pick_warning"):
+        lines = [state["pick_warning"]] + lines
+    return "\n".join(lines)
+
+
+def pick_warning(task):
+    # 번호가 아닌 답을 받았을 때 노드가 돌려주는 값입니다. check 로 돌아갔다가 같은 질문을 이 안내와 함께 다시 합니다.
+    return {"pick_warning": "현재 '%s' 업무 중입니다. 번호로 골라 주세요. 다른 요청은 '취소' 후 다시 입력해 주세요." % task}
+
+
 def common_pick_card_node(state: BankState):
     # 이름에 맞는 카드가 여러 장이면 번호로 고르게 합니다. 카드 설정·재발급이 같이 씁니다. (이체 transfer_confirm 과 같은 방식)
     # 고른 카드의 정확한 이름을 target_name 에 넣고 check 로 돌아갑니다.
@@ -85,13 +101,16 @@ def common_pick_card_node(state: BankState):
     with logger.get_logger().node("common_pick_card"):
         logger.get_logger().interrupt_pause("카드 고르기 (후보 %d장)" % len(candidates))
 
-    answer = interrupt(question("\n".join(lines))).strip()
+    answer = interrupt(question(pick_text(state, lines))).strip()
 
     if is_cancel(answer):
         return {"error": "요청을 취소했습니다.", "candidates": None}
     if answer.isdigit() and 1 <= int(answer) <= len(candidates):
-        return {"target_name": candidates[int(answer) - 1]["name"], "candidates": None}
-    return {}       # 번호가 아니면 check 로 돌아가 다시 고르게 합니다
+        return {"target_name": candidates[int(answer) - 1]["name"], "candidates": None, "pick_warning": None}
+    # 번호가 아니면 지금 하는 업무를 알려주고 check 로 돌아가 다시 고르게 합니다.
+    # 카드 설정은 "카드 일시 잠금", 재발급은 "재발급 신청" 처럼 보여줍니다.
+    prefix = "재발급 " if state.get("task") == "재발급" else "카드 "
+    return pick_warning(prefix + (state.get("setting_action") or ""))
 
 
 # ---------------------------------------------------------------- 인증

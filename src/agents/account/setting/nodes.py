@@ -22,7 +22,7 @@ import data_store
 import functions
 import logger
 from agents.account.setting.prompts import extract_prompt
-from agents.common.nodes import is_cancel, question
+from agents.common.nodes import is_cancel, pick_text, pick_warning, question
 from model import llm
 from state import BankState
 
@@ -206,6 +206,10 @@ def setting_check_node(state: BankState):
     return update
 
 
+# 번호 고르기에서 번호가 아닌 답을 받았을 때 보여줄 업무 이름입니다.
+SETTING_TASKS = {"변경": "계좌 별명·용도 변경", "삭제": "등록 계좌 삭제", "예약취소": "예약 이체 취소"}
+
+
 def setting_confirm_node(state: BankState):
     # 이름에 맞는 계좌·예약이 여러 개면 번호로 고르게 합니다. 고른 ID 를 target_account 에 넣고 check 로 돌아갑니다.
     # 후보는 check 가 {id, text} 로 만들어 둡니다 (내 계좌 / 등록 계좌 / 예약 모두 같은 모양).
@@ -216,13 +220,14 @@ def setting_confirm_node(state: BankState):
     with logger.get_logger().node("setting_confirm"):
         logger.get_logger().interrupt_pause("사용자 확인 (후보 %d개)" % len(candidates))
 
-    answer = interrupt(question("\n".join(lines))).strip()
+    answer = interrupt(question(pick_text(state, lines))).strip()
 
     if is_cancel(answer):
         return {"error": "요청을 취소했습니다."}
     if answer.isdigit() and 1 <= int(answer) <= len(candidates):
-        return {"target_account": candidates[int(answer) - 1]["id"], "candidates": None}
-    return {}       # 번호가 아니면 check 로 돌아가 다시 고르게 합니다
+        return {"target_account": candidates[int(answer) - 1]["id"], "candidates": None, "pick_warning": None}
+    # 번호가 아니면 지금 하는 업무를 알려주고 check 로 돌아가 다시 고르게 합니다.
+    return pick_warning(SETTING_TASKS.get(state.get("setting_action"), "계좌 설정"))
 
 
 def setting_ask_node(state: BankState):

@@ -29,6 +29,7 @@ class BankState(TypedDict):
     scheduled_at: str       # 예약 이체 시각. 있으면 지금 보내지 않고 예약만 합니다
     candidates: list        # 이름에 맞는 계좌가 여러 개일 때 후보 목록
     confirm_for: str        # 후보를 고르는 칸 (from / to / split = 나눠 이체의 split_index 줄)
+    pick_warning: str       # 번호 고르기에서 번호가 아닌 답을 받았을 때, 다음 질문 위에 붙일 안내 (지금 하는 업무 + '취소' 후 다시)
     question: str           # 방금 사용자에게 한 질문 (짧은 답이 어느 칸인지 알려고)
     error: str              # 더 진행할 수 없을 때 사유
 
@@ -82,7 +83,7 @@ def new_request(query):
         "splits": None, "split_index": None, "targets": None, "scheduled_at": None,
         "setting_action": None, "target_name": None, "target_account": None,
         "setting_field": None, "new_value": None, "reg_info": None, "card_filter": None, "address_id": None, "reissue_next": None, "reissue_address": None, "billing_info": None, "bounced": None,
-        "candidates": None, "confirm_for": None, "question": None, "error": None,
+        "candidates": None, "confirm_for": None, "pick_warning": None, "question": None, "error": None,
         "proposal": None, "approval": None, "new_data": None, "result": None,
         "auth_tries": 0,
     }

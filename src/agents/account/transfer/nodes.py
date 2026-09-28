@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field, ValidationError
 import data_store
 import functions
 import logger
-from agents.common.nodes import is_cancel, question
+from agents.common.nodes import is_cancel, pick_text, pick_warning, question
 from agents.account.transfer.prompts import extract_prompt, revise_prompt
 from model import llm
 from state import BankState
@@ -190,7 +190,7 @@ def transfer_confirm_node(state: BankState):
     lines = ["'%s' 에 맞는 계좌가 여러 개입니다. 번호를 골라 주세요." % name]
     for number, account in enumerate(candidates, start=1):
         lines.append("%d. %s (%s)" % (number, account["nickname"], account["account_number"]))
-    text = "\n".join(lines)
+    text = pick_text(state, lines)
 
     with logger.get_logger().node("transfer_confirm"):
         logger.get_logger().interrupt_pause("사용자 확인 (후보 %d개)" % len(candidates))
@@ -205,9 +205,10 @@ def transfer_confirm_node(state: BankState):
             # 고른 계좌를 그 줄에 적습니다. check 가 이 줄은 다시 찾지 않습니다.
             splits = [dict(split) for split in state["splits"]]
             splits[state["split_index"]].update({"to_account": picked["account_id"], "to_name": picked["nickname"]})
-            return {"splits": splits}
-        return {slot + "_account": picked["account_id"], slot + "_name": picked["nickname"]}
-    return {}       # 번호가 아니면 check 로 돌아가 다시 고르게 합니다
+            return {"splits": splits, "pick_warning": None}
+        return {slot + "_account": picked["account_id"], slot + "_name": picked["nickname"], "pick_warning": None}
+    # 번호가 아니면 지금 하는 업무를 알려주고 check 로 돌아가 다시 고르게 합니다.
+    return pick_warning("예약 이체" if state.get("scheduled_at") else "이체")
 
 
 def transfer_ask_node(state: BankState):
