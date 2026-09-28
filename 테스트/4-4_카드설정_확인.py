@@ -11,6 +11,7 @@
 #                   분실 정지 카드도 해지는 된다
 #   4) 등록        : 미래은행 체크카드를 생활비 계좌로 등록. 이미 있는 번호, 정보가 빠진 요청은 거절
 #   5) 로그        : 새 카드 비밀번호가 로그 파일에 남지 않는다
+#   (12장 보완) 카드 비밀번호는 해시로 저장되므로, 목록에는 해시 앞부분과 "9876 이 맞는지" 를 보여준다
 #
 # 시작과 끝에 data.json 을 원본으로 되돌립니다.
 
@@ -20,6 +21,9 @@ import shutil
 import subprocess
 import sys
 from datetime import date
+
+sys.path.insert(0, "src")
+from functions.common import check_secret   # noqa: E402
 
 DATA = "data/data.json"
 
@@ -40,8 +44,10 @@ def show_cards():
         data = json.load(f)
     for c in data["cards"]:
         if c["owner_id"] == "user-001":
-            print("  %s  %-12s %-10s %-6s %s  %s" % (c["card_id"], c["name"], c["status"], c["card_type"],
-                                                   c["card_number"], c["card_password"]))
+            password = c["card_password"]
+            print("  %s  %-12s %-10s %-6s %s  %s  9876=%s" % (c["card_id"], c["name"], c["status"], c["card_type"],
+                                                            c["card_number"], (password or "None")[:12] + "…",
+                                                            check_secret("9876", password)))
     print("  처리 기록 :", [(r["task_type"], r["status"]) for r in data["requests"]])
     print()
 

@@ -4,22 +4,22 @@
       "owner_id": "user-001",
       "name": "김도윤",
       "phone": "010-1234-5678",
-      "ssn_tail": "1234567",
-      "pin": "1234"
+      "ssn_tail": "a2654f2e9577a0da$145df4c43ce19f2c69b6c85c12bda3b3f7544909d99cc6a37d9787ab232e45c8",
+      "pin": "0cbed132703942fd$29ca0b6578001df77419a4efab5354691b138186ad0f116a78a7a077b6ea8ca0"
     },
     {
       "owner_id": "user-002",
       "name": "김서연",
       "phone": "010-2345-6789",
-      "ssn_tail": "2345678",
-      "pin": "2345"
+      "ssn_tail": "6db58f20bcd325b8$c22ee4471f229aca428001f0fc76d50ab53550f9a66fc6d7a6cc48579864222f",
+      "pin": "bf37cb7e103ff6ed$3d5c35b3c851f45358a4ca2465664410fd3e19143107e9e93c186dd8b5567589"
     },
     {
       "owner_id": "user-003",
       "name": "박지호",
       "phone": "010-3456-7890",
-      "ssn_tail": "3456789",
-      "pin": "3456"
+      "ssn_tail": "1bc9aca147b6b838$921cb498727cec05f8ccf34d2fa7b5471f54018791448f58d28bd06e5bb78744",
+      "pin": "19be325430d23989$2b4b4392067143caa2b8cda20ff69ca0d962e598ca65b0dbba278cb8b8b54b0e"
     }
   ],
   "accounts": [
@@ -32,7 +32,7 @@
       "bank_code": "001",
       "bank_name": "가상은행",
       "account_number": "110-001-100001",
-      "account_password": "1234"
+      "account_password": "6d6554d4a9f5d082$f90167ccebdd81bed4bf51b3603948e2c901bc9109352b0f3d56cebbdcb4a652"
     },
     {
       "account_id": "acc-002",
@@ -43,7 +43,7 @@
       "bank_code": "001",
       "bank_name": "가상은행",
       "account_number": "110-001-100002",
-      "account_password": "1234"
+      "account_password": "7a3201cd6bddc362$e51a60f43d5d60d051a9b7d1bf28975aaac3e8399fe619d85ab93dc09faa6e06"
     },
     {
       "account_id": "acc-003",
@@ -54,7 +54,7 @@
       "bank_code": "001",
       "bank_name": "가상은행",
       "account_number": "110-001-100003",
-      "account_password": "1234"
+      "account_password": "c111caa45047715b$09d6ede478e16df7b24991666de2974da71ecb7df01e0147604b1be88266e73e"
     },
     {
       "account_id": "acc-004",
@@ -65,7 +65,7 @@
       "bank_code": "001",
       "bank_name": "가상은행",
       "account_number": "110-001-100004",
-      "account_password": "2345"
+      "account_password": "feb6ebfe6a843522$1885e30cb46899cdb074e7af4910450081e1990ee8b8d01d3379eb3f115b5182"
     },
     {
       "account_id": "acc-005",
@@ -76,7 +76,7 @@
       "bank_code": "001",
       "bank_name": "가상은행",
       "account_number": "110-001-100005",
-      "account_password": "3456"
+      "account_password": "e55a87acc2bad40c$489a8b0e22babe50a5796653521f9315877762ce367ee5f4ff698b342a5c5f2b"
     }
   ],
   "registered_accounts": [
@@ -110,7 +110,7 @@
       "card_type": "debit",
       "bank_code": "001",
       "bank_name": "가상은행",
-      "card_password": "1111",
+      "card_password": "69c48e1250e80242$7cd61634ca928d0bdf9dbcf0483780a41ef24cf65a68e32df928e7fed4eb909e",
       "credit_limit": null,
       "report_reason": null,
       "reported_at": null
@@ -125,7 +125,7 @@
       "card_type": "debit",
       "bank_code": "001",
       "bank_name": "가상은행",
-      "card_password": "2222",
+      "card_password": "8df278b0fc0da70d$51c5e815c43c127d7116211386674b6a1e4297beda2ecacb63de6da0581c31af",
       "credit_limit": null,
       "report_reason": null,
       "reported_at": null
@@ -140,7 +140,7 @@
       "card_type": "debit",
       "bank_code": "001",
       "bank_name": "가상은행",
-      "card_password": "3333",
+      "card_password": "8da26a929fd1ccc7$4cddb5c103a8fdaaa5e3e7ea0ab0a9cee81c34cdb45ce588e925bb28c5d0304f",
       "credit_limit": null,
       "report_reason": null,
       "reported_at": null
@@ -155,7 +155,7 @@
       "card_type": "debit",
       "bank_code": "001",
       "bank_name": "가상은행",
-      "card_password": "4444",
+      "card_password": "60c47af921e56b55$fff683050a338fa91bb4d9071705aabfa9cae0edc6cc338dc4495bc6d5d19527",
       "credit_limit": null,
       "report_reason": null,
       "reported_at": null
@@ -170,7 +170,7 @@
       "card_type": "credit",
       "bank_code": "001",
       "bank_name": "가상은행",
-      "card_password": "5555",
+      "card_password": "a299734579dc9a71$741970a9ef47dae431bf8145c51cec27c88811983a9d7f68d9937c474a9eac09",
       "credit_limit": 3000000,
       "report_reason": null,
       "reported_at": null
@@ -185,7 +185,7 @@
       "card_type": "credit",
       "bank_code": "001",
       "bank_name": "가상은행",
-      "card_password": "6666",
+      "card_password": "29637f968e1a3c3f$dcfdea47472d9c217087bd4c2346cac120bc107b7b39a37ad38094509b6bb5d2",
       "credit_limit": 2000000,
       "report_reason": null,
       "reported_at": null
@@ -200,7 +200,7 @@
       "card_type": "debit",
       "bank_code": "001",
       "bank_name": "가상은행",
-      "card_password": "7777",
+      "card_password": "033543a63ff7d52e$e3f43a95f01b1c008eadf06275a8b02b4ef7208189c9c444af410b8bac08ede9",
       "credit_limit": null,
       "report_reason": "분실",
       "reported_at": "2026-09-14T10:00:00+09:00"
@@ -215,7 +215,7 @@
       "card_type": "debit",
       "bank_code": "001",
       "bank_name": "가상은행",
-      "card_password": "8888",
+      "card_password": "2ebc5fed7ad83276$3b2a0d5f193d06a2da645313f021034196fdf873f3d7bde7f1da0b2abc31735c",
       "credit_limit": null,
       "report_reason": "도난",
       "reported_at": "2026-09-09T14:00:00+09:00"

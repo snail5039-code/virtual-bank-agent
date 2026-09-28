@@ -1,5 +1,8 @@
 # 여러 업무가 같이 쓰는 함수입니다. 로그인한 사용자, 기준일, 본인 확인, 기간·시각 계산.
 
+import hashlib
+import hmac
+import secrets
 from datetime import date, datetime, timedelta
 
 import data_store
@@ -14,14 +17,41 @@ def base_date():
     return date.today()
 
 
+# ---------------------------------------------------------------- 비밀 값 해시
+# 계좌 비밀번호 / PIN / 주민번호 뒷자리 / 카드 비밀번호는 data.json 에 평문이 아니라 해시로 둡니다.
+# 저장할 때 hash_secret 으로 바꾸고, 확인할 때는 입력값을 같은 방법으로 해시해 비교합니다 (되돌릴 수 없음).
+# 숫자 4자리는 해시만 하면 0000~9999 를 다 해시해 보면 금방 풀리므로,
+#   salt : 값마다 다른 임의의 글자를 붙여 같은 비밀번호라도 해시가 다르게 나오게 하고
+#   반복 : pbkdf2 로 10만 번 반복해 한 번 해 보는 데 시간이 걸리게 합니다.
+# 저장 모양 : "salt$해시"   (Python 기본 라이브러리 hashlib 만 씁니다)
+HASH_ROUNDS = 100_000
+
+
+def hash_secret(value, salt=None):
+    salt = salt or secrets.token_hex(8)
+    digest = hashlib.pbkdf2_hmac("sha256", value.encode(), salt.encode(), HASH_ROUNDS).hex()
+    return "%s$%s" % (salt, digest)
+
+
+def check_secret(value, stored):
+    # 입력값(value)이 저장된 해시(stored)와 맞는지 봅니다. 저장된 값이 없으면(비밀번호를 정하지 않은 카드) False.
+    if not stored:
+        return False
+    salt = stored.split("$")[0]
+    return hmac.compare_digest(hash_secret(value, salt), stored)
+
+
 def authenticate(owner_id, value):
     # 본인 확인. 계좌 비밀번호 / PIN / 휴대전화번호 / 주민번호 뒷자리 중 하나가 맞으면 True 입니다.
+    # 휴대전화번호는 연락처라 평문으로 두고, 나머지는 해시로 비교합니다.
     data = data_store.load()
     user = next(u for u in data["users"] if u["owner_id"] == owner_id)
     value = value.replace("-", "").strip()
-    answers = {user["pin"], user["phone"].replace("-", ""), user["ssn_tail"]}
-    answers |= {a["account_password"] for a in data["accounts"] if a["owner_id"] == owner_id}
-    return value in answers
+    if value == user["phone"].replace("-", ""):
+        return True
+    hashes = [user["pin"], user["ssn_tail"]]
+    hashes += [a["account_password"] for a in data["accounts"] if a["owner_id"] == owner_id]
+    return any(check_secret(value, stored) for stored in hashes)
 
 
 def period_range(period):

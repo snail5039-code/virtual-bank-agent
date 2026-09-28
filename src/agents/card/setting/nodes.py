@@ -215,7 +215,8 @@ def card_setting_execute_node(state: BankState):
             functions.set_card_value(data, card["card_id"], "name", state["new_value"])
             answer = "카드 별칭 변경 완료 : %s → %s" % (old, card["name"])
         elif action == "비밀번호 변경":
-            functions.set_card_value(data, card["card_id"], "card_password", state["new_value"])
+            # 비밀번호는 평문이 아니라 해시로 저장합니다.
+            functions.set_card_value(data, card["card_id"], "card_password", functions.hash_secret(state["new_value"]))
             answer = "카드 비밀번호를 바꿨습니다. (%s)" % card["name"]
         else:
             old = functions.CARD_STATUS[card["status"]]

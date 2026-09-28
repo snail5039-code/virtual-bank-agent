@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 import data_store
 from functions.account import MAX_SETTING_LEN, get_transactions
+from functions.common import check_secret
 
 # 카드 상태와 종류를 화면에 보여줄 한국어로 바꾸는 표입니다.
 CARD_STATUS = {"active": "사용 가능", "locked": "일시 잠금", "lost": "분실 정지", "cancelled": "해지"}
@@ -81,7 +82,7 @@ def check_card_password(card, value):
     # 새 카드 비밀번호를 쓸 수 있는지 봅니다. 숫자 4자리이고 지금 비밀번호와 달라야 합니다.
     if not (len(value) == 4 and value.isdigit()):
         return "카드 비밀번호는 숫자 4자리여야 합니다."
-    if card["card_password"] == value:
+    if check_secret(value, card["card_password"]):     # 저장된 값은 해시라 해시끼리 비교합니다
         return "지금 비밀번호와 같습니다. 다른 번호로 정해 주세요."
     return None
 
