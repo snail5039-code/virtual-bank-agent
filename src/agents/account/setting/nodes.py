@@ -80,11 +80,11 @@ def setting_extract_node(state: BankState):
 
 def schedule_text(schedule_id):
     # 예약 한 건을 한 줄로 씁니다. 예) sch-001  09월 27일 09:00  생활비 → 저축  100,000원  [예약]
-    nicknames = {a["account_id"]: a["nickname"] for a in functions.get_accounts(functions.CURRENT_USER)}
+    data = data_store.load()
     s = next(s for s in functions.get_schedules(functions.CURRENT_USER) if s["schedule_id"] == schedule_id)
     return "%s  %s  %s → %s  %s원  [%s]" % (
         s["schedule_id"], functions.parse_time(s["scheduled_at"]).strftime("%m월 %d일 %H:%M"),
-        nicknames.get(s["from_account"], s["from_account"]), nicknames.get(s["to_account"], s["to_account"]),
+        functions.target_name(data, s["from_account"]), functions.target_name(data, s["to_account"]),
         format(s["amount"], ","), s["status"])
 
 

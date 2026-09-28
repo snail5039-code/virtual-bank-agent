@@ -113,7 +113,11 @@ def transfer_check_node(state: BankState):
             if state.get(slot + "_account") or not name:
                 continue
 
-            found = functions.find_accounts(functions.CURRENT_USER, name)
+            # 출금은 내 계좌에서만, 입금은 내 계좌와 등록 계좌(상대 계좌)에서 찾습니다.
+            if slot == "from":
+                found = functions.find_accounts(functions.CURRENT_USER, name)
+            else:
+                found = functions.find_targets(functions.CURRENT_USER, name)
             log.resolve(name, len(found), found[0]["account_id"] if found else None)
 
             if len(found) == 0:
@@ -213,6 +217,7 @@ def transfer_propose_node(state: BankState):
     log = logger.get_logger()
     with log.node("transfer_propose"):
         from_account = functions.get_account(functions.CURRENT_USER, state["from_account"])
+        data = data_store.load()
         targets = state["targets"]
         total = sum(target["amount"] for target in targets)
 
@@ -220,10 +225,10 @@ def transfer_propose_node(state: BankState):
         if state.get("keep_amount") is not None:
             rows.append(["남길 금액", format(state["keep_amount"], ",") + "원"])
         for number, target in enumerate(targets, start=1):
-            to_account = functions.get_account(functions.CURRENT_USER, target["to_account"])
+            # 입금 대상은 내 계좌이거나 등록 계좌입니다. 등록 계좌면 은행·예금주까지 보여줍니다.
+            to_text = functions.get_target(data, target["to_account"])["text"]
             label = "입금" if len(targets) == 1 else "입금 %d" % number
-            rows.append([label, "%s (%s)  %s원" % (
-                to_account["nickname"], to_account["account_number"], format(target["amount"], ","))])
+            rows.append([label, "%s  %s원" % (to_text, format(target["amount"], ","))])
         rows.append(["총액", format(total, ",") + "원"])
         rows.append(["출금 후 잔액", format(from_account["balance"] - total, ",") + "원"])
 

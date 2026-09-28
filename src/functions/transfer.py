@@ -4,23 +4,68 @@ from datetime import datetime
 
 import data_store
 import logger
-from functions.account import find_accounts, get_account, get_accounts
+from functions.account import find_accounts, find_registered, get_account
 from functions.common import parse_time
+
+
+# ---------------------------------------------------------------- 입금 대상 (내 계좌 + 등록 계좌)
+# 입금 대상 ID 는 두 종류입니다.
+#   acc-001 : 내 계좌
+#   reg-001 : 등록 계좌 (상대 계좌 주소록). 가상은행이면 그 계좌에 돈이 들어가고, 다른 은행이면 출금만 남깁니다.
+
+def find_targets(owner_id, name):
+    # 입금 대상을 이름으로 찾습니다. 내 계좌와 등록 계좌를 함께 봅니다. 0개 없음 / 1개 확정 / 2개 이상 고르게 합니다.
+    # 등록 계좌는 내 계좌와 같은 칸(account_id, nickname, account_number)으로 맞춰서 후보 고르기를 그대로 씁니다.
+    found = find_accounts(owner_id, name)
+    for r in find_registered(owner_id, name):
+        found.append({"account_id": r["registered_id"], "nickname": r["nickname"],
+                      "account_number": "%s %s, 예금주 %s, 등록 계좌" % (r["bank_name"], r["account_number"], r["holder_name"])})
+    return found
+
+
+def get_target(data, to_id):
+    # 입금 대상 ID 로 화면에 쓸 이름·설명과, 돈을 실제로 넣을 가상은행 계좌 ID(deposit_id)를 돌려줍니다.
+    # 다른 은행 등록 계좌는 deposit_id 가 None 입니다. 등록 계좌를 지웠으면 None 을 돌려줍니다.
+    for a in data["accounts"]:
+        if a["account_id"] == to_id:
+            return {"nickname": a["nickname"], "text": "%s (%s)" % (a["nickname"], a["account_number"]),
+                    "deposit_id": to_id}
+    for r in data["registered_accounts"]:
+        if r["registered_id"] == to_id:
+            return {"nickname": r["nickname"],
+                    "text": "%s (%s %s, 예금주 %s)" % (r["nickname"], r["bank_name"], r["account_number"], r["holder_name"]),
+                    "deposit_id": r["account_id"]}
+    return None
+
+
+def target_name(data, to_id):
+    # 입금 대상의 이름만 돌려줍니다. 찾을 수 없으면 ID 를 그대로 씁니다.
+    target = get_target(data, to_id)
+    return target["nickname"] if target else to_id
+
 
 def transfer(data, from_id, to_id, amount):
     # data 안에서 잔액을 옮기고 거래 내역을 출금 1건, 입금 1건 붙입니다. 파일에 저장하지는 않습니다.
+    # 다른 은행 등록 계좌로 보내면 받는 쪽 잔액이 없으므로 출금 1건만 붙입니다.
     # 실행 직전에 잔액을 다시 봅니다. 승인한 뒤에 잔액이 줄었을 수 있기 때문입니다.
     # 진행할 수 없으면 사유를, 성공하면 None 을 돌려줍니다.
     accounts = {account["account_id"]: account for account in data["accounts"]}
-    from_account, to_account = accounts[from_id], accounts[to_id]
+    from_account = accounts[from_id]
+    target = get_target(data, to_id)
+    if not target:
+        return "입금 계좌를 찾을 수 없습니다. (등록 계좌를 삭제했을 수 있습니다)"
     if from_account["balance"] < amount:
         return "잔액이 부족합니다. (%s 잔액 %s원)" % (from_account["nickname"], format(from_account["balance"], ","))
 
     from_account["balance"] -= amount
-    to_account["balance"] += amount
+    moves = [(from_account, "withdrawal")]
+    if target["deposit_id"]:
+        to_account = accounts[target["deposit_id"]]
+        to_account["balance"] += amount
+        moves.append((to_account, "deposit"))
 
     now = datetime.now().astimezone().isoformat(timespec="seconds")
-    for account, kind in [(from_account, "withdrawal"), (to_account, "deposit")]:
+    for account, kind in moves:
         data["transactions"].append({
             "transaction_id": "tx-%03d" % (len(data["transactions"]) + 1),
             "owner_id": account["owner_id"],
@@ -44,7 +89,7 @@ def build_targets(owner_id, from_account, to_account, to_name, amount, keep, spl
     if splits:
         targets = []
         for split in splits:
-            found = find_accounts(owner_id, split["to_name"])
+            found = find_targets(owner_id, split["to_name"])
             logger.get_logger().resolve(split["to_name"], len(found), found[0]["account_id"] if found else None)
             if len(found) != 1:
                 return None, "'%s' 계좌를 하나로 정할 수 없습니다. 정확한 이름으로 다시 요청해 주세요." % split["to_name"]
@@ -69,7 +114,9 @@ def check_transfer(owner_id, from_account, targets, keep):
         return "잔액이 %s원이라 %s원을 남기면 보낼 금액이 없습니다." % (format(balance, ","), format(keep, ","))
     if any(target["amount"] <= 0 for target in targets):
         return "이체 금액은 0원보다 커야 합니다."
-    if any(target["to_account"] == from_account for target in targets):
+    # 등록 계좌가 내 계좌를 가리킬 수도 있으므로, 돈이 실제로 들어갈 계좌(deposit_id)로 비교합니다.
+    data = data_store.load()
+    if any((get_target(data, target["to_account"]) or {}).get("deposit_id") == from_account for target in targets):
         return "출금 계좌와 입금 계좌가 같습니다."
     if balance < total:
         return "잔액이 부족합니다. (잔액 %s원 / 보낼 금액 %s원)" % (format(balance, ","), format(total, ","))
@@ -132,12 +179,12 @@ def get_schedules(owner_id):
 def find_schedules(owner_id, name):
     # 취소할 예약을 찾습니다. 아직 실행 전(예약)인 것만 봅니다.
     # 예약 번호(sch-001), 입금 계좌 이름, 날짜(09-27) 중 하나가 맞으면 후보입니다.
-    nicknames = {a["account_id"]: a["nickname"] for a in get_accounts(owner_id)}
+    data = data_store.load()
     pending = [s for s in get_schedules(owner_id) if s["status"] == "예약"]
     if not name:
         return pending
     return [s for s in pending
-            if name in s["schedule_id"] or name in nicknames.get(s["to_account"], "") or name in s["scheduled_at"]]
+            if name in s["schedule_id"] or name in target_name(data, s["to_account"]) or name in s["scheduled_at"]]
 
 
 def cancel_schedule(data, schedule_id):
@@ -160,7 +207,7 @@ def run_due_schedules():
         error = transfer(data, s["from_account"], s["to_account"], s["amount"])
         s["status"] = "실패" if error else "완료"
         lines.append("[예약 이체 %s] %s → %s  %s원  (%s)%s" % (
-            s["status"], nicknames[s["from_account"]], nicknames[s["to_account"]], format(s["amount"], ","),
+            s["status"], nicknames[s["from_account"]], target_name(data, s["to_account"]), format(s["amount"], ","),
             parse_time(s["scheduled_at"]).strftime("%m월 %d일 %H:%M"), "  " + error if error else ""))
     if lines:
         try:
