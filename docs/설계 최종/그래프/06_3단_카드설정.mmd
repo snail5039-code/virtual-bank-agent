@@ -1,0 +1,23 @@
+flowchart TD
+    S([START]) --> ex["card_setting_extract<br/>할 일·카드·사유·새 별칭·등록 정보·재발급 여부 (LLM)"]
+    ex --> ck["card_setting_check<br/>카드 한 장으로, 상태 전이·별칭 검사"]
+    ck -.->|error| fail["card_setting_fail"]
+    ck -.->|"카드 여러 장"| pk["common_pick_card<br/>번호 고르기 (interrupt)"]
+    ck -.->|"정해짐"| au["common_authenticate"]
+    pk -.->|"번호 / 번호 아님"| ck
+    pk -.->|취소| fail
+    au -.->|틀림| au
+    au -.->|"취소·3회 실패"| fail
+    au -.->|"비밀번호 변경 + 새 비밀번호 없음"| pw["card_setting_password<br/>가린 입력으로 받기 (interrupt)"]
+    au -.->|그 밖| pr["card_setting_propose"]
+    pw -.->|"형식 오류·같은 번호·취소"| fail
+    pw -.->|OK| pr
+    pr --> ap["common_approve"] --> it["common_interpret"]
+    it -.->|승인| exe["card_setting_execute"]
+    it -.->|"거절·취소·다른요청"| rj["common_reject"]
+    it -.->|"수정 (다시 뽑기)"| ex
+    it -.->|모름| ap
+    exe --> log["common_log_request"]
+    rj --> log
+    log --> sv["common_save"] --> rp["common_report"] --> E([END])
+    fail --> E

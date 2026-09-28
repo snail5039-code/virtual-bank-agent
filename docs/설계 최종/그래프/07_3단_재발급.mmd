@@ -1,0 +1,23 @@
+flowchart TD
+    S([START]) -.->|"보통"| ex["reissue_extract<br/>할 일·카드·배송지 (LLM)"]
+    S -.->|"분실 신고에서 이어 옴 (reissue_next)"| ck
+    ex -.->|조회| ls["reissue_list"]
+    ex -.->|그 밖| ck["reissue_check<br/>카드·배송지 하나로, 신청 상태 검사"]
+    ck -.->|error| fail["reissue_fail"]
+    ck -.->|"카드 여러 장"| pk["common_pick_card"]
+    ck -.->|정해짐| au["common_authenticate"]
+    pk -.->|"번호 / 번호 아님"| ck
+    pk -.->|취소| fail
+    au -.->|틀림| au
+    au -.->|"취소·3회 실패"| fail
+    au -.->|인증됨| pr["reissue_propose"]
+    pr --> ap["common_approve"] --> it["common_interpret"]
+    it -.->|승인| exe["reissue_execute<br/>신청 / 배송지 수정 / 신청 취소"]
+    it -.->|"거절·취소·다른요청"| rj["common_reject"]
+    it -.->|"수정 (다시 뽑기)"| ex
+    it -.->|모름| ap
+    exe --> log["common_log_request"]
+    rj --> log
+    log --> sv["common_save"] --> rp["common_report"] --> E([END])
+    ls --> E
+    fail --> E

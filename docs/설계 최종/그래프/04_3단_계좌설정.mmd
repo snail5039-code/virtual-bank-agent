@@ -1,0 +1,25 @@
+flowchart TD
+    S([START]) --> ex["setting_extract<br/>할 일·계좌·항목·새 값·등록 정보 (LLM)"]
+    ex -.->|"조회 / 예약조회"| ls["setting_list<br/>등록 계좌·예약 목록"]
+    ex -.->|그 밖| ck["setting_check<br/>대상 → ID, 빠진 값, 검사"]
+    ck -.->|error| fail["setting_fail"]
+    ck -.->|"후보 여러 개"| cf["setting_confirm<br/>번호 고르기 (interrupt)"]
+    ck -.->|"빠진 값 (question)"| ask["setting_ask<br/>질문 (interrupt)"]
+    ck -.->|"다 모임"| au["common_authenticate"]
+    cf -.->|"번호 / 번호 아님"| ck
+    cf -.->|취소| fail
+    ask -.->|답| ex
+    ask -.->|취소| fail
+    au -.->|틀림| au
+    au -.->|"취소·3회 실패"| fail
+    au -.->|인증됨| pr["setting_propose"]
+    pr --> ap["common_approve"] --> it["common_interpret"]
+    it -.->|승인| exe["setting_execute<br/>변경·등록·삭제·예약 취소"]
+    it -.->|"거절·취소·다른요청"| rj["common_reject"]
+    it -.->|"수정 (다시 뽑기)"| ex
+    it -.->|모름| ap
+    exe --> log["common_log_request"]
+    rj --> log
+    log --> sv["common_save"] --> rp["common_report"] --> E([END])
+    ls --> E
+    fail --> E

@@ -1,0 +1,17 @@
+flowchart TD
+    S([START]) --> router["card_router<br/>카드 업무 고르기 (LLM)"]
+    router -.->|조회| ex["card_extract<br/>볼 것·은행·뺄 은행·이름·종류·상태·기간 (LLM)"]
+    router -.->|설정| st[["card_setting<br/>카드 설정 그래프"]]
+    router -.->|재발급| re[["reissue<br/>재발급 그래프"]]
+    router -.->|결제| bi[["billing<br/>카드 요금 그래프"]]
+    router -.->|"계좌 업무 (반송)"| E([END])
+    ex -.->|"카드 번호"| au["common_authenticate"]
+    ex -.->|"그 밖 · error"| q["card_query<br/>은행별로 나눠 보여주기"]
+    au -.->|틀림| au
+    au -.->|"인증됨 · 취소·3회 실패"| q
+    q --> E
+    st -.->|"분실 신고 완료 + 재발급도 원함"| tr["card_to_reissue<br/>State 를 재발급용으로"]
+    st -.->|그 밖| E
+    tr --> re
+    re --> E
+    bi --> E

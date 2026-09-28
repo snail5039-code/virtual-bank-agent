@@ -1,0 +1,22 @@
+flowchart TD
+    S([START]) --> ex["billing_extract<br/>할 일·카드·청구 월·금액·계좌·방식·개월 (LLM)"]
+    ex -.->|error| fail["billing_fail"]
+    ex -.->|"요금 조회"| fee["billing_fee<br/>낼 돈이 남은 청구서·합계"]
+    ex -.->|"명세서 조회"| stm["billing_statement<br/>청구서 + 상세 내역"]
+    ex -.->|결제| ck["billing_check<br/>방식 정하기, 청구서·계좌·금액, 검사"]
+    ck -.->|error| fail
+    ck -.->|정해짐| au["common_authenticate"]
+    au -.->|틀림| au
+    au -.->|"취소·3회 실패"| fail
+    au -.->|인증됨| pr["billing_propose"]
+    pr --> ap["common_approve"] --> it["common_interpret"]
+    it -.->|승인| exe["billing_execute<br/>전체·부분·분할 : 한 번에 / 일괄 : 건별 저장"]
+    it -.->|"거절·취소·다른요청"| rj["common_reject"]
+    it -.->|"수정 (다시 뽑기)"| ex
+    it -.->|모름| ap
+    exe --> log["common_log_request"]
+    rj --> log
+    log --> sv["common_save"] --> rp["common_report"] --> E([END])
+    fee --> E
+    stm --> E
+    fail --> E

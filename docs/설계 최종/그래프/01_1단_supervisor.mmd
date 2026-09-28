@@ -1,0 +1,18 @@
+flowchart TD
+    S([START]) --> rewrite["rewrite<br/>그거·그 카드 → 이름 (최근 대화가 있을 때만 LLM)"]
+    rewrite --> supervisor["supervisor<br/>분야 고르기 (LLM)"]
+    supervisor -.->|계좌| account[["account<br/>계좌 에이전트"]]
+    supervisor -.->|카드| card[["card<br/>카드 에이전트"]]
+    supervisor -.->|결과| result["result<br/>처리 기록에서 찾아 답"]
+    supervisor -.->|없음| guide["guide<br/>사용법 안내"]
+    account -.->|"task = 카드 업무<br/>반송 전"| bounce["bounce<br/>반대쪽 분야로"]
+    card -.->|"task = 계좌 업무<br/>반송 전"| bounce
+    account -.->|"이미 반송함"| bounce_fail["bounce_fail<br/>안내"]
+    card -.->|"이미 반송함"| bounce_fail
+    bounce -.->|카드| card
+    bounce -.->|계좌| account
+    account -.->|그 밖| E([END])
+    card -.->|그 밖| E
+    result --> E
+    guide --> E
+    bounce_fail --> E

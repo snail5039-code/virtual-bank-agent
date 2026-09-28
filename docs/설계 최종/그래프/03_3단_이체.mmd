@@ -1,0 +1,27 @@
+flowchart TD
+    S([START]) --> ex["transfer_extract<br/>출금·입금·금액·남길 금액·나눠·예약 시각 (LLM)"]
+    ex --> ck["transfer_check<br/>이름 → ID, 목록(targets) 만들기, 검사"]
+    ck -.->|error| fail["transfer_fail"]
+    ck -.->|"후보 여러 개"| cf["transfer_confirm<br/>번호 고르기 (interrupt)"]
+    ck -.->|"출금 계좌·목록 부족"| ask["transfer_ask<br/>빠진 값 질문 (interrupt)"]
+    ck -.->|"다 모임"| au["common_authenticate<br/>본인 확인 (interrupt)"]
+    cf -.->|"번호 / 번호 아님"| ck
+    cf -.->|취소| fail
+    ask -.->|답| ex
+    ask -.->|취소| fail
+    au -.->|"틀림 (3회 미만)"| au
+    au -.->|"취소·3회 실패"| fail
+    au -.->|"인증됨"| pr["transfer_propose<br/>처리안 (계산만)"]
+    pr --> ap["common_approve<br/>interrupt 한 줄"]
+    ap --> it["common_interpret<br/>답 해석 (LLM)"]
+    it -.->|승인| exe["transfer_execute<br/>재검사 + 이체 / 예약 등록"]
+    it -.->|"거절·취소·다른요청"| rj["common_reject"]
+    it -.->|수정| rv["transfer_revise<br/>바뀐 칸만 덮어쓰기 (LLM)"]
+    it -.->|모름| ap
+    rv --> ck
+    exe --> log["common_log_request"]
+    rj --> log
+    log --> sv["common_save<br/>3회까지"]
+    sv --> rp["common_report"]
+    rp --> E([END])
+    fail --> E

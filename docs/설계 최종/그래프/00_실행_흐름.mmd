@@ -1,0 +1,9 @@
+flowchart TD
+    IN["사용자 입력"] --> P0{"분기 0<br/>멈춰 있는 업무?<br/>(common_pending_check)"}
+    P0 -->|"승인 대기 / 질문 대기"| RES["Command(resume=입력)<br/>멈춘 노드부터 다시 실행"]
+    P0 -->|"없음"| NEW["new_request(입력, 최근 대화)<br/>이번 업무 칸 비우기"]
+    NEW --> G["bank_graph<br/>rewrite → supervisor → 2단 → 3단"]
+    RES --> G
+    G --> OUT{"그래프가 멈췄나?"}
+    OUT -->|"interrupt"| Q["질문·처리안을 보여줌<br/>진행 중 업무를 data.json pending 에 기록"]
+    OUT -->|"끝남"| A["answer 를 보여줌<br/>최근 대화에 한 줄 남김 · pending 지움"]

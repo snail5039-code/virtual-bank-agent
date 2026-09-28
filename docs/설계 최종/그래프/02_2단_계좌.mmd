@@ -1,0 +1,11 @@
+flowchart TD
+    S([START]) --> router["account_router<br/>계좌 업무 고르기 (LLM)"]
+    router -.->|조회| q["account_query<br/>목록·잔액·총액"]
+    router -.->|거래내역| h["account_history<br/>기간·계좌·종류·금액으로 거르기"]
+    router -.->|이체| t[["transfer<br/>이체 그래프"]]
+    router -.->|설정| st[["account_setting<br/>계좌 설정 그래프"]]
+    router -.->|"카드 업무 (반송)"| E([END])
+    q --> E
+    h --> E
+    t --> E
+    st --> E
