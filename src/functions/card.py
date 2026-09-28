@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 import data_store
 from functions.account import MAX_SETTING_LEN, get_transactions
-from functions.common import check_secret
+from functions.common import check_secret, next_id
 
 # 카드 상태와 종류를 화면에 보여줄 한국어로 바꾸는 표입니다.
 CARD_STATUS = {"active": "사용 가능", "locked": "일시 잠금", "lost": "분실 정지", "cancelled": "해지"}
@@ -15,6 +15,11 @@ CARD_TYPES = {"debit": "체크", "credit": "신용"}
 def get_cards(owner_id):
     data = data_store.load()
     return [card for card in data["cards"] if card["owner_id"] == owner_id]
+
+
+def get_card(owner_id, card_id):
+    # ID 로 카드 한 장을 찾습니다. 없거나 다른 사람 카드면 None 입니다. (계좌의 get_account 와 같은 모양)
+    return next((card for card in get_cards(owner_id) if card["card_id"] == card_id), None)
 
 
 def find_cards(owner_id, bank_name=None, card_name=None, card_type=None, status=None, exclude_banks=None):
@@ -127,8 +132,7 @@ def normalize_card_number(text):
 def register_card(data, owner_id, info):
     # data 에 카드를 한 장 덧붙입니다. 파일에 저장하지는 않습니다.
     # 한도·비밀번호는 모르므로 비워 둡니다. 비밀번호는 비밀번호 변경으로 정합니다.
-    numbers = [int(c["card_id"].split("-")[1]) for c in data["cards"]]
-    card_id = "card-%03d" % (max(numbers, default=0) + 1)
+    card_id = next_id(data["cards"], "card_id", "card")
     data["cards"].append({
         "card_id": card_id,
         "owner_id": owner_id,

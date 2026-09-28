@@ -8,7 +8,7 @@
 # 읽기만 하므로 인증·승인 없이 끝납니다.
 
 from datetime import date
-from typing import Literal, Optional
+from typing import Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
@@ -25,8 +25,7 @@ SHOW_MAX = 5    # "다 보여줘" 일 때 최근 몇 건까지 보여줄지
 class ResultQuery(BaseModel):
     keyword: Optional[str] = Field(default=None, description="업무를 나타내는 짧은 말 (예: 이체, 잠금, 결제)")
     # 언제 한 업무인지. 카드 이용 내역과 같은 방식입니다.
-    period: Literal["오늘", "어제", "이번 주", "지난 주", "이번 달", "지난 달", "전체"] = Field(
-        default="전체", description="기간")
+    period: functions.Period = Field(default="전체", description="기간")
     start_date: Optional[date] = Field(default=None, description="직접 말한 시작일 YYYY-MM-DD")
     end_date: Optional[date] = Field(default=None, description="직접 말한 종료일 YYYY-MM-DD")
     target_name: Optional[str] = Field(default=None, description="업무의 대상인 카드나 계좌 이름 (예: 여행 카드, 저축)")
@@ -54,9 +53,7 @@ def result_query_node(state: BankState):
             HumanMessage(content=state["query"]),
         ])
         # 기간 : 직접 말한 날짜가 있으면 그 날짜, 없으면 기간 이름으로 계산합니다. 계산은 Python 이 합니다.
-        start, end = functions.period_range(r.period)
-        start = r.start_date or start
-        end = r.end_date or end
+        start, end = functions.date_range(r.period, r.start_date, r.end_date)
         log.detail("추출  업무=%s  기간=%s %s~%s  대상=%s  여러 건=%s" % (
             r.keyword, r.period, start, end, r.target_name, r.show_all))
 

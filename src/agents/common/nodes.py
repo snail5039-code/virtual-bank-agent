@@ -225,15 +225,9 @@ def common_log_request_node(state: BankState):
     with log.node("common_log_request"):
         # 업무 노드가 바꾼 데이터가 있으면 거기에, 없으면(거절) 지금 파일 내용에 덧붙입니다.
         data = state.get("new_data") or data_store.load()
-        record = {
-            "request_id": "req-%04d" % (len(data["requests"]) + 1),
-            "owner_id": functions.CURRENT_USER,
-            "task_type": state["proposal"]["task"],
-            "content": dict(state["proposal"]["rows"]),
-            "status": state["result"],
-            "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        }
-        data["requests"].append(record)
+        functions.add_request(data, functions.CURRENT_USER, state["proposal"]["task"],
+                              dict(state["proposal"]["rows"]), state["result"], datetime.now().astimezone())
+        record = data["requests"][-1]
         log.detail("처리 기록 %s  %s / %s" % (record["request_id"], record["task_type"], record["status"]))
 
     return {"new_data": data}

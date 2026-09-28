@@ -4,6 +4,7 @@ from datetime import datetime
 
 import data_store
 from functions.card import CARD_STATUS
+from functions.common import next_id
 
 # 신청 상태 : 접수 → 제작중 → 배송중. 취소하면 취소됨. 실제 제작·배송 진행은 만들지 않습니다. (기획서 5.4)
 REISSUE_STATUS = {"received": "접수", "making": "제작중", "shipping": "배송중", "cancelled": "취소됨"}
@@ -69,8 +70,7 @@ def change_application(data, app_id, action, address_id=None):
 def add_reissue(data, owner_id, card_id, address_id):
     # data 에 재발급 신청을 한 줄 덧붙입니다. 파일에 저장하지는 않습니다.
     # 기존 카드의 분실 정지는 그대로 둡니다. (기획서 5.4)
-    numbers = [int(a["application_id"].split("-")[1]) for a in data["reissue_applications"]]
-    app_id = "app-%03d" % (max(numbers, default=0) + 1)
+    app_id = next_id(data["reissue_applications"], "application_id", "app")
     data["reissue_applications"].append({
         "application_id": app_id,
         "owner_id": owner_id,

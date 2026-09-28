@@ -62,8 +62,7 @@ def account_query_node(state: BankState):
 
 class HistoryFilter(BaseModel):
     account_name: Optional[str] = Field(default=None, description="계좌 이름")
-    period: Literal["오늘", "어제", "이번 주", "지난 주", "이번 달", "지난 달", "전체"] = Field(
-        default="전체", description="기간")
+    period: functions.Period = Field(default="전체", description="기간")
     # 타입을 date 로 고정합니다. 형식이 틀린 값은 pydantic 이 받지 않아 코드 안으로 들어오지 못합니다.
     start_date: Optional[date] = Field(default=None, description="직접 말한 시작일 YYYY-MM-DD")
     end_date: Optional[date] = Field(default=None, description="직접 말한 종료일 YYYY-MM-DD")
@@ -97,10 +96,8 @@ def account_history_node(state: BankState):
             if not accounts:
                 return {"answer": "'%s' 계좌를 찾을 수 없습니다." % f.account_name}
 
-        start, end = functions.period_range(f.period)
         # 직접 말한 날짜가 있으면 그걸 씁니다. 이미 date 라서 바꿀 필요가 없습니다.
-        start = f.start_date or start
-        end = f.end_date or end
+        start, end = functions.date_range(f.period, f.start_date, f.end_date)
 
         found = functions.get_transactions(
             functions.CURRENT_USER, [a["account_id"] for a in accounts],

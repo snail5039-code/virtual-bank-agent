@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import secrets
 from datetime import date, datetime, timedelta
+from typing import Literal
 
 import data_store
 
@@ -53,6 +54,16 @@ def authenticate(owner_id, value):
     hashes = [user["pin"], user["ssn_tail"]]
     hashes += [a["account_password"] for a in data["accounts"] if a["owner_id"] == owner_id]
     return any(check_secret(value, stored) for stored in hashes)
+
+
+# LLM 이 고르는 기간 이름입니다. 거래 내역·카드 이용 내역·결과 조회가 같이 씁니다.
+Period = Literal["오늘", "어제", "이번 주", "지난 주", "이번 달", "지난 달", "전체"]
+
+
+def date_range(period, start_date=None, end_date=None):
+    # 조회할 (시작일, 종료일). 직접 말한 날짜가 있으면 그 날짜, 없으면 기간 이름으로 계산합니다.
+    start, end = period_range(period)
+    return start_date or start, end_date or end
 
 
 def period_range(period):
@@ -132,8 +143,8 @@ def add_month(when):
 
 
 def add_request(data, owner_id, task_type, content, status, now):
-    # data 에 처리 기록을 한 줄 덧붙입니다. 모양은 common_log_request 와 같습니다.
-    # 사용자 요청 없이 켤 때·입력할 때 자동으로 한 일(예약 이체 실행, 분할 회차 결제)이 씁니다.
+    # data 에 처리 기록을 한 줄 덧붙입니다. 파일에 저장하지는 않습니다.
+    # 업무가 끝날 때(common_log_request)와, 사용자 요청 없이 자동으로 한 일(예약 이체 실행, 분할 회차 결제)이 씁니다.
     data["requests"].append({
         "request_id": "req-%04d" % (len(data["requests"]) + 1),
         "owner_id": owner_id,
@@ -141,6 +152,28 @@ def add_request(data, owner_id, task_type, content, status, now):
         "content": content,
         "status": status,
         "created_at": now.isoformat(timespec="seconds"),
+    })
+
+
+def next_id(items, key, prefix):
+    # 목록에서 가장 큰 번호 + 1 로 새 ID 를 만듭니다. 예) reg-003 까지 있으면 reg-004. 비어 있으면 reg-001.
+    # 개수 + 1 이 아니라 가장 큰 번호를 보는 이유 : 지운 항목(등록 계좌 삭제)이 있으면 번호가 겹칩니다.
+    numbers = [int(item[key].split("-")[1]) for item in items]
+    return "%s-%03d" % (prefix, max(numbers, default=0) + 1)
+
+
+def add_transaction(data, account, kind, amount, occurred_at, merchant=None):
+    # data 에 계좌 거래 내역을 한 줄 덧붙입니다. 파일에 저장하지는 않습니다.
+    # kind : deposit(입금) / withdrawal(출금). 이체와 카드값 결제가 씁니다. 카드 이용이 아니므로 card_id 는 비웁니다.
+    data["transactions"].append({
+        "transaction_id": "tx-%03d" % (len(data["transactions"]) + 1),
+        "owner_id": account["owner_id"],
+        "account_id": account["account_id"],
+        "type": kind,
+        "amount": amount,
+        "occurred_at": occurred_at,
+        "card_id": None,
+        "merchant": merchant,
     })
 
 

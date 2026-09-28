@@ -145,7 +145,7 @@ def reissue_check_node(state: BankState):
 def reissue_propose_node(state: BankState):
     with logger.get_logger().node("reissue_propose"):
         action = state["setting_action"]
-        card = next(c for c in functions.get_cards(functions.CURRENT_USER) if c["card_id"] == state["target_account"])
+        card = functions.get_card(functions.CURRENT_USER, state["target_account"])
         addresses = {a["address_id"]: a for a in functions.get_addresses(functions.CURRENT_USER)}
         card_row = ["카드", "%s (%s)" % (card["name"], card["card_number"])]
 

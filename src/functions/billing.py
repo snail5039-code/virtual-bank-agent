@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import data_store
 from functions.account import get_account
-from functions.common import add_month, add_request, parse_time
+from functions.common import add_month, add_request, add_transaction, next_id, parse_time
 
 # 청구서는 신용카드에만 있습니다. 체크카드는 쓰는 즉시 계좌에서 빠지므로 낼 돈이 따로 없습니다.
 # 남은 금액 = 청구 총액 - 낸 금액 (데이터에 remaining_amount 로 들어 있습니다)
@@ -70,16 +70,7 @@ def pay_statement(data, statement_id, account_id, amount, memo):
                 i["status"] = "paid"
     statement["paid_at"] = now
     statement["paid_account"] = account_id
-    data["transactions"].append({
-        "transaction_id": "tx-%03d" % (len(data["transactions"]) + 1),
-        "owner_id": account["owner_id"],
-        "account_id": account_id,
-        "type": "withdrawal",
-        "amount": amount,
-        "occurred_at": now,
-        "card_id": None,
-        "merchant": memo,
-    })
+    add_transaction(data, account, "withdrawal", amount, now, memo)
 
 
 INSTALLMENT_MONTHS = (2, 12)     # 분할(할부) 개월 수 범위
@@ -107,8 +98,7 @@ def add_installment(data, statement_id, months):
     # 남은 회차는 next_due_at(다음 납부일, 한 달 뒤)이 되면 pay_due_installments 가 냅니다.
     statement = next(s for s in data["card_statements"] if s["statement_id"] == statement_id)
     amounts = installment_amounts(statement["remaining_amount"], months)
-    numbers = [int(i["installment_id"].split("-")[1]) for i in data["card_installments"]]
-    installment_id = "inst-%03d" % (max(numbers, default=0) + 1)
+    installment_id = next_id(data["card_installments"], "installment_id", "inst")
     data["card_installments"].append({
         "installment_id": installment_id,
         "statement_id": statement_id,

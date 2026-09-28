@@ -6,7 +6,7 @@ import data_store
 import logger
 from functions.account import find_accounts, find_registered, get_account
 from functions.billing import pay_due_installments
-from functions.common import add_request, parse_time
+from functions.common import add_request, add_transaction, next_id, parse_time
 
 
 # ---------------------------------------------------------------- 입금 대상 (내 계좌 + 등록 계좌)
@@ -67,16 +67,7 @@ def transfer(data, from_id, to_id, amount):
 
     now = datetime.now().astimezone().isoformat(timespec="seconds")
     for account, kind in moves:
-        data["transactions"].append({
-            "transaction_id": "tx-%03d" % (len(data["transactions"]) + 1),
-            "owner_id": account["owner_id"],
-            "account_id": account["account_id"],
-            "type": kind,
-            "amount": amount,
-            "occurred_at": now,
-            "card_id": None,
-            "merchant": None,
-        })
+        add_transaction(data, account, kind, amount, now)
     return None
 
 
@@ -187,9 +178,8 @@ def check_schedule(scheduled_at, targets, keep):
 
 def add_schedule(data, owner_id, from_id, target, scheduled_at):
     # data 에 예약을 한 줄 덧붙입니다. 돈은 옮기지 않습니다. 파일에 저장하지는 않습니다.
-    numbers = [int(s["schedule_id"].split("-")[1]) for s in data["scheduled_transfers"]]
     data["scheduled_transfers"].append({
-        "schedule_id": "sch-%03d" % (max(numbers, default=0) + 1),
+        "schedule_id": next_id(data["scheduled_transfers"], "schedule_id", "sch"),
         "owner_id": owner_id,
         "from_account": from_id,
         "to_account": target["to_account"],

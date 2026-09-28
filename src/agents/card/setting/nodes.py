@@ -150,7 +150,7 @@ def card_setting_password_node(state: BankState):
 
     if is_cancel(answer):
         return {"error": "비밀번호 변경을 취소했습니다."}
-    card = next(c for c in functions.get_cards(functions.CURRENT_USER) if c["card_id"] == state["target_account"])
+    card = functions.get_card(functions.CURRENT_USER, state["target_account"])
     error = functions.check_card_password(card, answer)
     if error:
         return {"error": error}
@@ -158,8 +158,8 @@ def card_setting_password_node(state: BankState):
 
 
 def card_row(card_id):
-    card = next(c for c in functions.get_cards(functions.CURRENT_USER) if c["card_id"] == card_id)
-    return card, ["카드", "%s (%s)" % (card["name"], card["card_number"])]
+    card = functions.get_card(functions.CURRENT_USER, card_id)
+    return card,["카드", "%s (%s)" % (card["name"], card["card_number"])]
 
 
 def card_setting_propose_node(state: BankState):

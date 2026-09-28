@@ -50,8 +50,7 @@ class CardFilter(BaseModel):
     card_type: Optional[Literal["체크", "신용"]] = Field(default=None, description="카드 종류")
     status: Optional[Literal["사용 가능", "일시 잠금", "분실 정지", "해지"]] = Field(default=None, description="카드 상태")
     # 이용 내역의 기간입니다. 계좌 거래내역과 같은 방식입니다.
-    period: Literal["오늘", "어제", "이번 주", "지난 주", "이번 달", "지난 달", "전체"] = Field(
-        default="전체", description="기간")
+    period: functions.Period = Field(default="전체", description="기간")
     start_date: Optional[date] = Field(default=None, description="직접 말한 시작일 YYYY-MM-DD")
     end_date: Optional[date] = Field(default=None, description="직접 말한 종료일 YYYY-MM-DD")
 
@@ -150,9 +149,7 @@ def card_lines(f, cards):
             lines.append("- %s : %s %s등급  %sP" % (names[m["card_id"]], m["name"], m["grade"], format(m["points"], ",")))
 
     elif info == "이용 내역":
-        start, end = functions.period_range(f["period"])
-        start = f["start_date"] or start
-        end = f["end_date"] or end
+        start, end = functions.date_range(f["period"], f["start_date"], f["end_date"])
         found = functions.get_card_history(functions.CURRENT_USER, list(names), start, end)
         if not found:
             return ["조건에 맞는 카드 이용 내역이 없습니다."]

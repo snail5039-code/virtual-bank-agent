@@ -75,33 +75,34 @@ def turn_result():
     return "완료"
 
 
-def run_schedules(log):
-    # 시각이 지난 예약 이체를 실행하고 결과를 화면에 알립니다. 그래프를 거치지 않습니다.
-    # 승인은 예약할 때 받았기 때문입니다.
-    # 여기서 예외가 나도 프로그램이 꺼지지 않게 막습니다. 예약은 다음 입력 때 다시 확인합니다.
+def run_due(log):
+    # 시각이 지난 예약 이체·분할 회차를 실행하고 결과 줄을 로그에 남긴 뒤 돌려줍니다. 그래프를 거치지 않습니다.
+    # 승인은 예약할 때(분할을 걸 때) 받았기 때문입니다.
+    # 여기서 예외가 나도 프로그램·스케줄러 스레드가 죽지 않게 막습니다. 다음 확인 때 다시 봅니다.
     try:
         lines = functions.run_due_schedules()
     except Exception as e:
         log.error(e)
-        lines = ["[예약 이체] 확인 중 오류가 나 처리하지 못했습니다. 다음 입력 때 다시 확인합니다."]
+        lines = ["[예약 이체·분할 회차] 확인 중 오류가 나 처리하지 못했습니다. 다음 확인 때 다시 봅니다."]
     for line in lines:
         log.note(line)
+    return lines
+
+
+def run_schedules(log):
+    # 켤 때와 입력을 처리하기 전에 부릅니다. 결과를 바로 화면에 보여줍니다.
+    for line in run_due(log):
         print(line)
 
 
 def scheduler_loop(log):
     # 스케줄러 스레드가 도는 함수입니다. SCHEDULE_SECONDS 동안 쉬었다가(쉬는 동안은 CPU 를 쓰지 않습니다) 확인하기를 반복합니다.
     # "종료" 로 stop_event 가 켜지면 쉬던 중이라도 바로 끝납니다.
-    # 여기서 예외가 나도 스레드가 죽지 않게 막습니다. 다음 확인 때 다시 봅니다.
+    # 결과는 화면에 바로 쓰지 않고 outbox 에 넣습니다. (치고 있는 줄에 끼어들지 않게)
     while not stop_event.wait(SCHEDULE_SECONDS):
         with work_lock, log.background("스케줄러") as job:
-            try:
-                lines = functions.run_due_schedules()
-            except Exception as e:
-                log.error(e)
-                lines = ["[예약 이체·분할 회차] 확인 중 오류가 나 처리하지 못했습니다. 다음 확인 때 다시 봅니다."]
+            lines = run_due(log)
             for line in lines:
-                log.note(line)
                 outbox.put(line)
             job["keep"] = bool(lines)
 

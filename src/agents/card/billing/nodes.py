@@ -195,7 +195,7 @@ def billing_check_node(state: BankState):
 def target_text(target):
     # 결제 대상 한 건의 이름과 계좌. 예) ("생활비 신용카드 2026-08분", "생활비 (110-001-100001)")
     statement = next(s for s in functions.get_statements(functions.CURRENT_USER) if s["statement_id"] == target["statement_id"])
-    card = next(c for c in functions.get_cards(functions.CURRENT_USER) if c["card_id"] == statement["card_id"])
+    card = functions.get_card(functions.CURRENT_USER, statement["card_id"])
     account = functions.get_account(functions.CURRENT_USER, target["account_id"])
     return statement, "%s %s분" % (card["name"], statement["billing_month"]), account
 

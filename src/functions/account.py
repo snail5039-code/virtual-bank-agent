@@ -3,6 +3,7 @@
 from datetime import date
 
 import data_store
+from functions.common import next_id
 
 TYPES = {"입금": "deposit", "출금": "withdrawal"}
 
@@ -121,9 +122,8 @@ def register_account(data, owner_id, info):
     # 가상은행 계좌면 그 계좌 ID 를 이어 둡니다. 다른 은행이면 None 입니다.
     linked = next((a["account_id"] for a in data["accounts"]
                    if a["bank_name"] == info["bank_name"] and a["account_number"] == info["account_number"]), None)
-    numbers = [int(r["registered_id"].split("-")[1]) for r in data["registered_accounts"]]
     data["registered_accounts"].append({
-        "registered_id": "reg-%03d" % (max(numbers, default=0) + 1),
+        "registered_id": next_id(data["registered_accounts"], "registered_id", "reg"),
         "owner_id": owner_id,
         "bank_name": info["bank_name"],
         "account_number": info["account_number"],
