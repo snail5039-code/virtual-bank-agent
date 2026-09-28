@@ -138,7 +138,7 @@ def remember_pending():
             "kind": "승인 대기" if kind == APPROVAL else "질문 대기",
         }
         if not saved or {k: saved.get(k) for k in record} != record:     # 같은 업무면 다시 쓰지 않습니다
-            record["created_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
+            record["created_at"] = functions.now_text()
             functions.set_pending(record)
     elif saved:
         functions.clear_pending()
@@ -196,7 +196,7 @@ def recover_pending(log):
     if not record:
         return
 
-    when = functions.parse_time(record["created_at"]).strftime("%m월 %d일 %H:%M")
+    when = functions.when_text(record["created_at"])
     print("[진행 중이던 업무] %s  '%s' (%s) 요청이 끝나기 전에 종료되었습니다." % (when, record["request_text"], record["task"]))
     print("  처음부터 다시 진행할까요? 잔액·카드 상태를 다시 확인하고 승인도 다시 받습니다. (예 / 아니오)")
     answer = read_input().lower()

@@ -180,3 +180,13 @@ def add_transaction(data, account, kind, amount, occurred_at, merchant=None):
 def parse_time(text):
     # "2026-09-27T09:00" 같은 문자열을 시각으로 바꿉니다. 시간대가 없으면 이 컴퓨터 시간대로 봅니다.
     return datetime.fromisoformat(text).astimezone()
+
+
+def now_text():
+    # 지금 시각을 data.json 에 넣는 모양으로 돌려줍니다. 예) "2026-09-28T17:14:53+09:00"
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def when_text(text):
+    # 저장된 시각 문자열을 화면에 보여줄 모양으로 바꿉니다. 예) "09월 28일 17:14"
+    return parse_time(text).strftime("%m월 %d일 %H:%M")

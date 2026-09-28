@@ -22,7 +22,7 @@ import data_store
 import functions
 import logger
 from agents.account.setting.prompts import extract_prompt
-from agents.common.nodes import is_cancel, pick_text, pick_warning, question
+from agents.common.nodes import is_cancel, pick_text, pick_warning, picked, question
 from model import llm
 from state import BankState
 
@@ -95,7 +95,7 @@ def schedule_text(schedule_id):
     data = data_store.load()
     s = next(s for s in functions.get_schedules(functions.CURRENT_USER) if s["schedule_id"] == schedule_id)
     return "%s  %s  %s → %s  %s원  [%s]" % (
-        s["schedule_id"], functions.parse_time(s["scheduled_at"]).strftime("%m월 %d일 %H:%M"),
+        s["schedule_id"], functions.when_text(s["scheduled_at"]),
         functions.target_name(data, s["from_account"]), functions.target_name(data, s["to_account"]),
         format(s["amount"], ","), s["status"])
 
@@ -224,8 +224,9 @@ def setting_confirm_node(state: BankState):
 
     if is_cancel(answer):
         return {"error": "요청을 취소했습니다."}
-    if answer.isdigit() and 1 <= int(answer) <= len(candidates):
-        return {"target_account": candidates[int(answer) - 1]["id"], "candidates": None, "pick_warning": None}
+    choice = picked(answer, candidates)
+    if choice:
+        return {"target_account": choice["id"], "candidates": None, "pick_warning": None}
     # 번호가 아니면 지금 하는 업무를 알려주고 check 로 돌아가 다시 고르게 합니다.
     return pick_warning(SETTING_TASKS.get(state.get("setting_action"), "계좌 설정"))
 

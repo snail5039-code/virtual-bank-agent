@@ -38,7 +38,7 @@ llm_with_result_output = llm.with_structured_output(ResultQuery)
 def record_text(record):
     # 기록 한 건. 예) 09월 28일 09:31  이체  [완료]
     #                  - 출금 : 생활비 ...
-    lines = ["%s  %s  [%s]" % (functions.parse_time(record["created_at"]).strftime("%m월 %d일 %H:%M"),
+    lines = ["%s  %s  [%s]" % (functions.when_text(record["created_at"]),
                                record["task_type"], record["status"])]
     lines += ["    - %s : %s" % (label, value) for label, value in record["content"].items()]
     return "\n".join(lines)

@@ -83,6 +83,13 @@ def pick_text(state, lines):
     return "\n".join(lines)
 
 
+def picked(answer, candidates):
+    # 번호로 고른 후보를 돌려줍니다. 번호가 아니거나 범위 밖이면 None 입니다.
+    if answer.isdigit() and 1 <= int(answer) <= len(candidates):
+        return candidates[int(answer) - 1]
+    return None
+
+
 def pick_warning(task):
     # 번호가 아닌 답을 받았을 때 노드가 돌려주는 값입니다. check 로 돌아갔다가 같은 질문을 이 안내와 함께 다시 합니다.
     return {"pick_warning": "현재 '%s' 업무 중입니다. 번호로 골라 주세요. 다른 요청은 '취소' 후 다시 입력해 주세요." % task}
@@ -105,8 +112,9 @@ def common_pick_card_node(state: BankState):
 
     if is_cancel(answer):
         return {"error": "요청을 취소했습니다.", "candidates": None}
-    if answer.isdigit() and 1 <= int(answer) <= len(candidates):
-        return {"target_name": candidates[int(answer) - 1]["name"], "candidates": None, "pick_warning": None}
+    card = picked(answer, candidates)
+    if card:
+        return {"target_name": card["name"], "candidates": None, "pick_warning": None}
     # 번호가 아니면 지금 하는 업무를 알려주고 check 로 돌아가 다시 고르게 합니다.
     # 카드 설정은 "카드 일시 잠금", 재발급은 "재발급 신청" 처럼 보여줍니다.
     prefix = "재발급 " if state.get("task") == "재발급" else "카드 "

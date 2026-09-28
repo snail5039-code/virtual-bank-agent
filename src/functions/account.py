@@ -107,7 +107,7 @@ def register_missing(info):
 
 def check_register(owner_id, info):
     # 계좌를 등록할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
-    if not info.get("bank_name") or not info.get("account_number") or not info.get("holder_name"):
+    if register_missing(info):
         return "등록하려면 은행, 계좌번호, 예금주 이름이 필요합니다. (예: 미래은행 210-11-223344 이영희 계좌 등록해줘)"
     if not 1 <= len(info["nickname"].strip()) <= MAX_SETTING_LEN:
         return "별명은 1~%d자로 정해 주세요." % MAX_SETTING_LEN

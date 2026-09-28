@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import data_store
 from functions.account import get_account
-from functions.common import add_month, add_request, add_transaction, next_id, parse_time
+from functions.common import add_month, add_request, add_transaction, next_id, now_text, parse_time
 
 # 청구서는 신용카드에만 있습니다. 체크카드는 쓰는 즉시 계좌에서 빠지므로 낼 돈이 따로 없습니다.
 # 남은 금액 = 청구 총액 - 낸 금액 (데이터에 remaining_amount 로 들어 있습니다)
@@ -57,7 +57,7 @@ def pay_statement(data, statement_id, account_id, amount, memo):
     # 세 가지를 한 번에 저장하므로, 저장이 실패하면 셋 다 반영되지 않습니다. (기획서 5.2 전체·부분 = 전부 롤백)
     account = next(a for a in data["accounts"] if a["account_id"] == account_id)
     statement = next(s for s in data["card_statements"] if s["statement_id"] == statement_id)
-    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    now = now_text()
 
     account["balance"] -= amount
     statement["paid_amount"] += amount

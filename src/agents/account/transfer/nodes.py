@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field, ValidationError
 import data_store
 import functions
 import logger
-from agents.common.nodes import is_cancel, pick_text, pick_warning, question
+from agents.common.nodes import is_cancel, pick_text, pick_warning, picked, question
 from agents.account.transfer.prompts import extract_prompt, revise_prompt
 from model import llm
 from state import BankState
@@ -203,14 +203,14 @@ def transfer_confirm_node(state: BankState):
 
     if is_cancel(answer):
         return {"error": "이체를 취소했습니다."}
-    if answer.isdigit() and 1 <= int(answer) <= len(candidates):
-        picked = candidates[int(answer) - 1]
+    account = picked(answer, candidates)
+    if account:
         if slot == "split":
             # 고른 계좌를 그 줄에 적습니다. check 가 이 줄은 다시 찾지 않습니다.
             splits = [dict(split) for split in state["splits"]]
-            splits[state["split_index"]].update({"to_account": picked["account_id"], "to_name": picked["nickname"]})
+            splits[state["split_index"]].update({"to_account": account["account_id"], "to_name": account["nickname"]})
             return {"splits": splits, "pick_warning": None}
-        return {slot + "_account": picked["account_id"], slot + "_name": picked["nickname"], "pick_warning": None}
+        return {slot + "_account": account["account_id"], slot + "_name": account["nickname"], "pick_warning": None}
     # 번호가 아니면 지금 하는 업무를 알려주고 check 로 돌아가 다시 고르게 합니다.
     return pick_warning("예약 이체" if state.get("scheduled_at") else "이체")
 
@@ -324,7 +324,7 @@ def transfer_execute_node(state: BankState):
             functions.add_schedule(data, functions.CURRENT_USER, state["from_account"], target, state["scheduled_at"])
             answer = "%s → %s  %s원\n%s 에 이체하도록 예약했습니다." % (
                 state["from_name"], target["to_name"], format(target["amount"], ","),
-                functions.parse_time(state["scheduled_at"]).strftime("%m월 %d일 %H:%M"))
+                functions.when_text(state["scheduled_at"]))
             return {"new_data": data, "answer": answer, "result": "완료"}
 
         # 하나라도 안 되면 new_data 를 넘기지 않으므로 아무것도 저장되지 않습니다 (전부 아니면 전무).

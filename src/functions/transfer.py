@@ -6,7 +6,7 @@ import data_store
 import logger
 from functions.account import find_accounts, find_registered, get_account
 from functions.billing import pay_due_installments
-from functions.common import add_request, add_transaction, next_id, parse_time
+from functions.common import add_request, add_transaction, next_id, now_text, parse_time, when_text
 
 
 # ---------------------------------------------------------------- 입금 대상 (내 계좌 + 등록 계좌)
@@ -65,7 +65,7 @@ def transfer(data, from_id, to_id, amount):
         to_account["balance"] += amount
         moves.append((to_account, "deposit"))
 
-    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    now = now_text()
     for account, kind in moves:
         add_transaction(data, account, kind, amount, now)
     return None
@@ -172,7 +172,7 @@ def check_schedule(scheduled_at, targets, keep):
     if keep is not None or len(targets) != 1:
         return SCHEDULE_ONE_ONLY
     if parse_time(scheduled_at) <= datetime.now().astimezone():
-        return "예약 시각이 이미 지났습니다. (%s)" % parse_time(scheduled_at).strftime("%m월 %d일 %H:%M")
+        return "예약 시각이 이미 지났습니다. (%s)" % when_text(scheduled_at)
     return None
 
 
@@ -227,7 +227,7 @@ def run_due_schedules():
             continue
         error = transfer(data, s["from_account"], s["to_account"], s["amount"])
         s["status"] = "실패" if error else "완료"
-        when = parse_time(s["scheduled_at"]).strftime("%m월 %d일 %H:%M")
+        when = when_text(s["scheduled_at"])
         to_name = target_name(data, s["to_account"])
         lines.append("[예약 이체 %s] %s → %s  %s원  (%s)%s" % (
             s["status"], nicknames[s["from_account"]], to_name, format(s["amount"], ","),

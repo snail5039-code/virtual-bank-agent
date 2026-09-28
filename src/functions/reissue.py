@@ -1,10 +1,8 @@
 # 카드 재발급 함수입니다. 신청, 조회, 배송지 수정, 신청 취소.
 
-from datetime import datetime
-
 import data_store
 from functions.card import CARD_STATUS
-from functions.common import next_id
+from functions.common import next_id, now_text
 
 # 신청 상태 : 접수 → 제작중 → 배송중. 취소하면 취소됨. 실제 제작·배송 진행은 만들지 않습니다. (기획서 5.4)
 REISSUE_STATUS = {"received": "접수", "making": "제작중", "shipping": "배송중", "cancelled": "취소됨"}
@@ -77,6 +75,6 @@ def add_reissue(data, owner_id, card_id, address_id):
         "card_id": card_id,
         "address_id": address_id,
         "status": "received",
-        "created_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "created_at": now_text(),
     })
     return app_id

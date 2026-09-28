@@ -1,11 +1,11 @@
 # 카드 함수입니다. 카드 조회·찾기, 상태 바꾸기(분실·잠금·해지), 별칭·비밀번호, 카드 등록, 이용 내역, 멤버십.
 
 import re
-from datetime import date, datetime
+from datetime import date
 
 import data_store
 from functions.account import MAX_SETTING_LEN, get_transactions
-from functions.common import check_secret, next_id
+from functions.common import check_secret, next_id, now_text
 
 # 카드 상태와 종류를 화면에 보여줄 한국어로 바꾸는 표입니다.
 CARD_STATUS = {"active": "사용 가능", "locked": "일시 잠금", "lost": "분실 정지", "cancelled": "해지"}
@@ -158,7 +158,7 @@ def change_card_status(data, card_id, action, reason=None):
     card["status"] = CARD_ACTIONS[action]
     if action == "분실 신고":
         card["report_reason"] = reason or "분실"
-        card["reported_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
+        card["reported_at"] = now_text()
 
 
 def get_card_history(owner_id, card_ids, start=None, end=None):
