@@ -7,8 +7,8 @@
 
 from langgraph.graph import END, START, StateGraph
 
-from agents.setting.graph import setting_graph
-from agents.transfer.graph import transfer_graph
+from agents.account.setting.graph import setting_graph
+from agents.account.transfer.graph import transfer_graph
 from agents.account.nodes import (account_history_node, account_query_node,
                                   account_router_node, route_by_task)
 from state import BankState

@@ -25,7 +25,7 @@ import data_store
 import functions
 import logger
 from agents.common.nodes import is_cancel, question
-from agents.transfer.prompts import extract_prompt, revise_prompt
+from agents.account.transfer.prompts import extract_prompt, revise_prompt
 from model import llm
 from state import BankState
 

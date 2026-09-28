@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 import data_store
 import functions
 import logger
-from agents.card_setting.prompts import extract_prompt
+from agents.card.setting.prompts import extract_prompt
 from agents.common.nodes import is_cancel, secret
 from model import llm
 from state import BankState

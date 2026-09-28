@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field, ValidationError
 import data_store
 import functions
 import logger
-from agents.billing.prompts import extract_prompt
+from agents.card.billing.prompts import extract_prompt
 from model import llm
 from state import BankState
 

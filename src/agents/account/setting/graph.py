@@ -14,7 +14,7 @@ from langgraph.graph import END, START, StateGraph
 from agents.common.nodes import (common_approve_node, common_authenticate_node, common_interpret_node,
                                  common_log_request_node, common_reject_node,
                                  common_report_node, common_save_node)
-from agents.setting.nodes import (route_after_authenticate, route_after_check, route_after_extract,
+from agents.account.setting.nodes import (route_after_authenticate, route_after_check, route_after_extract,
                                   route_after_interpret, setting_check_node, setting_list_node, setting_execute_node, setting_extract_node,
                                   setting_fail_node, setting_propose_node)
 from state import BankState

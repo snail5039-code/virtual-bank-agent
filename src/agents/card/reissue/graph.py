@@ -17,7 +17,7 @@ from langgraph.graph import END, START, StateGraph
 from agents.common.nodes import (common_approve_node, common_authenticate_node, common_interpret_node,
                                  common_log_request_node, common_reject_node,
                                  common_report_node, common_save_node)
-from agents.reissue.nodes import (reissue_check_node, reissue_execute_node, reissue_extract_node, reissue_fail_node,
+from agents.card.reissue.nodes import (reissue_check_node, reissue_execute_node, reissue_extract_node, reissue_fail_node,
                                   reissue_list_node, reissue_propose_node,
                                   route_after_authenticate, route_after_check, route_after_extract,
                                   route_after_interpret, route_start)

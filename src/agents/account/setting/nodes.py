@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 import data_store
 import functions
 import logger
-from agents.setting.prompts import extract_prompt
+from agents.account.setting.prompts import extract_prompt
 from model import llm
 from state import BankState
 
