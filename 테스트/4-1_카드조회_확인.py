@@ -7,7 +7,7 @@
 #   2) 카드 조회 요청은 카드 → 조회 로 가서 목록이 상태(한국어)와 함께 나온다
 #      LLM 이 뽑은 조건은 로그 대신 결과 장수로 확인합니다
 #   3) 없는 은행("미래은행 카드") 은 "미래은행 카드는 없습니다" 로 짚어 준다 (12장 보완)
-#   4) 결제 요청은 카드 → 결제 로 가서 "준비 중" 이 나온다 (설정·재발급은 4-3 ~ 4-5 테스트에서 확인)
+#   4) 결제 요청은 카드 → 결제 로 간다 (결제 자체는 4-9 · 4-10, 설정·재발급은 4-3 ~ 4-7 테스트에서 확인)
 # 조회만 하므로 data.json 은 바뀌지 않습니다.
 
 import sys
@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 import functions
 from agents.supervisor.graph import bank_graph
+from state import new_request
 
 # ============================================================ 1) 함수만
 print("1) get_cards")
@@ -31,7 +32,25 @@ print("   여행 카드 %d장 / 신용 %d장 / 분실 정지 %d장" % (
 print()
 
 # ============================================================ 2) 3) 4) 그래프
-config = {"configurable": {"thread_id": "test-4-1"}}
+THREAD = "test-4-1"
+
+
+def run_one(number, query):
+    # 요청마다 새 세션(thread_id)과 new_request 로 부릅니다. 앞 요청의 값이 섞이지 않게 하려는 것입니다.
+    # 본인 확인·질문에서 멈추면 답이 아직 없으므로, 멈춘 질문과 경로를 보여주고 이 요청은 여기서 끝냅니다.
+    # (멈춘 동안 2단이 고른 업무는 바깥 State 에 아직 없어서 안쪽 그래프의 State 에서 꺼냅니다)
+    config = {"configurable": {"thread_id": "%s-%d" % (THREAD, number)}}
+    result = bank_graph.invoke(new_request(query), config=config)
+    print("요청 :", query)
+    if "__interrupt__" in result:
+        inner = bank_graph.get_state(config, subgraphs=True).tasks[0].state
+        print("경로 :", result["domain"], "→", inner.values.get("task") if inner else None, " (여기서 멈춤)")
+        print(result["__interrupt__"][0].value["text"])
+    else:
+        print("경로 :", result["domain"], "→", result.get("task"))
+        print(result["answer"])
+    print()
+
 
 queries = [
     "내 카드 목록 보여줘",
@@ -45,9 +64,5 @@ queries = [
     "이번 달 카드값 내줘",
 ]
 
-for query in queries:
-    result = bank_graph.invoke({"query": query}, config=config)
-    print("요청 :", query)
-    print("경로 :", result["domain"], "→", result.get("task"))
-    print(result["answer"])
-    print()
+for number, query in enumerate(queries, start=1):
+    run_one(number, query)
