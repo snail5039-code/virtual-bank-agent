@@ -130,7 +130,8 @@ def card_query_node(state: BankState):
             lines = ["카드 %d장입니다." % len(cards)]
             for card in cards:
                 if card["card_type"] == "credit":
-                    extra = "한도 %s원" % format(card["credit_limit"], ",")
+                    # 직접 등록한 카드는 한도를 모릅니다 (credit_limit 이 비어 있음).
+                    extra = "한도 %s원" % format(card["credit_limit"], ",") if card["credit_limit"] else "한도 정보 없음"
                 else:
                     extra = "연결 계좌 %s" % accounts[card["account_id"]]["nickname"]
                 lines.append("- %s (%s %s) : %s  [%s]" % (
