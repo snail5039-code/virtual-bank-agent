@@ -77,14 +77,27 @@ def period_range(period):
     return start, next_month - timedelta(days=1)
 
 
-def find_requests(owner_id, keyword=None):
+def find_requests(owner_id, keyword=None, start=None, end=None, target=None):
     # 처리 기록(원장)을 최근순으로 돌려줍니다. 쓰기 업무가 끝날 때마다 common_log_request 가 한 줄씩 남깁니다.
-    # keyword 를 주면 업무 이름(task_type)에 그 글자가 든 기록만 봅니다. 예) "이체", "잠금", "결제", "재발급"
     # "아까 이체 됐어?" 같은 후속 질문은 LLM 이 기억으로 답하지 않고 여기서 꺼낸 기록으로 답합니다. (원칙 6)
-    records = [r for r in data_store.load()["requests"] if r["owner_id"] == owner_id
-               and (not keyword or keyword.replace(" ", "") in r["task_type"].replace(" ", ""))]
+    # 조건을 조합해 거릅니다. 비워 둔 조건은 보지 않습니다. (거래 내역 get_transactions 와 같은 방식)
+    #   keyword    : 업무 이름(task_type)에 그 글자가 든 기록.     예) "이체", "잠금", "결제", "재발급"
+    #   start, end : 기록한 날짜가 그 기간 안인 기록 (둘 다 포함).  예) 어제 → (어제, 어제)
+    #   target     : 기록 내용(content)에 그 이름이 든 기록.        예) "여행 카드", "저축"
+    result = []
+    for r in data_store.load()["requests"]:
+        day = date.fromisoformat(r["created_at"][:10])
+        if r["owner_id"] != owner_id:
+            continue
+        if keyword and keyword.replace(" ", "") not in r["task_type"].replace(" ", ""):
+            continue
+        if (start and day < start) or (end and day > end):
+            continue
+        if target and not any(target.replace(" ", "") in str(value).replace(" ", "") for value in r["content"].values()):
+            continue
+        result.append(r)
     # 같은 초에 여러 건이 남을 수 있으므로(예약 여러 건 실행, 일괄 결제) 시각이 같으면 나중 번호(request_id)가 앞입니다.
-    return sorted(records, key=lambda r: (r["created_at"], r["request_id"]), reverse=True)
+    return sorted(result, key=lambda r: (r["created_at"], r["request_id"]), reverse=True)
 
 
 # ---------------------------------------------------------------- 진행 중 업무 (재시작 복구, 5-2)
