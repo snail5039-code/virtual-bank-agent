@@ -5,7 +5,8 @@ from datetime import datetime
 import data_store
 import logger
 from functions.account import find_accounts, find_registered, get_account
-from functions.common import parse_time
+from functions.billing import pay_due_installments
+from functions.common import add_request, parse_time
 
 
 # ---------------------------------------------------------------- 입금 대상 (내 계좌 + 등록 계좌)
@@ -222,6 +223,7 @@ def cancel_schedule(data, schedule_id):
 
 def run_due_schedules():
     # 시각이 지난 예약을 이체합니다. main.py 가 켤 때와 입력을 받을 때마다 부릅니다.
+    # 분할 결제의 남은 회차(납부일이 지난 것)도 여기서 같이 냅니다 (pay_due_installments). 한 번 읽고 한 번 저장합니다.
     # 승인은 예약할 때 받았으므로 다시 묻지 않습니다. 잔액이 모자라면 이체하지 않고 실패로 남깁니다.
     # 실행 결과는 처리 기록(requests)에도 한 줄 남깁니다. 그래야 "아까 이체 됐어?"(5-1)에 예약 실행 결과도 나옵니다.
     # (예약을 걸 때 남는 "예약 이체" 기록은 예약을 건 것이고, 이 "예약 이체 실행" 기록은 실제로 돈이 나간 것입니다)
@@ -246,17 +248,13 @@ def run_due_schedules():
                    "입금": to_name, "금액": format(s["amount"], ",") + "원"}
         if error:
             content["실패 사유"] = error
-        data["requests"].append({
-            "request_id": "req-%04d" % (len(data["requests"]) + 1),
-            "owner_id": s["owner_id"],
-            "task_type": "예약 이체 실행",
-            "content": content,
-            "status": s["status"],
-            "created_at": now.isoformat(timespec="seconds"),
-        })
+        add_request(data, s["owner_id"], "예약 이체 실행", content, s["status"], now)
+
+    # 분할 결제 남은 회차 : 예약 이체와 같이 납부일이 지났으면 냅니다.
+    lines += pay_due_installments(data, now)
     if lines:
         try:
             data_store.save(data)
         except data_store.DataStoreError:
-            return ["[예약 이체] 저장에 실패해 처리하지 못했습니다. 다음 입력 때 다시 확인합니다."]
+            return ["[예약 이체·분할 회차] 저장에 실패해 처리하지 못했습니다. 다음 입력 때 다시 확인합니다."]
     return lines

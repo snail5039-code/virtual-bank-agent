@@ -1,9 +1,10 @@
 # 카드 요금 함수입니다. 청구서 조회, 전체·부분·분할 결제.
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import data_store
 from functions.account import get_account
+from functions.common import add_month, add_request, parse_time
 
 # 청구서는 신용카드에만 있습니다. 체크카드는 쓰는 즉시 계좌에서 빠지므로 낼 돈이 따로 없습니다.
 # 남은 금액 = 청구 총액 - 낸 금액 (데이터에 remaining_amount 로 들어 있습니다)
@@ -103,7 +104,7 @@ def installment_amounts(total, months):
 
 def add_installment(data, statement_id, months):
     # data 에 분할 계획을 한 줄 넣습니다. 첫 회차는 지금 내므로 낸 회차를 1로 둡니다. (첫 회차 결제는 pay_statement 가 합니다)
-    # 남은 회차를 매달 자동으로 내는 기능은 없습니다 (기획서 12장).
+    # 남은 회차는 next_due_at(다음 납부일, 한 달 뒤)이 되면 pay_due_installments 가 냅니다.
     statement = next(s for s in data["card_statements"] if s["statement_id"] == statement_id)
     amounts = installment_amounts(statement["remaining_amount"], months)
     numbers = [int(i["installment_id"].split("-")[1]) for i in data["card_installments"]]
@@ -116,6 +117,50 @@ def add_installment(data, statement_id, months):
         "months": months,
         "paid_count": 1,
         "monthly_amount": amounts[1],
+        "next_due_at": add_month(datetime.now().astimezone()).isoformat(timespec="seconds"),
         "status": "active",
     })
     return installment_id
+
+
+def pay_due_installments(data, now):
+    # 분할 계획 중 다음 납부일이 지난 회차를 냅니다. 예약 이체(run_due_schedules)와 같은 방식이고, 거기서 같이 부릅니다.
+    # data 안에서만 바꾸고 파일에 저장하지는 않습니다 (run_due_schedules 가 한 번에 저장합니다).
+    # 승인은 분할을 걸 때 받았으므로 다시 묻지 않습니다. 첫 회차를 낸 계좌(paid_account)에서 냅니다.
+    #   낼 수 있으면 : 낸 회차 +1, 다음 납부일을 한 달 뒤로. 마지막 회차면 pay_statement 가 분할을 끝냅니다 (남은 금액 0)
+    #   잔액이 모자라면 : 내지 않고 실패로 기록하고, 다음 납부일을 하루 뒤로 미뤄 다시 시도합니다
+    #                    (미루지 않으면 입력할 때마다 같은 실패가 반복해서 뜹니다)
+    # 처리한 결과를 한 줄씩 돌려줍니다.
+    cards = {c["card_id"]: c["name"] for c in data["cards"]}
+    lines = []
+    for i in data["card_installments"]:
+        if i["status"] != "active" or not i.get("next_due_at") or parse_time(i["next_due_at"]) > now:
+            continue
+        statement = next(s for s in data["card_statements"] if s["statement_id"] == i["statement_id"])
+        account = next(a for a in data["accounts"] if a["account_id"] == statement["paid_account"])
+        # 이번 회차 금액. 마지막 회차는 남은 금액을 그대로 냅니다 (나누고 남은 원 단위 차이를 맞추려고).
+        number = i["paid_count"] + 1
+        amount = i["monthly_amount"] if number < i["months"] else statement["remaining_amount"]
+        amount = min(amount, statement["remaining_amount"])
+        name = "%s %s분 분할 %d/%d회" % (cards.get(i["card_id"], i["card_id"]), statement["billing_month"], number, i["months"])
+
+        if account["balance"] < amount:
+            status = "실패"
+            reason = "잔액이 부족합니다. (%s 잔액 %s원)" % (account["nickname"], format(account["balance"], ","))
+            i["next_due_at"] = (now + timedelta(days=1)).isoformat(timespec="seconds")
+            lines.append("[분할 회차 실패] %s  %s원  %s 내일 다시 시도합니다." % (name, format(amount, ","), reason))
+        else:
+            status = "완료"
+            reason = None
+            pay_statement(data, statement["statement_id"], account["account_id"], amount, "카드값 " + name)
+            i["paid_count"] = number
+            i["next_due_at"] = add_month(parse_time(i["next_due_at"])).isoformat(timespec="seconds")
+            lines.append("[분할 회차 완료] %s  %s원  (%s)%s" % (
+                name, format(amount, ","), account["nickname"], "  분할 끝" if i["status"] == "paid" else ""))
+
+        content = {"분할": i["installment_id"], "청구서": name, "금액": format(amount, ",") + "원",
+                   "결제 계좌": account["nickname"]}
+        if reason:
+            content["실패 사유"] = reason
+        add_request(data, statement["owner_id"], "분할 회차 결제", content, status, now)
+    return lines

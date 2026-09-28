@@ -1,5 +1,6 @@
 # 여러 업무가 같이 쓰는 함수입니다. 로그인한 사용자, 기준일, 본인 확인, 기간·시각 계산.
 
+import calendar
 import hashlib
 import hmac
 import secrets
@@ -121,6 +122,26 @@ def clear_pending():
     if data.get("pending"):
         data["pending"] = None
         data_store.save(data)
+
+
+def add_month(when):
+    # 한 달 뒤 같은 날·같은 시각. 그 달에 그날이 없으면(1월 31일 → 2월) 그 달 마지막 날로 맞춥니다.
+    year, month = (when.year + 1, 1) if when.month == 12 else (when.year, when.month + 1)
+    day = min(when.day, calendar.monthrange(year, month)[1])
+    return when.replace(year=year, month=month, day=day)
+
+
+def add_request(data, owner_id, task_type, content, status, now):
+    # data 에 처리 기록을 한 줄 덧붙입니다. 모양은 common_log_request 와 같습니다.
+    # 사용자 요청 없이 켤 때·입력할 때 자동으로 한 일(예약 이체 실행, 분할 회차 결제)이 씁니다.
+    data["requests"].append({
+        "request_id": "req-%04d" % (len(data["requests"]) + 1),
+        "owner_id": owner_id,
+        "task_type": task_type,
+        "content": content,
+        "status": status,
+        "created_at": now.isoformat(timespec="seconds"),
+    })
 
 
 def parse_time(text):
