@@ -10,6 +10,7 @@ from typing import TypedDict
 
 class BankState(TypedDict):
     query: str              # 사용자 입력 (질문에 답하면 그 답으로 바뀝니다)
+    request_text: str       # 이번 요청의 처음 문장. 바뀌지 않습니다 (재시작 복구 때 이 문장으로 다시 돌립니다)
     domain: str             # 1단 supervisor 가 고른 분야  (계좌 / 카드 / 결과 / 없음)
     reason: str             # 그렇게 고른 이유
     task: str               # 2단 에이전트가 고른 업무    (조회 / 이체 / 설정)
@@ -70,7 +71,7 @@ class BankState(TypedDict):
 def new_request(query):
     # 새 요청의 시작값입니다. 지난 업무의 값이 섞이지 않게 비웁니다.
     return {
-        "query": query,
+        "query": query, "request_text": query,
         "domain": None, "reason": None, "task": None, "answer": None,
         "from_name": None, "to_name": None,
         "from_account": None, "to_account": None, "amount": None, "keep_amount": None,

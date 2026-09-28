@@ -56,6 +56,29 @@ def find_requests(owner_id, keyword=None):
     return sorted(records, key=lambda r: r["created_at"], reverse=True)
 
 
+# ---------------------------------------------------------------- 진행 중 업무 (재시작 복구, 5-2)
+# 승인·질문을 기다리며 멈춘 업무를 data.json 의 "pending" 에 한 건 적어 둡니다. 예약 이체와 같은 방식입니다.
+# 켤 때 남아 있으면 main.py 가 알려주고, 다시 하겠다고 하면 원래 요청을 처음부터 다시 돌립니다.
+# 이전 승인은 쓰지 않습니다. 꺼져 있는 동안 잔액·카드 상태가 바뀌었을 수 있기 때문입니다. (기획서 recovery)
+
+def get_pending():
+    return data_store.load().get("pending")
+
+
+def set_pending(record):
+    # record : {request_text(원래 요청 문장), task(업무 이름), kind(승인 / 질문 대기), created_at}
+    data = data_store.load()
+    data["pending"] = record
+    data_store.save(data)
+
+
+def clear_pending():
+    data = data_store.load()
+    if data.get("pending"):
+        data["pending"] = None
+        data_store.save(data)
+
+
 def parse_time(text):
     # "2026-09-27T09:00" 같은 문자열을 시각으로 바꿉니다. 시간대가 없으면 이 컴퓨터 시간대로 봅니다.
     return datetime.fromisoformat(text).astimezone()

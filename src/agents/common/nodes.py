@@ -201,6 +201,9 @@ def common_save_node(state: BankState):
     # 저장이 실패해도 파일은 그대로 남습니다 (data_store 가 보장합니다).
     log = logger.get_logger()
     with log.node("common_save"):
+        # 진행 중 업무 기록(5-2)은 업무 변경과 같은 저장에서 지웁니다.
+        # 따로 지우면, 저장은 됐는데 기록이 남은 채 꺼졌을 때 켤 때 같은 업무를 또 하자고 묻게 됩니다.
+        state["new_data"]["pending"] = None
         for attempt in range(1, SAVE_TRIES + 1):
             try:
                 data_store.save(state["new_data"])
