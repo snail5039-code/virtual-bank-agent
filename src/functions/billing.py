@@ -34,6 +34,14 @@ def check_payment(owner_id, statement, account_id, amount):
         return "결제 금액은 1원 이상이어야 합니다."
     if amount > statement["remaining_amount"]:
         return "남은 금액(%s원)보다 많이 낼 수 없습니다." % format(statement["remaining_amount"], ",")
+    # 분할 중인 청구서는 남은 금액을 한 번에 다 낼 때(중도 상환)만 받습니다.
+    # 일부만 내면 남은 금액은 줄지만 분할 계획의 회차 금액은 그대로라 둘이 맞지 않게 됩니다.
+    if amount < statement["remaining_amount"]:
+        for i in data_store.load()["card_installments"]:
+            if i["statement_id"] == statement["statement_id"] and i["status"] == "active":
+                return ("분할 결제 중인 청구서입니다. (%s  %d/%d회)\n"
+                        "남은 금액 %s원을 한 번에 다 낼 때만 결제할 수 있습니다." % (
+                            i["installment_id"], i["paid_count"], i["months"], format(statement["remaining_amount"], ",")))
     account = get_account(owner_id, account_id)
     if account["balance"] < amount:
         return "잔액이 부족합니다. (%s 잔액 %s원)" % (account["nickname"], format(account["balance"], ","))
