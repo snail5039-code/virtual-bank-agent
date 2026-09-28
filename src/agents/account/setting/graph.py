@@ -2,6 +2,8 @@
 #
 #   START → extract ─┬─ 조회           → list → END                    (읽기만. 승인 없음)
 #              ↑     └─ 변경·등록·삭제 → check ─┬─ 할 수 없음 → fail → END
+#              │                                ├─ 여러 개   → confirm (번호 고르기) → check 로
+#              │                                ├─ 값 빠짐   → ask (계좌 / 항목 / 새 값 / 등록 정보) → 답을 들고 extract 로
 #              │                                └─ 할 수 있음 → authenticate → propose → approve → interpret
 #              │                                                                           ↑         │
 #              │                                                                           └─ 모름 ──┤
@@ -15,7 +17,8 @@ from agents.common.nodes import (common_approve_node, common_authenticate_node, 
                                  common_log_request_node, common_reject_node,
                                  common_report_node, common_save_node)
 from agents.account.setting.nodes import (route_after_authenticate, route_after_check, route_after_extract,
-                                  route_after_interpret, setting_check_node, setting_list_node, setting_execute_node, setting_extract_node,
+                                  route_after_interpret, route_after_confirm, route_after_ask, setting_ask_node, setting_confirm_node,
+                                  setting_check_node, setting_list_node, setting_execute_node, setting_extract_node,
                                   setting_fail_node, setting_propose_node)
 from state import BankState
 
@@ -24,6 +27,8 @@ builder = StateGraph(BankState)
 builder.add_node("setting_extract", setting_extract_node)
 builder.add_node("setting_list", setting_list_node)
 builder.add_node("setting_check", setting_check_node)
+builder.add_node("setting_confirm", setting_confirm_node)
+builder.add_node("setting_ask", setting_ask_node)
 builder.add_node("common_authenticate", common_authenticate_node)
 builder.add_node("setting_propose", setting_propose_node)
 builder.add_node("common_approve", common_approve_node)
@@ -38,7 +43,10 @@ builder.add_node("setting_fail", setting_fail_node)
 builder.add_edge(START, "setting_extract")
 builder.add_conditional_edges("setting_extract", route_after_extract, ["setting_list", "setting_check"])
 builder.add_edge("setting_list", END)
-builder.add_conditional_edges("setting_check", route_after_check, ["setting_fail", "common_authenticate"])
+builder.add_conditional_edges("setting_check", route_after_check,
+                              ["setting_fail", "setting_confirm", "setting_ask", "common_authenticate"])
+builder.add_conditional_edges("setting_confirm", route_after_confirm, ["setting_fail", "setting_check"])
+builder.add_conditional_edges("setting_ask", route_after_ask, ["setting_fail", "setting_extract"])
 builder.add_conditional_edges("common_authenticate", route_after_authenticate,
                               ["setting_fail", "setting_propose", "common_authenticate"])
 builder.add_edge("setting_propose", "common_approve")

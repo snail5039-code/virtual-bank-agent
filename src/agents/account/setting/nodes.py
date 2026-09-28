@@ -4,6 +4,8 @@
 #   setting_extract : 사용자 말에서 할 일(변경/등록/삭제/조회/예약조회/예약취소)과 필요한 값을 뽑습니다 (LLM)
 #   setting_list    : 등록 계좌나 예약 이체 목록을 보여줍니다. 읽기만 하므로 승인 없이 끝납니다
 #   setting_check   : 대상을 ID 로 바꾸고, 할 수 있는지 봅니다 (Python)
+#   setting_confirm : 이름에 맞는 것이 여러 개면 번호를 고르게 합니다 (interrupt)
+#   setting_ask     : 빠진 값(계좌, 새 값, 등록 정보)을 묻습니다 (interrupt)
 #   setting_propose : 처리안을 만듭니다. 계산만 하고 저장하지 않습니다
 #   setting_execute : 승인되면 데이터를 바꿉니다 (저장은 common_save)
 #   setting_fail    : 진행할 수 없는 사유를 알려줍니다
@@ -13,12 +15,14 @@ from datetime import date
 from typing import Literal, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 import data_store
 import functions
 import logger
 from agents.account.setting.prompts import extract_prompt
+from agents.common.nodes import is_cancel, question
 from model import llm
 from state import BankState
 
@@ -32,6 +36,7 @@ class SettingInfo(BaseModel):
     account_number: Optional[str] = Field(default=None, description="등록할 계좌번호")
     holder_name: Optional[str] = Field(default=None, description="등록할 계좌의 예금주 이름")
     nickname: Optional[str] = Field(default=None, description="등록할 계좌에 붙일 별명")
+    other_request: bool = Field(default=False, description="방금 한 질문의 답이 아니라 계좌 설정과 관계없는 다른 요청이면 true")
 
 
 llm_with_setting_output = llm.with_structured_output(SettingInfo)
@@ -47,6 +52,7 @@ def setting_extract_node(state: BankState):
             field=state.get("setting_field") or "모름",
             new_value=state.get("new_value") or "모름",
             reg_info=state.get("reg_info") or "없음",
+            question=state.get("question") or "없음",
             today=date.today(),
         )
         r = llm_with_setting_output.invoke([
@@ -55,6 +61,10 @@ def setting_extract_node(state: BankState):
         ])
         log.detail("추출  할 일=%s  계좌=%s  항목=%s  새 값=%s  등록=%s %s %s %s" % (
             r.action, r.account_name, r.field, r.new_value, r.bank_name, r.account_number, r.holder_name, r.nickname))
+
+        # 질문(빠진 값)에 답하는 대신 다른 요청을 쳤으면 멈춥니다. (이체와 같은 방식)
+        if state.get("question") and r.other_request:
+            return {"error": "진행 중이던 계좌 설정을 멈췄습니다. 새 요청을 다시 입력해 주세요."}
 
         update = {}
         if r.action and not state.get("setting_action"):
@@ -72,7 +82,9 @@ def setting_extract_node(state: BankState):
             if getattr(r, key):
                 reg[key] = getattr(r, key)
         if reg:
-            reg.setdefault("nickname", reg.get("holder_name", ""))     # 별명을 안 말하면 예금주 이름
+            # 별명을 안 말하면 예금주 이름. 예금주를 나중에 답할 수도 있으므로 비어 있으면 매번 다시 채웁니다.
+            if not reg.get("nickname"):
+                reg["nickname"] = reg.get("holder_name", "")
             update["reg_info"] = reg
 
     return update
@@ -111,49 +123,118 @@ def setting_list_node(state: BankState):
 
 
 def setting_check_node(state: BankState):
+    # 대상을 하나로 정하고 빠진 값이 있는지 봅니다. 모자라면 끝내지 않고 다음 중 하나를 State 에 남깁니다.
+    #   candidates : 이름에 맞는 것이 여러 개 → setting_confirm 이 번호로 고르게 합니다
+    #   question   : 빠진 값이 있음          → setting_ask 가 그 값만 묻습니다
+    # 한 번 정한 대상(target_account)은 다시 찾지 않습니다. 되물은 뒤 여기로 돌아오기 때문입니다.
     log = logger.get_logger()
     with log.node("setting_check"):
         action = state.get("setting_action")
+        target_id = state.get("target_account")
+        update = {"candidates": None, "question": None}
 
         if action == "등록":
-            error = functions.check_register(functions.CURRENT_USER, state.get("reg_info") or {})
-            return {"error": error} if error else {}
+            reg = state.get("reg_info") or {}
+            missing = functions.register_missing(reg)
+            if missing:
+                update["question"] = "[등록] 알려주세요 : %s  (예: 미래은행 210-11-223344 이영희)" % ", ".join(missing)
+                return update
+            error = functions.check_register(functions.CURRENT_USER, reg)
+            if error:
+                update["error"] = error
+            return update
 
         if action == "예약취소":
-            found = functions.find_schedules(functions.CURRENT_USER, state.get("target_name"))
-            log.resolve(state.get("target_name") or "(말 안 함)", len(found), found[0]["schedule_id"] if found else None)
-            if len(found) != 1:
-                return {"error": "취소할 예약을 하나로 정할 수 없습니다. 예약 번호로 말해 주세요. (예: sch-001 예약 취소해줘)\n"
-                        + schedule_list_text()}
-            return {"target_account": found[0]["schedule_id"]}
+            if not target_id:
+                found = functions.find_schedules(functions.CURRENT_USER, state.get("target_name"))
+                log.resolve(state.get("target_name") or "(말 안 함)", len(found), found[0]["schedule_id"] if found else None)
+                if not found:
+                    update["error"] = "취소할 예약을 찾을 수 없습니다.\n" + schedule_list_text()
+                    return update
+                if len(found) > 1:
+                    update["candidates"] = [{"id": s["schedule_id"], "text": schedule_text(s["schedule_id"])} for s in found]
+                    return update
+                update["target_account"] = found[0]["schedule_id"]
+            return update
 
-        if not state.get("target_name"):
-            return {"error": "어느 계좌인지 말해 주세요. (예: 여행 자금 계좌 이름을 휴가비로 바꿔줘 / 친구 민수 계좌 삭제해줘)"}
+        if not state.get("target_name") and not target_id:
+            if action == "삭제":
+                update["question"] = "[계좌] 어느 등록 계좌를 지울까요? (별명이나 예금주 이름)"
+            else:
+                update["question"] = "[계좌] 어느 계좌를 바꿀까요?"
+            return update
 
         if action == "삭제":
-            found = functions.find_registered(functions.CURRENT_USER, state["target_name"])
-            log.resolve(state["target_name"], len(found), found[0]["registered_id"] if found else None)
-            if len(found) != 1:
-                return {"error": "'%s' 에 맞는 등록 계좌를 하나로 정할 수 없습니다. 정확한 이름으로 다시 요청해 주세요." % state["target_name"]}
-            return {"target_account": found[0]["registered_id"]}
+            if not target_id:
+                found = functions.find_registered(functions.CURRENT_USER, state["target_name"])
+                log.resolve(state["target_name"], len(found), found[0]["registered_id"] if found else None)
+                if not found:
+                    update["error"] = "'%s' 등록 계좌를 찾을 수 없습니다." % state["target_name"]
+                    return update
+                if len(found) > 1:
+                    update["candidates"] = [{"id": r["registered_id"], "text": "%s (%s %s, 예금주 %s)" % (
+                        r["nickname"], r["bank_name"], r["account_number"], r["holder_name"])} for r in found]
+                    return update
+                update["target_account"] = found[0]["registered_id"]
+            return update
 
-        # 변경 : 내 계좌의 별명·용도
-        if not state.get("setting_field") or not state.get("new_value"):
-            return {"error": "무엇을 무엇으로 바꿀지 말해 주세요. (예: 여행 자금 계좌 이름을 휴가비로 바꿔줘)"}
-        update = {}
-        account_id = state.get("target_account")
-        if not account_id:
+        # 변경 : 내 계좌의 별명·용도. 계좌를 먼저 정하고, 그다음 무엇을 무엇으로 바꿀지 봅니다.
+        if not target_id:
             found = functions.find_accounts(functions.CURRENT_USER, state["target_name"])
             log.resolve(state["target_name"], len(found), found[0]["account_id"] if found else None)
-            if len(found) != 1:
-                return {"error": "'%s' 계좌를 하나로 정할 수 없습니다. 정확한 이름으로 다시 요청해 주세요." % state["target_name"]}
-            account_id = found[0]["account_id"]
-            update["target_account"] = account_id
-        error = functions.check_setting(functions.CURRENT_USER, account_id, state["setting_field"], state["new_value"])
+            if not found:
+                update["error"] = "'%s' 계좌를 찾을 수 없습니다." % state["target_name"]
+                return update
+            if len(found) > 1:
+                update["candidates"] = [{"id": a["account_id"], "text": "%s (%s)" % (a["nickname"], a["account_number"])}
+                                        for a in found]
+                return update
+            target_id = found[0]["account_id"]
+            update["target_account"] = target_id
+        field = state.get("setting_field")
+        if not field:
+            update["question"] = "[항목] 별명과 용도 중 무엇을 바꿀까요?"
+            return update
+        if not state.get("new_value"):
+            account = functions.get_account(functions.CURRENT_USER, target_id)
+            update["question"] = "[새 값] 무엇으로 바꿀까요? (지금 %s : %s)" % (field, account[functions.SETTING_FIELDS[field]])
+            return update
+        error = functions.check_setting(functions.CURRENT_USER, target_id, field, state["new_value"])
         if error:
             update["error"] = error
 
     return update
+
+
+def setting_confirm_node(state: BankState):
+    # 이름에 맞는 계좌·예약이 여러 개면 번호로 고르게 합니다. 고른 ID 를 target_account 에 넣고 check 로 돌아갑니다.
+    # 후보는 check 가 {id, text} 로 만들어 둡니다 (내 계좌 / 등록 계좌 / 예약 모두 같은 모양).
+    candidates = state["candidates"]
+    lines = ["맞는 것이 %d개입니다. 번호를 골라 주세요." % len(candidates)]
+    lines += ["%d. %s" % (number, c["text"]) for number, c in enumerate(candidates, start=1)]
+
+    with logger.get_logger().node("setting_confirm"):
+        logger.get_logger().interrupt_pause("사용자 확인 (후보 %d개)" % len(candidates))
+
+    answer = interrupt(question("\n".join(lines))).strip()
+
+    if is_cancel(answer):
+        return {"error": "요청을 취소했습니다."}
+    if answer.isdigit() and 1 <= int(answer) <= len(candidates):
+        return {"target_account": candidates[int(answer) - 1]["id"], "candidates": None}
+    return {}       # 번호가 아니면 check 로 돌아가 다시 고르게 합니다
+
+
+def setting_ask_node(state: BankState):
+    # check 가 남긴 질문(빠진 값)을 묻습니다. 답은 새 입력으로 삼아 extract 로 돌아가 빈 칸만 채웁니다.
+    with logger.get_logger().node("setting_ask"):
+        logger.get_logger().interrupt_pause("질문: " + state["question"])
+
+    answer = interrupt(question(state["question"] + "\n(그만두려면 '취소')")).strip()
+
+    if is_cancel(answer):
+        return {"error": "요청을 취소했습니다."}
+    return {"query": answer}
 
 
 def setting_propose_node(state: BankState):
@@ -230,7 +311,23 @@ def route_after_extract(state: BankState):
 def route_after_check(state: BankState):
     if state.get("error"):
         return "setting_fail"
+    if state.get("candidates"):
+        return "setting_confirm"
+    if state.get("question"):
+        return "setting_ask"
     return "common_authenticate"
+
+
+def route_after_confirm(state: BankState):
+    if state.get("error"):
+        return "setting_fail"
+    return "setting_check"
+
+
+def route_after_ask(state: BankState):
+    if state.get("error"):
+        return "setting_fail"
+    return "setting_extract"
 
 
 def route_after_authenticate(state: BankState):

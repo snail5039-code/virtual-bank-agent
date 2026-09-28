@@ -96,6 +96,14 @@ def find_registered(owner_id, name):
     return [r for r in get_registered(owner_id) if name and (name in r["nickname"] or name in r["holder_name"])]
 
 
+REGISTER_FIELDS = {"bank_name": "은행", "account_number": "계좌번호", "holder_name": "예금주 이름"}
+
+
+def register_missing(info):
+    # 등록에 꼭 필요한데 아직 모르는 칸의 이름을 돌려줍니다. 예) ["계좌번호", "예금주 이름"]. 다 있으면 빈 목록입니다.
+    return [label for key, label in REGISTER_FIELDS.items() if not info.get(key)]
+
+
 def check_register(owner_id, info):
     # 계좌를 등록할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
     if not info.get("bank_name") or not info.get("account_number") or not info.get("holder_name"):
