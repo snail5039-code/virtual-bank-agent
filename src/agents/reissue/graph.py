@@ -3,6 +3,7 @@
 #
 #   START → extract ─┬─ 조회 → list → END                             (읽기만. 승인 없음)
 #              ↑     └─ 신청 → check ─┬─ 할 수 없음 → fail → END     (분실 정지 아님 / 기존 신청 있음 / 배송지 모름)
+#              │        배송지 수정·신청 취소도 check 로 갑니다      (접수 상태가 아님 / 같은 배송지)
 #              │                      └─ 할 수 있음 → authenticate → propose → approve → interpret
 #              │                                                                 ↑         │
 #              │                                                                 └─ 모름 ──┤

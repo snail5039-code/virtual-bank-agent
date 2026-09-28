@@ -1,11 +1,12 @@
 # 카드 재발급 에이전트(3단)의 노드 함수입니다.
-# 지금은 재발급 신청 / 신청 조회 를 맡습니다. 배송지 수정 / 신청 취소 는 4-6 에서 만듭니다.
+# 재발급 신청 / 신청 조회 (4-5), 배송지 수정 / 신청 취소 (4-6) 를 맡습니다.
+# 수정·취소는 신청이 접수 상태일 때만 됩니다. 제작중·배송중이면 불가 안내로 끝납니다.
 #
 #   reissue_extract : 사용자 말에서 할 일과 카드 이름, 배송지를 뽑습니다 (LLM)
 #   reissue_list    : 신청 목록을 보여줍니다. 읽기만 하므로 승인 없이 끝납니다
-#   reissue_check   : 카드와 배송지를 하나로 정하고, 신청할 수 있는지 봅니다 (Python)
+#   reissue_check   : 카드와 배송지를 하나로 정하고, 할 수 있는지 봅니다 (Python)
 #   reissue_propose : 처리안을 만듭니다. 계산만 하고 저장하지 않습니다
-#   reissue_execute : 승인되면 신청을 한 줄 넣습니다 (저장은 common_save)
+#   reissue_execute : 승인되면 신청을 넣거나, 배송지를 바꾸거나, 취소합니다 (저장은 common_save)
 #   reissue_fail    : 진행할 수 없는 사유를 알려줍니다
 #   (인증·승인·응답 해석·거절·기록·저장·안내는 공통 노드를 씁니다)
 #
@@ -97,10 +98,9 @@ def address_guide():
 def reissue_check_node(state: BankState):
     log = logger.get_logger()
     with log.node("reissue_check"):
-        if state.get("setting_action") in ("배송지 수정", "신청 취소"):
-            return {"error": "재발급 배송지 수정과 신청 취소는 아직 준비 중입니다."}
+        action = state.get("setting_action")
         if not state.get("target_name"):
-            return {"error": "어느 카드를 재발급할지 말해 주세요. (예: 생활비 카드 재발급해줘 집으로)"}
+            return {"error": "어느 카드인지 말해 주세요. (예: 생활비 카드 재발급해줘 집으로 / 구 생활비 카드 재발급 취소해줘)"}
 
         # 카드를 한 장으로 정합니다. (카드 설정과 같은 방식)
         found = functions.pick_cards(functions.CURRENT_USER, state["target_name"])
@@ -113,38 +113,81 @@ def reissue_check_node(state: BankState):
             return {"error": "\n".join(lines)}
         card = found[0]
 
-        # 분실 정지 카드인지, 진행 중인 신청이 없는지 봅니다.
-        error = functions.check_reissue(functions.CURRENT_USER, card)
-        if error:
-            return {"error": error}
+        if action == "신청 취소":
+            # 이 카드의 진행 중인 신청이 접수 상태인지 봅니다.
+            app = functions.find_open_application(functions.CURRENT_USER, card["card_id"])
+            if not app:
+                return {"error": "진행 중인 재발급 신청이 없습니다. (%s)" % card["name"]}
+            error = functions.check_application(app, action)
+            return {"error": error} if error else {"target_account": card["card_id"]}
 
-        # 배송지를 하나로 정합니다.
+        if action == "신청":
+            # 분실 정지 카드인지, 진행 중인 신청이 없는지 봅니다.
+            error = functions.check_reissue(functions.CURRENT_USER, card)
+            if error:
+                return {"error": error}
+
+        # 배송지를 하나로 정합니다. (신청, 배송지 수정)
         addresses = functions.find_addresses(functions.CURRENT_USER, state.get("new_value"))
         if len(addresses) != 1:
             return {"error": address_guide()}
+        address_id = addresses[0]["address_id"]
 
-    return {"target_account": card["card_id"], "address_id": addresses[0]["address_id"]}
+        if action == "배송지 수정":
+            app = functions.find_open_application(functions.CURRENT_USER, card["card_id"])
+            if not app:
+                return {"error": "진행 중인 재발급 신청이 없습니다. (%s)" % card["name"]}
+            error = functions.check_application(app, action, address_id)
+            if error:
+                return {"error": error}
+
+    return {"target_account": card["card_id"], "address_id": address_id}
 
 
 def reissue_propose_node(state: BankState):
     with logger.get_logger().node("reissue_propose"):
+        action = state["setting_action"]
         card = next(c for c in functions.get_cards(functions.CURRENT_USER) if c["card_id"] == state["target_account"])
-        address = next(a for a in functions.get_addresses(functions.CURRENT_USER) if a["address_id"] == state["address_id"])
-        rows = [
-            ["카드", "%s (%s)" % (card["name"], card["card_number"])],
-            ["지금 상태", functions.CARD_STATUS[card["status"]]],
-            ["배송지", "%s (%s)" % (address["label"], address["address"])],
-            ["안내", "신청해도 기존 카드의 분실 정지는 그대로입니다"],
-        ]
-    return {"proposal": {"task": "카드 재발급 신청", "rows": rows}, "approval": "대기"}
+        addresses = {a["address_id"]: a for a in functions.get_addresses(functions.CURRENT_USER)}
+        card_row = ["카드", "%s (%s)" % (card["name"], card["card_number"])]
+
+        if action == "신청":
+            address = addresses[state["address_id"]]
+            rows = [
+                card_row,
+                ["지금 상태", functions.CARD_STATUS[card["status"]]],
+                ["배송지", "%s (%s)" % (address["label"], address["address"])],
+                ["안내", "신청해도 기존 카드의 분실 정지는 그대로입니다"],
+            ]
+        else:
+            app = functions.find_open_application(functions.CURRENT_USER, card["card_id"])
+            rows = [["신청", app["application_id"]], card_row, ["신청 상태", functions.REISSUE_STATUS[app["status"]]]]
+            if action == "배송지 수정":
+                old, new = addresses[app["address_id"]], addresses[state["address_id"]]
+                rows.append(["지금 배송지", "%s (%s)" % (old["label"], old["address"])])
+                rows.append(["새 배송지", "%s (%s)" % (new["label"], new["address"])])
+            else:
+                rows.append(["안내", "취소해도 기존 카드의 분실 정지는 그대로입니다"])
+
+    return {"proposal": {"task": "카드 재발급 " + action, "rows": rows}, "approval": "대기"}
 
 
 def reissue_execute_node(state: BankState):
     # 승인된 뒤에만 옵니다. 바꾼 데이터를 new_data 로 넘기고, 저장은 common_save 가 합니다.
     with logger.get_logger().node("reissue_execute"):
         data = data_store.load()
-        app_id = functions.add_reissue(data, functions.CURRENT_USER, state["target_account"], state["address_id"])
-        answer = "재발급을 신청했습니다. (%s  [접수])" % app_id
+        action = state["setting_action"]
+        if action == "신청":
+            app_id = functions.add_reissue(data, functions.CURRENT_USER, state["target_account"], state["address_id"])
+            answer = "재발급을 신청했습니다. (%s  [접수])" % app_id
+        else:
+            app = functions.find_open_application(functions.CURRENT_USER, state["target_account"])
+            functions.change_application(data, app["application_id"], action, state.get("address_id"))
+            if action == "배송지 수정":
+                address = next(a for a in data["addresses"] if a["address_id"] == state["address_id"])
+                answer = "재발급 배송지를 바꿨습니다. (%s → %s)" % (app["application_id"], address["label"])
+            else:
+                answer = "재발급 신청을 취소했습니다. (%s  [취소됨])" % app["application_id"]
     return {"new_data": data, "answer": answer, "result": "완료"}
 
 
