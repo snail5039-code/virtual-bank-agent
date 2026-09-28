@@ -5,6 +5,8 @@
 #   잘 끝난 턴  : 한 줄 요약만 남깁니다.
 #   터진 턴     : 전부 펼칩니다. 그래서 문제가 생긴 턴만 눈에 띕니다.
 #   --debug     : 콘솔에도 띄우고, 모든 턴을 펼칩니다.
+#   백그라운드  : 30초마다 도는 스케줄러는 background() 로 감쌉니다. 실제로 실행한 게 있을 때만 파일에 남기고,
+#                 콘솔에는 띄우지 않습니다 (입력 중인 줄에 끼어들지 않게. 결과는 main.py 가 입력 사이에 보여줍니다).
 #
 # 줄 앞 기호
 #   >  노드가 정상으로 지나감
@@ -203,8 +205,8 @@ class Logger:
             self._file = self._name(self._date, self._index)
             self._size = 0
 
-    def _emit(self, lines: list[str]) -> None:
-        """한 덩어리를 파일에 씁니다. 덩어리는 쪼개지 않습니다."""
+    def _emit(self, lines: list[str], echo: bool = True) -> None:
+        """한 덩어리를 파일에 씁니다. 덩어리는 쪼개지 않습니다. echo=False 면 --debug 여도 콘솔에 띄우지 않습니다."""
         if not lines:
             return
         blob = "\n".join(lines) + "\n"
@@ -213,7 +215,7 @@ class Logger:
         with open(self._file, "ab") as f:
             f.write(data)
         self._size += len(data)
-        if self.debug:
+        if self.debug and echo:
             print(blob, end="")
 
     def _line(self, text: str) -> None:
@@ -271,6 +273,24 @@ class Logger:
         if result not in ("승인 대기", "질문 대기"):
             self._ran.clear()
             self._before_interrupt.clear()
+
+    # ------------------------------------------------------------ 백그라운드 작업 (실시간 스케줄러)
+    @contextmanager
+    def background(self, name: str):
+        """백그라운드 작업 한 번을 감쌉니다. 턴처럼 줄을 모아 두었다가 keep 을 True 로 했을 때만 파일에 씁니다.
+        할 일이 없어 읽기만 한 경우(30초마다 대부분)는 아무것도 남기지 않습니다. 로그가 쌓이지 않게 하려는 것입니다.
+        main.py 가 잠금으로 턴과 겹치지 않게 하므로, 여기서 턴의 버퍼를 잠깐 빌려 씁니다."""
+        saved = (self._in_turn, self._buffer, self._cut)
+        self._in_turn, self._buffer, self._cut = True, [], False
+        job = {"keep": False}
+        try:
+            yield job
+        finally:
+            lines = self._buffer
+            self._in_turn, self._buffer, self._cut = saved
+            if job["keep"]:
+                stamp = datetime.now().strftime("%H:%M:%S")
+                self._emit(["", "--- %s   %s ---" % (name, stamp)] + lines, echo=False)
 
     # ------------------------------------------------------------ 분기
     def branch(self, number: int, text: str) -> None:

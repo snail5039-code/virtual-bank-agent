@@ -2,13 +2,16 @@
 # 같은 대화 세션(thread_id)을 유지하고, 종료 명령을 처리합니다.
 # 그래프가 질문하거나 승인을 기다리며 멈춰 있으면, 다음 입력을 그 답으로 넘깁니다. (분기 0)
 # 멈춘 채 꺼졌다가 다시 켜면, 끊긴 업무를 알려주고 처음부터 다시 할지 묻습니다. (재시작 복구, 5-2)
+# 켜 있는 동안 스케줄러 스레드가 30초마다 예약 이체·분할 회차를 확인해 시각이 되면 바로 실행합니다. (실시간 스케줄러, 12장 보완)
 #
 # 실행 : uv run python src/main.py
 #        uv run python src/main.py --debug   (로그를 화면에도 띄웁니다)
 
 import getpass
+import queue
 import re
 import sys
+import threading
 from datetime import datetime
 
 from langgraph.types import Command
@@ -31,6 +34,18 @@ console = Console()
 HISTORY_TURNS = 5
 HISTORY_ANSWER_LINES = 4
 history = []
+
+# 실시간 스케줄러 : 입력을 기다리는 동안에도 SCHEDULE_SECONDS 마다 예약 이체·분할 회차를 확인합니다.
+#   work_lock : data.json 을 읽고 쓰는 일을 한 번에 한쪽만 하게 합니다.
+#               사용자 입력 한 번을 처리하는 동안(handle_turn)과 스케줄러가 한 번 도는 동안 잡습니다.
+#               둘이 겹치면 먼저 읽은 쪽이 나중에 저장하면서 다른 쪽이 바꾼 내용을 덮어씁니다.
+#               승인·질문을 기다리는 동안은 그래프가 멈춰 있어 잡지 않으므로, 그 사이에는 스케줄러가 돕니다.
+#   outbox    : 스케줄러는 화면에 바로 쓰지 않고 결과 줄을 여기에 넣습니다. 치고 있는 줄에 글자가 끼어들지 않게,
+#               main 이 입력을 받은 직후 답을 보여주기 전에 꺼내 보여줍니다. (실행은 제시각, 화면에는 다음 입력 때)
+SCHEDULE_SECONDS = 30
+work_lock = threading.Lock()
+outbox = queue.Queue()
+stop_event = threading.Event()
 
 
 def respond(user_input, log):
@@ -72,6 +87,29 @@ def run_schedules(log):
     for line in lines:
         log.note(line)
         print(line)
+
+
+def scheduler_loop(log):
+    # 스케줄러 스레드가 도는 함수입니다. SCHEDULE_SECONDS 동안 쉬었다가(쉬는 동안은 CPU 를 쓰지 않습니다) 확인하기를 반복합니다.
+    # "종료" 로 stop_event 가 켜지면 쉬던 중이라도 바로 끝납니다.
+    # 여기서 예외가 나도 스레드가 죽지 않게 막습니다. 다음 확인 때 다시 봅니다.
+    while not stop_event.wait(SCHEDULE_SECONDS):
+        with work_lock, log.background("스케줄러") as job:
+            try:
+                lines = functions.run_due_schedules()
+            except Exception as e:
+                log.error(e)
+                lines = ["[예약 이체·분할 회차] 확인 중 오류가 나 처리하지 못했습니다. 다음 확인 때 다시 봅니다."]
+            for line in lines:
+                log.note(line)
+                outbox.put(line)
+            job["keep"] = bool(lines)
+
+
+def show_outbox():
+    # 스케줄러가 모아 둔 결과를 보여줍니다. 입력을 받은 직후, 답을 보여주기 전에 부릅니다.
+    while not outbox.empty():
+        print(outbox.get())
 
 
 def read_input():
@@ -119,23 +157,25 @@ def remember_turn():
 def handle_turn(user_input, log):
     # 입력 한 번을 처리하고 답을 화면에 보여줍니다. 복구로 다시 돌릴 때도 이 함수를 씁니다.
     # 본인 확인 답(비밀번호 등)은 로그 파일에 그대로 남기지 않습니다.
-    secret = common_pending_check(bank_graph, config) == SECRET
-    log.turn_start("****" if secret else user_input, thread_id)
-    # 예약 이체 : 요청을 처리하기 전에, 켜져 있는 동안 시각이 된 예약을 처리합니다.
-    run_schedules(log)
-    try:
-        with console.status("[bold green]에이전트가 작업 중입니다...[/bold green]", spinner="dots"):
-            answer = respond(user_input, log)
+    # 입력 한 번을 처리하는 동안은 잠금을 잡습니다. 스케줄러가 끼어들어 data.json 을 동시에 쓰지 않게 합니다.
+    with work_lock:
+        secret = common_pending_check(bank_graph, config) == SECRET
+        log.turn_start("****" if secret else user_input, thread_id)
+        # 예약 이체 : 요청을 처리하기 전에, 시각이 된 예약을 처리합니다. (스케줄러가 30초마다 보지만, 그 사이에 된 것까지 확실히)
+        run_schedules(log)
         try:
-            remember_pending()
-        except data_store.DataStoreError:
-            pass    # 진행 중 기록을 못 남겨도 이번 답은 그대로 보여줍니다. (사유는 data_store 가 로그에 남깁니다)
-        remember_turn()
-        log.turn_end(turn_result())
-    except Exception as e:
-        log.error(e)
-        log.turn_end("오류")
-        answer = "처리 중 오류가 발생했습니다."
+            with console.status("[bold green]에이전트가 작업 중입니다...[/bold green]", spinner="dots"):
+                answer = respond(user_input, log)
+            try:
+                remember_pending()
+            except data_store.DataStoreError:
+                pass    # 진행 중 기록을 못 남겨도 이번 답은 그대로 보여줍니다. (사유는 data_store 가 로그에 남깁니다)
+            remember_turn()
+            log.turn_end(turn_result())
+        except Exception as e:
+            log.error(e)
+            log.turn_end("오류")
+            answer = "처리 중 오류가 발생했습니다."
 
     print(answer)
     print()
@@ -181,13 +221,19 @@ def main():
     # 재시작 복구 : 지난번에 끝나기 전에 꺼진 업무가 있으면 먼저 묻습니다.
     recover_pending(log)
 
+    # 실시간 스케줄러 : 켜 있는 동안 SCHEDULE_SECONDS 마다 예약 이체·분할 회차를 확인합니다.
+    # daemon 스레드라 프로그램이 끝나면 같이 끝납니다.
+    threading.Thread(target=scheduler_loop, args=(log,), daemon=True).start()
+
     while True:
         user_input = read_input()
+        show_outbox()       # 입력을 기다리는 동안 스케줄러가 실행한 결과
 
         if user_input == "":
             continue
 
         if user_input in ["exit", "종료"]:
+            stop_event.set()
             print("시스템을 종료합니다.")
             break
 
