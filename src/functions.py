@@ -217,6 +217,49 @@ def get_statement_items(owner_id, statement):
     return sorted(items, key=lambda u: u["occurred_at"])
 
 
+def check_payment(owner_id, statement, account_id, amount):
+    # 카드값을 낼 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
+    # 전체 결제는 "남은 금액 전부를 내는 부분 결제" 라서 같은 검사를 씁니다.
+    if statement["remaining_amount"] <= 0:
+        return "이미 납부 완료된 청구서입니다. (%s)" % statement["billing_month"]
+    if amount <= 0:
+        return "결제 금액은 1원 이상이어야 합니다."
+    if amount > statement["remaining_amount"]:
+        return "남은 금액(%s원)보다 많이 낼 수 없습니다." % format(statement["remaining_amount"], ",")
+    account = get_account(owner_id, account_id)
+    if account["balance"] < amount:
+        return "잔액이 부족합니다. (%s 잔액 %s원)" % (account["nickname"], format(account["balance"], ","))
+    return None
+
+
+def pay_statement(data, statement_id, account_id, amount, memo):
+    # data 안에서 카드값을 냅니다. 파일에 저장하지는 않습니다 (저장은 common_save).
+    #   1) 계좌 잔액에서 뺍니다
+    #   2) 청구서의 낸 금액·남은 금액을 바꾸고, 남은 금액이 0 이면 납부 완료, 남아 있으면 일부 납부로 둡니다
+    #   3) 계좌 거래 내역에 출금 한 줄을 남깁니다 (카드 이용이 아니므로 card_id 는 비웁니다)
+    # 세 가지를 한 번에 저장하므로, 저장이 실패하면 셋 다 반영되지 않습니다. (기획서 5.2 전체·부분 = 전부 롤백)
+    account = next(a for a in data["accounts"] if a["account_id"] == account_id)
+    statement = next(s for s in data["card_statements"] if s["statement_id"] == statement_id)
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+
+    account["balance"] -= amount
+    statement["paid_amount"] += amount
+    statement["remaining_amount"] -= amount
+    statement["status"] = "paid" if statement["remaining_amount"] == 0 else "partial"
+    statement["paid_at"] = now
+    statement["paid_account"] = account_id
+    data["transactions"].append({
+        "transaction_id": "tx-%03d" % (len(data["transactions"]) + 1),
+        "owner_id": account["owner_id"],
+        "account_id": account_id,
+        "type": "withdrawal",
+        "amount": amount,
+        "occurred_at": now,
+        "card_id": None,
+        "merchant": memo,
+    })
+
+
 # ---------------------------------------------------------------- 재발급
 # 신청 상태 : 접수 → 제작중 → 배송중. 취소하면 취소됨. 실제 제작·배송 진행은 만들지 않습니다. (기획서 5.4)
 REISSUE_STATUS = {"received": "접수", "making": "제작중", "shipping": "배송중", "cancelled": "취소됨"}
