@@ -26,6 +26,12 @@ thread_id = "session-" + datetime.now().strftime("%Y%m%d-%H%M%S")
 config = {"configurable": {"thread_id": thread_id}}
 console = Console()
 
+# 대화 기억 : 끝난 턴마다 {요청, 답} 을 한 줄씩 남기고 최근 HISTORY_TURNS 개만 둡니다. 세션(켜고 끌 때까지) 동안만 있습니다.
+# 중간에 오간 것(본인 확인, 승인, 번호 고르기)은 넣지 않습니다. 답은 앞부분만 남깁니다.
+HISTORY_TURNS = 5
+HISTORY_ANSWER_LINES = 4
+history = []
+
 
 def respond(user_input, log):
     # [분기 0] 멈춰 있는 업무가 있으면 입력을 그 답으로 넘기고, 없으면 새 요청으로 시작합니다.
@@ -38,7 +44,7 @@ def respond(user_input, log):
         result = bank_graph.invoke(Command(resume=user_input), config=config)
     else:
         log.branch(0, "대기 중인 업무 없음 → 새 요청")
-        result = bank_graph.invoke(new_request(user_input), config=config)
+        result = bank_graph.invoke(new_request(user_input, list(history)), config=config)
 
     if "__interrupt__" in result:
         return result["__interrupt__"][0].value["text"]     # 그래프가 던진 질문이나 처리안
@@ -99,6 +105,17 @@ def remember_pending():
         functions.clear_pending()
 
 
+def remember_turn():
+    # 업무가 끝난 턴(승인·질문을 기다리지 않음)이면 그 요청과 마지막 답을 최근 대화에 한 줄 남깁니다.
+    # 요청은 "그거" 를 풀었으면 푼 문장(request_text)입니다. 그래야 다음 턴에서 또 가리킬 때 이름이 남아 있습니다.
+    values = bank_graph.get_state(config).values
+    if common_pending_check(bank_graph, config) or not values.get("answer"):
+        return
+    answer = "\n".join(values["answer"].splitlines()[:HISTORY_ANSWER_LINES])
+    history.append({"request": values["request_text"], "answer": answer})
+    del history[:-HISTORY_TURNS]
+
+
 def handle_turn(user_input, log):
     # 입력 한 번을 처리하고 답을 화면에 보여줍니다. 복구로 다시 돌릴 때도 이 함수를 씁니다.
     # 본인 확인 답(비밀번호 등)은 로그 파일에 그대로 남기지 않습니다.
@@ -113,6 +130,7 @@ def handle_turn(user_input, log):
             remember_pending()
         except data_store.DataStoreError:
             pass    # 진행 중 기록을 못 남겨도 이번 답은 그대로 보여줍니다. (사유는 data_store 가 로그에 남깁니다)
+        remember_turn()
         log.turn_end(turn_result())
     except Exception as e:
         log.error(e)
