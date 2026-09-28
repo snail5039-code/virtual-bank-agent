@@ -4,7 +4,7 @@
 #   card_extract: 무엇을 볼지(목록 / 결제 계좌 / 카드 번호 / 멤버십 / 이용 내역)와 조건을 뽑습니다
 #   card_query  : 조건으로 카드를 걸러 볼 것을 보여줍니다. 카드 번호는 본인 확인 뒤에만 옵니다
 #   card_to_reissue : 분실 신고가 끝난 뒤 재발급으로 넘어갈 때 State 를 재발급용으로 바꿉니다 (4-7)
-#   card_todo   : 결제 는 아직 준비 중이라고 안내합니다 (설정·재발급은 각 에이전트 그래프로 넘깁니다)
+#   (설정·재발급·결제는 각 에이전트 그래프로 넘깁니다)
 
 from datetime import date
 from typing import Literal, Optional
@@ -152,21 +152,15 @@ def card_to_reissue_node(state: BankState):
                 "proposal": None, "approval": None, "result": None, "error": None, "new_data": None}
 
 
-def card_todo_node(state: BankState):
-    with logger.get_logger().node("card_todo"):
-        answer = "카드 %s 업무는 아직 준비 중입니다." % state["task"]
-    return {"answer": answer}
-
-
 def route_by_task(state: BankState):
-    # 고른 업무에 따라 다음 노드를 정합니다. 결제는 아직 준비 중입니다.
+    # 고른 업무에 따라 다음 노드를 정합니다. 설정·재발급·결제는 각 에이전트 그래프로 넘깁니다.
     if state["task"] == "조회":
         return "card_extract"
     if state["task"] == "설정":
         return "card_setting"
     if state["task"] == "재발급":
         return "reissue"
-    return "card_todo"
+    return "billing"
 
 
 def route_after_setting(state: BankState):

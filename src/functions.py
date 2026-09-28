@@ -196,6 +196,27 @@ def change_card_status(data, card_id, action, reason=None):
         card["reported_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
 
 
+# ---------------------------------------------------------------- 카드 청구서 (요금)
+# 청구서는 신용카드에만 있습니다. 체크카드는 쓰는 즉시 계좌에서 빠지므로 낼 돈이 따로 없습니다.
+# 남은 금액 = 청구 총액 - 낸 금액 (데이터에 remaining_amount 로 들어 있습니다)
+STATEMENT_STATUS = {"unpaid": "미납", "partial": "일부 납부", "paid": "납부 완료"}
+
+
+def get_statements(owner_id, card_ids=None, month=None):
+    # 청구서를 거릅니다. card_ids 를 주면 그 카드만, month("2026-08")를 주면 그 달만 봅니다. 최근 달부터 돌려줍니다.
+    result = [s for s in data_store.load()["card_statements"] if s["owner_id"] == owner_id
+              and (not card_ids or s["card_id"] in card_ids)
+              and (not month or s["billing_month"] == month)]
+    return sorted(result, key=lambda s: (s["billing_month"], s["card_id"]), reverse=True)
+
+
+def get_statement_items(owner_id, statement):
+    # 청구서 한 건의 상세 내역. items 에는 이용 내역 ID 만 있으므로 card_usages 에서 찾아 붙입니다. 날짜순입니다.
+    usages = {u["usage_id"]: u for u in data_store.load()["card_usages"] if u["owner_id"] == owner_id}
+    items = [usages[usage_id] for usage_id in statement["items"] if usage_id in usages]
+    return sorted(items, key=lambda u: u["occurred_at"])
+
+
 # ---------------------------------------------------------------- 재발급
 # 신청 상태 : 접수 → 제작중 → 배송중. 취소하면 취소됨. 실제 제작·배송 진행은 만들지 않습니다. (기획서 5.4)
 REISSUE_STATUS = {"received": "접수", "making": "제작중", "shipping": "배송중", "cancelled": "취소됨"}

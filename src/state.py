@@ -44,6 +44,9 @@ class BankState(TypedDict):
     # 카드 재발급
     address_id: str         # 찾아낸 배송지 ID
 
+    # 카드 요금
+    billing_info: dict      # 할 일(요금 조회 / 명세서 조회 / 결제)과 카드 이름, 청구 월
+
     # 정지 후 재발급 연속 처리 (4-7)
     reissue_next: bool      # 분실 신고가 끝나면 이어서 재발급 신청도 할지
     reissue_address: str    # 그때 쓸 배송지 (분실 신고 중에는 new_value 가 사유라서 따로 둡니다)
@@ -73,7 +76,7 @@ def new_request(query):
         "from_account": None, "to_account": None, "amount": None, "keep_amount": None,
         "splits": None, "targets": None, "scheduled_at": None,
         "setting_action": None, "target_name": None, "target_account": None,
-        "setting_field": None, "new_value": None, "reg_info": None, "card_filter": None, "address_id": None, "reissue_next": None, "reissue_address": None,
+        "setting_field": None, "new_value": None, "reg_info": None, "card_filter": None, "address_id": None, "reissue_next": None, "reissue_address": None, "billing_info": None,
         "candidates": None, "confirm_for": None, "question": None, "error": None,
         "proposal": None, "approval": None, "new_data": None, "result": None,
         "auth_tries": 0,
