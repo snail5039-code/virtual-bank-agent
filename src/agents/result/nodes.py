@@ -50,7 +50,7 @@ def result_query_node(state: BankState):
         log.detail("처리 기록 %d건" % len(records))
         if not records:
             what = "'%s' " % r.keyword if r.keyword else ""
-            return {"answer": "%s처리한 기록이 없습니다. (예약 이체 결과는 '예약 이체 목록 보여줘' 로 볼 수 있습니다)" % what}
+            return {"answer": "%s처리한 기록이 없습니다." % what}
 
         if r.show_all:
             shown = records[:SHOW_MAX]

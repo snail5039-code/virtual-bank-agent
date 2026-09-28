@@ -141,6 +141,10 @@ def transfer_check_node(state: BankState):
         # 나눠 이체 : 줄마다 계좌·금액을 봅니다. 모자란 줄이 있으면 그 줄만 고르게 하거나(confirm) 묻습니다(ask).
         splits = state.get("splits")
         update["split_index"] = None
+        # 예약은 금액을 정한 한 곳 이체만 됩니다. 나눠·조건부 예약이면 빠진 값을 되묻기 전에 먼저 알려줍니다.
+        if state.get("scheduled_at") and (splits or state.get("keep_amount") is not None):
+            update["error"] = functions.SCHEDULE_ONE_ONLY
+            return update
         if splits:
             splits, index, candidates, error = functions.resolve_splits(functions.CURRENT_USER, splits)
             update["splits"] = splits

@@ -53,7 +53,8 @@ def find_requests(owner_id, keyword=None):
     # "아까 이체 됐어?" 같은 후속 질문은 LLM 이 기억으로 답하지 않고 여기서 꺼낸 기록으로 답합니다. (원칙 6)
     records = [r for r in data_store.load()["requests"] if r["owner_id"] == owner_id
                and (not keyword or keyword.replace(" ", "") in r["task_type"].replace(" ", ""))]
-    return sorted(records, key=lambda r: r["created_at"], reverse=True)
+    # 같은 초에 여러 건이 남을 수 있으므로(예약 여러 건 실행, 일괄 결제) 시각이 같으면 나중 번호(request_id)가 앞입니다.
+    return sorted(records, key=lambda r: (r["created_at"], r["request_id"]), reverse=True)
 
 
 # ---------------------------------------------------------------- 진행 중 업무 (재시작 복구, 5-2)

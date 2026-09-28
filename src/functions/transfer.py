@@ -168,10 +168,17 @@ def transfer_all(data, from_id, targets, keep):
 # 상태 : 예약 → 완료 / 실패 / 취소. 목록에서 지우지 않고 상태만 바꿉니다 (나중에 결과를 물을 수 있게).
 
 
+# 예약은 금액을 정한 한 곳 이체만 받습니다.
+#   조건부(남길 금액) : 금액이 실행할 때의 잔액으로 정해져서, 승인한 금액과 실제로 보낸 금액이 달라집니다
+#   나눠 이체         : 한 곳씩 따로 예약하면 됩니다
+SCHEDULE_ONE_ONLY = ("예약은 금액을 정한 한 곳 이체만 됩니다. 여러 곳으로 보내려면 한 곳씩 따로 예약해 주세요.\n"
+                     "(예: 내일 9시에 생활비에서 저축으로 10만원 보내줘)")
+
+
 def check_schedule(scheduled_at, targets, keep):
     # 예약할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
     if keep is not None or len(targets) != 1:
-        return "예약은 금액을 정한 한 곳 이체만 됩니다. (예: 내일 9시에 생활비에서 저축으로 10만원 보내줘)"
+        return SCHEDULE_ONE_ONLY
     if parse_time(scheduled_at) <= datetime.now().astimezone():
         return "예약 시각이 이미 지났습니다. (%s)" % parse_time(scheduled_at).strftime("%m월 %d일 %H:%M")
     return None
@@ -216,6 +223,8 @@ def cancel_schedule(data, schedule_id):
 def run_due_schedules():
     # 시각이 지난 예약을 이체합니다. main.py 가 켤 때와 입력을 받을 때마다 부릅니다.
     # 승인은 예약할 때 받았으므로 다시 묻지 않습니다. 잔액이 모자라면 이체하지 않고 실패로 남깁니다.
+    # 실행 결과는 처리 기록(requests)에도 한 줄 남깁니다. 그래야 "아까 이체 됐어?"(5-1)에 예약 실행 결과도 나옵니다.
+    # (예약을 걸 때 남는 "예약 이체" 기록은 예약을 건 것이고, 이 "예약 이체 실행" 기록은 실제로 돈이 나간 것입니다)
     # 처리한 결과를 한 줄씩 돌려줍니다. 처리할 게 없으면 빈 목록입니다.
     data = data_store.load()
     now = datetime.now().astimezone()
@@ -226,9 +235,25 @@ def run_due_schedules():
             continue
         error = transfer(data, s["from_account"], s["to_account"], s["amount"])
         s["status"] = "실패" if error else "완료"
+        when = parse_time(s["scheduled_at"]).strftime("%m월 %d일 %H:%M")
+        to_name = target_name(data, s["to_account"])
         lines.append("[예약 이체 %s] %s → %s  %s원  (%s)%s" % (
-            s["status"], nicknames[s["from_account"]], target_name(data, s["to_account"]), format(s["amount"], ","),
-            parse_time(s["scheduled_at"]).strftime("%m월 %d일 %H:%M"), "  " + error if error else ""))
+            s["status"], nicknames[s["from_account"]], to_name, format(s["amount"], ","),
+            when, "  " + error if error else ""))
+
+        # 처리 기록 한 줄. 모양은 common_log_request 와 같습니다.
+        content = {"예약 번호": s["schedule_id"], "예약 시각": when, "출금": nicknames[s["from_account"]],
+                   "입금": to_name, "금액": format(s["amount"], ",") + "원"}
+        if error:
+            content["실패 사유"] = error
+        data["requests"].append({
+            "request_id": "req-%04d" % (len(data["requests"]) + 1),
+            "owner_id": s["owner_id"],
+            "task_type": "예약 이체 실행",
+            "content": content,
+            "status": s["status"],
+            "created_at": now.isoformat(timespec="seconds"),
+        })
     if lines:
         try:
             data_store.save(data)
