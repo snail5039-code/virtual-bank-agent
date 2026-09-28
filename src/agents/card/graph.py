@@ -5,7 +5,8 @@
 #                        ├─ 설정 → card_setting (카드 설정 에이전트 그래프) ─┬─────────────────────────┤
 #                        │               분실 신고 완료 + 재발급도 원함 → card_to_reissue ─┐           │
 #                        ├─ 재발급 → reissue (카드 재발급 에이전트 그래프) ←───────────────┘ ──────────┤
-#                        └─ 결제 → billing (카드 요금 에이전트 그래프) ─────────────────────────────────┴→ END
+#                        ├─ 결제 → billing (카드 요금 에이전트 그래프) ─────────────────────────────────┤
+#                        └─ 계좌 업무 → (일 안 하고 나감. supervisor 가 계좌로 반송) ────────────────────┴→ END
 
 from langgraph.graph import END, START, StateGraph
 
@@ -30,7 +31,7 @@ builder.add_node("card_to_reissue", card_to_reissue_node)
 builder.add_node("billing", billing_graph)             # 카드 요금 에이전트 그래프를 노드로 넣습니다
 
 builder.add_edge(START, "card_router")
-builder.add_conditional_edges("card_router", route_by_task, ["card_extract", "card_setting", "reissue", "billing"])
+builder.add_conditional_edges("card_router", route_by_task, ["card_extract", "card_setting", "reissue", "billing", END])
 builder.add_conditional_edges("card_extract", route_after_extract, ["common_authenticate", "card_query"])
 builder.add_conditional_edges("common_authenticate", route_after_authenticate, ["common_authenticate", "card_query"])
 builder.add_edge("card_query", END)

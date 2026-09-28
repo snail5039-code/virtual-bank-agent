@@ -22,7 +22,7 @@ from state import BankState
 
 
 class CardDecision(BaseModel):
-    task: Literal["조회", "결제", "설정", "재발급"] = Field(description="카드 요청의 업무 종류")
+    task: Literal["조회", "결제", "설정", "재발급", "계좌 업무"] = Field(description="카드 요청의 업무 종류")
     reason: str = Field(description="그 업무를 고른 이유")
 
 
@@ -154,6 +154,9 @@ def card_to_reissue_node(state: BankState):
 
 def route_by_task(state: BankState):
     # 고른 업무에 따라 다음 노드를 정합니다. 설정·재발급·결제는 각 에이전트 그래프로 넘깁니다.
+    # "계좌 업무" 는 1단이 잘못 보낸 요청입니다. 일을 하지 않고 나가면 supervisor 그래프가 계좌로 다시 보냅니다. (도메인 반송)
+    if state["task"] == "계좌 업무":
+        return END
     if state["task"] == "조회":
         return "card_extract"
     if state["task"] == "설정":

@@ -12,6 +12,8 @@ from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field, ValidationError
 
+from langgraph.graph import END
+
 import functions
 import logger
 from agents.account.prompts import account_prompt, history_prompt
@@ -20,7 +22,7 @@ from state import BankState
 
 
 class AccountDecision(BaseModel):
-    task: Literal["조회", "거래내역", "이체", "설정"] = Field(description="계좌 요청의 업무 종류")
+    task: Literal["조회", "거래내역", "이체", "설정", "카드 업무"] = Field(description="계좌 요청의 업무 종류")
     reason: str = Field(description="그 업무를 고른 이유")
 
 
@@ -126,6 +128,9 @@ def account_history_node(state: BankState):
 
 def route_by_task(state: BankState):
     # 고른 업무에 따라 다음 노드를 정합니다.
+    # "카드 업무" 는 1단이 잘못 보낸 요청입니다. 일을 하지 않고 나가면 supervisor 그래프가 카드로 다시 보냅니다. (도메인 반송)
+    if state["task"] == "카드 업무":
+        return END
     if state["task"] == "조회":
         return "account_query"
     if state["task"] == "거래내역":
