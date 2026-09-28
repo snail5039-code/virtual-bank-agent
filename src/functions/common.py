@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 
 import data_store
 
-# 로그인한 사용자입니다. 인증(3-5 단계)을 만들기 전까지는 고정해 둡니다.
+# 로그인한 사용자입니다. 로그인 기능은 없어서 한 명으로 고정합니다. (본인 확인은 authenticate 가 따로 합니다)
 CURRENT_USER = "user-001"
 
 

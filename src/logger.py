@@ -386,11 +386,9 @@ class Logger:
         tag = " (%s)" % request_id if request_id else ""
         self.branch(0, "승인 대기 있음%s → 재개" % tag)
 
-    def error(self, exc: BaseException, state: dict | None = None) -> None:
+    def error(self, exc: BaseException) -> None:
         self._force_full = True              # 예외가 난 턴은 전부 펼칩니다
         self._line("  X 예외  %s: %s" % (type(exc).__name__, exc))
-        if state is not None:
-            self._line(" " * _DETAIL_COL + "state %s" % _fmt(mask(state)))
         for line in traceback.format_exc().rstrip().splitlines():
             self._line("      " + line)
 

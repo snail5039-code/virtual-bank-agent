@@ -1,5 +1,5 @@
 # 사용할 LLM 을 한 곳에서 만듭니다.
-# .env 의 GOOGLE_API_KEY 를 읽습니다.
+# src/.env 의 GEMINI_API_KEY 를 읽습니다.
 
 import logging
 
