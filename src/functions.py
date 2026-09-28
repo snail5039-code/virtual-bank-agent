@@ -78,6 +78,43 @@ def find_cards(owner_id, bank_name=None, card_name=None, card_type=None, status=
     return cards
 
 
+# 카드 상태를 바꾸는 할 일과, 바꾼 뒤의 상태입니다. 분실·도난·부정사용은 모두 lost 이고 사유만 따로 남깁니다.
+CARD_ACTIONS = {"분실 신고": "lost", "일시 잠금": "locked", "잠금 해제": "active"}
+
+
+def pick_cards(owner_id, name):
+    # 상태를 바꿀 카드를 이름으로 찾습니다. 한 장으로 정해야 하므로 이름이 정확히 같은 카드를 먼저 봅니다.
+    # "생활비 카드" → 생활비 카드 1장 (생활비 신용카드, 구 생활비 카드는 빠짐)
+    # 정확히 같은 카드가 없으면 글자가 들어 있는 카드를 모두 돌려줍니다. (여러 장이면 노드가 후보를 보여줍니다)
+    exact = [c for c in get_cards(owner_id) if c["name"].replace(" ", "") == name.replace(" ", "")]
+    return exact or find_cards(owner_id, card_name=name)
+
+
+def check_card_status(card, action):
+    # 지금 상태에서 이 할 일을 할 수 있는지 봅니다. (기획서 5.3 전이 불가 목록)
+    # 할 수 없으면 사유를, 할 수 있으면 None 을 돌려줍니다.
+    status = card["status"]
+    if status == "cancelled":
+        return "해지된 카드는 상태를 바꿀 수 없습니다. (%s)" % card["name"]
+    if status == "lost":
+        if action == "분실 신고":
+            return "이미 분실 정지된 카드입니다. (%s)" % card["name"]
+        return "분실 정지된 카드는 잠그거나 해제할 수 없습니다. 재발급을 신청해 주세요. (%s)" % card["name"]
+    if status == CARD_ACTIONS[action]:
+        return "이미 %s 상태인 카드입니다. (%s)" % (CARD_STATUS[status], card["name"])
+    return None
+
+
+def change_card_status(data, card_id, action, reason=None):
+    # data 안에서 카드 상태를 바꿉니다. 파일에 저장하지는 않습니다 (저장은 common_save).
+    # 분실 신고면 사유와 신고 시각도 남깁니다.
+    card = next(c for c in data["cards"] if c["card_id"] == card_id)
+    card["status"] = CARD_ACTIONS[action]
+    if action == "분실 신고":
+        card["report_reason"] = reason or "분실"
+        card["reported_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
+
+
 def get_card_history(owner_id, card_ids, start=None, end=None):
     # 카드 이용 내역. 두 곳을 합칩니다. (기획서 8장)
     #   체크카드 : transactions 에 출금으로 남아 있으므로 거래내역 함수에 카드 필터만 줘서 재사용합니다
