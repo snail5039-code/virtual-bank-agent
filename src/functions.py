@@ -246,6 +246,11 @@ def pay_statement(data, statement_id, account_id, amount, memo):
     statement["paid_amount"] += amount
     statement["remaining_amount"] -= amount
     statement["status"] = "paid" if statement["remaining_amount"] == 0 else "partial"
+    if statement["remaining_amount"] == 0:
+        # 분할 중인 청구서를 다 냈으면(중도 상환) 그 분할 계획도 끝냅니다.
+        for i in data["card_installments"]:
+            if i["statement_id"] == statement_id and i["status"] == "active":
+                i["status"] = "paid"
     statement["paid_at"] = now
     statement["paid_account"] = account_id
     data["transactions"].append({
@@ -258,6 +263,46 @@ def pay_statement(data, statement_id, account_id, amount, memo):
         "card_id": None,
         "merchant": memo,
     })
+
+
+INSTALLMENT_MONTHS = (2, 12)     # 분할(할부) 개월 수 범위
+
+
+def check_installment(owner_id, statement, months):
+    # 분할 결제를 걸 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
+    low, high = INSTALLMENT_MONTHS
+    if not months or not low <= months <= high:
+        return "분할 개월 수는 %d~%d개월로 정해 주세요. (예: 9월 생활비 신용카드 값 3개월로 나눠 내줘)" % (low, high)
+    for i in data_store.load()["card_installments"]:
+        if i["statement_id"] == statement["statement_id"] and i["status"] == "active":
+            return "이미 분할 결제 중인 청구서입니다. (%s  %d/%d회)" % (i["installment_id"], i["paid_count"], i["months"])
+    return None
+
+
+def installment_amounts(total, months):
+    # 분할 금액. 나누어떨어지지 않는 나머지는 첫 회차에 붙입니다. 예) 452,000원 3개월 → [150,668, 150,666, 150,666]
+    base = total // months
+    return [total - base * (months - 1)] + [base] * (months - 1)
+
+
+def add_installment(data, statement_id, months):
+    # data 에 분할 계획을 한 줄 넣습니다. 첫 회차는 지금 내므로 낸 회차를 1로 둡니다. (첫 회차 결제는 pay_statement 가 합니다)
+    # 남은 회차를 매달 자동으로 내는 기능은 없습니다 (기획서 12장).
+    statement = next(s for s in data["card_statements"] if s["statement_id"] == statement_id)
+    amounts = installment_amounts(statement["remaining_amount"], months)
+    numbers = [int(i["installment_id"].split("-")[1]) for i in data["card_installments"]]
+    installment_id = "inst-%03d" % (max(numbers, default=0) + 1)
+    data["card_installments"].append({
+        "installment_id": installment_id,
+        "statement_id": statement_id,
+        "card_id": statement["card_id"],
+        "total_amount": statement["remaining_amount"],
+        "months": months,
+        "paid_count": 1,
+        "monthly_amount": amounts[1],
+        "status": "active",
+    })
+    return installment_id
 
 
 # ---------------------------------------------------------------- 재발급
