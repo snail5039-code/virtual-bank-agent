@@ -54,6 +54,7 @@
   .quick button:hover { background: var(--hover); }
   .me-box { margin-top: auto; padding: 10px; font-size: 12px; line-height: 1.6; }
   .me-box b { font-weight: 500; }
+  .me-box a { color: var(--muted); text-decoration: underline; cursor: pointer; }
 
   /* 가운데 */
   .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -172,7 +173,7 @@
     <div class="nav" data-view="bills">카드값</div>
     <div class="nav" data-view="schedules">예약 이체</div>
     <div class="nav" data-view="requests">처리 기록</div>
-    <div class="me-box"><b id="user">-</b><br><span class="muted" id="auth">본인 확인 전</span></div>
+    <div class="me-box"><b id="user">-</b><br><span class="muted" id="auth">본인 확인 전</span><br><a id="logout">로그아웃</a></div>
   </aside>
 
   <main class="main">

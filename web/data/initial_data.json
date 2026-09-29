@@ -5,21 +5,27 @@
       "name": "김도윤",
       "phone": "010-1234-5678",
       "ssn_tail": "a2654f2e9577a0da$145df4c43ce19f2c69b6c85c12bda3b3f7544909d99cc6a37d9787ab232e45c8",
-      "pin": "0cbed132703942fd$29ca0b6578001df77419a4efab5354691b138186ad0f116a78a7a077b6ea8ca0"
+      "pin": "0cbed132703942fd$29ca0b6578001df77419a4efab5354691b138186ad0f116a78a7a077b6ea8ca0",
+      "login_id": "doyoon",
+      "password": "19ec21b3d9064508$6b08aa16f019e13df556d402ba4c4a98ab1229e0c34bc88d59eeb728f85bddcb"
     },
     {
       "owner_id": "user-002",
       "name": "김서연",
       "phone": "010-2345-6789",
       "ssn_tail": "6db58f20bcd325b8$c22ee4471f229aca428001f0fc76d50ab53550f9a66fc6d7a6cc48579864222f",
-      "pin": "bf37cb7e103ff6ed$3d5c35b3c851f45358a4ca2465664410fd3e19143107e9e93c186dd8b5567589"
+      "pin": "bf37cb7e103ff6ed$3d5c35b3c851f45358a4ca2465664410fd3e19143107e9e93c186dd8b5567589",
+      "login_id": "seoyeon",
+      "password": "148dec08955f697a$691b7779de290837511f2eab7a54ad61988689adcc296f87c969ac8e92f048a3"
     },
     {
       "owner_id": "user-003",
       "name": "박지호",
       "phone": "010-3456-7890",
       "ssn_tail": "1bc9aca147b6b838$921cb498727cec05f8ccf34d2fa7b5471f54018791448f58d28bd06e5bb78744",
-      "pin": "19be325430d23989$2b4b4392067143caa2b8cda20ff69ca0d962e598ca65b0dbba278cb8b8b54b0e"
+      "pin": "19be325430d23989$2b4b4392067143caa2b8cda20ff69ca0d962e598ca65b0dbba278cb8b8b54b0e",
+      "login_id": "jiho",
+      "password": "223a88729dd4bd2b$696e97f36c441fc9c4ac57c07f6de5890ad828c6a4c9970952c8024bddbd0dc6"
     }
   ],
   "accounts": [

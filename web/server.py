@@ -9,8 +9,16 @@
 #
 # 실행 : uv run python web/server.py   → 브라우저에서 http://127.0.0.1:8000
 #
-# 지금은 한 사람이 한 창에서 쓰는 것만 생각합니다. (세션은 main.py 처럼 서버를 켤 때 하나)
+# 로그인 (여러 사람용 2단계) : /login 화면에서 아이디·로그인 비밀번호로 들어옵니다. 로그인하지 않으면 화면과 /api 를 못 씁니다.
+#   시험용 계정 (web/data 에는 비밀번호가 해시로만 있음)
+#     doyoon  / doyoon1234   → user-001 김도윤
+#     seoyeon / seoyeon1234  → user-002 김서연
+#     jiho    / jiho1234     → user-003 박지호
+#   회원가입 : /signup 화면. 이름·휴대전화번호·아이디·비밀번호·PIN(본인 확인용 4자리)을 받아 users 에 새 사람을 넣고 바로 로그인합니다.
+#   아직은 로그인만 합니다. 화면·업무·에이전트는 그대로 user-001 기준입니다 (3~5단계에서 사람별로 바꿈).
 
+import re
+import secrets
 import sys
 import threading
 from pathlib import Path
@@ -19,8 +27,8 @@ WEB_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(WEB_DIR / "bank"))     # web/bank : src 를 복사해 온 웹 전용 에이전트 코드 (src 는 터미널 버전으로 그대로 둠)
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -52,6 +60,134 @@ threading.Thread(target=bank.scheduler_loop, args=(log,), daemon=True).start()
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
+
+
+# ---------------------------------------------------------------- 로그인
+# 세션 : 로그인하면 임의의 글자(토큰)를 만들어 쿠키로 주고, 서버는 {토큰: owner_id} 로 기억합니다.
+# 서버 메모리에만 두므로 서버를 다시 켜면 모두 로그아웃됩니다.
+SESSION_COOKIE = "session"
+sessions = {}
+
+
+def login_user(request: Request):
+    # 요청의 쿠키로 로그인한 사람(owner_id)을 찾습니다. 없으면 None.
+    return sessions.get(request.cookies.get(SESSION_COOKIE))
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    # 로그인 화면과 로그인 요청, 화면 파일(static) 말고는 로그인해야 씁니다.
+    # 화면(/)은 로그인 화면으로 보내고, /api 는 401 을 돌려줍니다 (app.js 가 로그인 화면으로 보냄).
+    path = request.url.path
+    if path in ("/login", "/api/login", "/signup", "/api/signup") or path.startswith("/static/") or login_user(request):
+        return await call_next(request)
+    if path.startswith("/api/"):
+        return JSONResponse({"detail": "로그인이 필요합니다"}, status_code=401)
+    return RedirectResponse("/login")
+
+
+class LoginIn(BaseModel):
+    login_id: str
+    password: str
+
+
+@app.get("/login")
+def login_page(request: Request):
+    if login_user(request):
+        return RedirectResponse("/")
+    return FileResponse(WEB_DIR / "static" / "login.html")
+
+
+@app.post("/api/login")
+def login(body: LoginIn):
+    # 아이디로 사람을 찾고, 로그인 비밀번호를 해시로 비교합니다. (본인 확인 PIN 과는 다른 값)
+    # 아이디가 없을 때와 비밀번호가 틀렸을 때 같은 문구를 써서, 어떤 아이디가 있는지 알 수 없게 합니다.
+    with bank.work_lock:
+        data = data_store.load()
+    user = next((u for u in data["users"] if u.get("login_id") == body.login_id.strip()), None)
+    if not user or not functions.check_secret(body.password, user.get("password")):
+        log.note("로그인 실패  %s" % body.login_id.strip())
+        return JSONResponse({"error": "아이디 또는 비밀번호가 맞지 않습니다."}, status_code=401)
+    log.note("로그인  %s (%s)" % (user["login_id"], user["owner_id"]))
+    return start_session(user)
+
+
+def start_session(user):
+    # 토큰을 만들어 기억하고 쿠키로 줍니다. 로그인과 회원가입이 같이 씁니다.
+    token = secrets.token_hex(16)
+    sessions[token] = user["owner_id"]
+    response = JSONResponse({"name": user["name"]})
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="lax")
+    return response
+
+
+class SignupIn(BaseModel):
+    name: str
+    phone: str
+    login_id: str
+    password: str
+    pin: str
+
+
+def check_signup(data, info):
+    # 회원가입 값 검사. 문제가 있으면 사유, 없으면 None.
+    if not 1 <= len(info["name"]) <= 20:
+        return "이름을 1~20자로 적어 주세요."
+    if not re.fullmatch(r"010-\d{4}-\d{4}", info["phone"]):
+        return "휴대전화번호는 010-1234-5678 모양으로 적어 주세요."
+    if not re.fullmatch(r"[a-z0-9]{4,20}", info["login_id"]):
+        return "아이디는 영어 소문자·숫자 4~20자로 정해 주세요."
+    if any(u.get("login_id") == info["login_id"] for u in data["users"]):
+        return "이미 쓰는 아이디입니다."
+    if len(info["password"]) < 8:
+        return "비밀번호는 8자 이상으로 정해 주세요."
+    if not re.fullmatch(r"\d{4}", info["pin"]):
+        return "PIN 은 숫자 4자리로 정해 주세요."
+    return None
+
+
+@app.get("/signup")
+def signup_page(request: Request):
+    if login_user(request):
+        return RedirectResponse("/")
+    return FileResponse(WEB_DIR / "static" / "signup.html")
+
+
+@app.post("/api/signup")
+def signup(body: SignupIn):
+    # 새 사람을 users 에 넣습니다. 비밀번호·PIN 은 해시로만 둡니다. 계좌·카드는 없이 시작합니다.
+    # 주민번호 뒷자리는 받지 않아서 비워 둡니다 (본인 확인은 PIN·휴대전화번호·계좌 비밀번호로 함).
+    info = {key: value.strip() for key, value in body.model_dump().items()}
+    with bank.work_lock:
+        data = data_store.load()
+        error = check_signup(data, info)
+        if error:
+            return JSONResponse({"error": error}, status_code=400)
+        user = {
+            "owner_id": functions.next_id(data["users"], "owner_id", "user"),
+            "name": info["name"],
+            "phone": info["phone"],
+            "ssn_tail": None,
+            "pin": functions.hash_secret(info["pin"]),
+            "login_id": info["login_id"],
+            "password": functions.hash_secret(info["password"]),
+        }
+        data["users"].append(user)
+        try:
+            data_store.save(data)
+        except data_store.DataStoreError:
+            return JSONResponse({"error": "저장에 실패해 가입하지 못했습니다."}, status_code=500)
+    log.note("회원가입  %s (%s)" % (user["login_id"], user["owner_id"]))
+    return start_session(user)
+
+
+@app.post("/api/logout")
+def logout(request: Request):
+    owner = sessions.pop(request.cookies.get(SESSION_COOKIE), None)
+    log.note("로그아웃  %s" % owner)
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(SESSION_COOKIE)
+    return response
 
 
 class ChatIn(BaseModel):

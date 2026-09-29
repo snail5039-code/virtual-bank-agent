@@ -5,6 +5,20 @@
 // 3단계 : 옆 패널(총 잔액, 계좌, 카드, 카드값, 예약 이체, 최근 처리)을 /api/summary 로 채웁니다.
 //         켤 때와 답을 받을 때마다 다시 읽습니다. 진행 상황은 멈춘 종류(pending)로 표시합니다.
 
+// 로그인 (여러 사람용 2단계) : 로그인이 풀리면(서버를 다시 켰을 때 등) /api 가 401 을 돌려줍니다.
+// 모든 fetch 를 한 곳에서 보고, 401 이면 로그인 화면으로 보냅니다.
+const serverFetch = window.fetch;
+window.fetch = async (...args) => {
+  const res = await serverFetch(...args);
+  if (res.status === 401) location.href = "/login";
+  return res;
+};
+
+document.getElementById("logout").addEventListener("click", async () => {
+  await fetch("/api/logout", { method: "POST" });
+  location.href = "/login";
+});
+
 const log = document.getElementById("log");
 const form = document.getElementById("form");
 const input = document.getElementById("text");
