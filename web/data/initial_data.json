@@ -26,6 +26,15 @@
       "pin": "19be325430d23989$2b4b4392067143caa2b8cda20ff69ca0d962e598ca65b0dbba278cb8b8b54b0e",
       "login_id": "jiho",
       "password": "223a88729dd4bd2b$696e97f36c441fc9c4ac57c07f6de5890ad828c6a4c9970952c8024bddbd0dc6"
+    },
+    {
+      "owner_id": "user-005",
+      "name": "테스트",
+      "phone": "010-0000-0000",
+      "ssn_tail": "e15f961c5fcdf376$96549cea1aea4c604bd90db5b0de2d2e282e3b6897a2125c0442fbd7ae7a5aee",
+      "pin": "445f4bf6bba76362$0f570e14cca6148cdc8662c33f1e9418a6de85e33d00bb813f54dd9140d2234a",
+      "login_id": "test",
+      "password": "361402f566078fda$4a36682a2391a6a0c9472ba307de47214cf50ef9e6ef1077f984a9c47feb2d37"
     }
   ],
   "accounts": [
