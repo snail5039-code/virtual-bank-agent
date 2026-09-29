@@ -17,3 +17,6 @@ logs/
 
 # 작업본 (실행할 때마다 바뀜. 없으면 data_store.ensure() 가 initial_data.json 에서 복사)
 data/data.json
+
+# Claude Code 로컬 스킬 (외부에서 받은 디자인 규칙)
+.claude/
