@@ -23,6 +23,9 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from datetime import datetime
+
+import actions          # web/actions.py : 메뉴 화면 버튼 업무
 import data_store
 import functions
 import logger
@@ -58,6 +61,19 @@ class RecoveryIn(BaseModel):
     again: bool     # True : 처음부터 다시 진행 / False : 지우기
 
 
+class ActionIn(BaseModel):
+    kind: str                   # actions.ACTIONS 의 이름 (예: card_lock)
+    target: str                 # 대상 ID (카드 ID 등)
+    approve: bool = True        # False 면 거절
+    secret: str | None = None   # 본인 확인 답 (아직 본인 확인 전일 때만)
+
+
+# 버튼 업무의 본인 확인 : 에이전트처럼 한 번 맞히면 서버를 끌 때까지 다시 묻지 않고, 3번 틀리면 처음부터 다시입니다.
+# 에이전트에서 이미 본인 확인을 했으면 그것도 인정합니다. (반대로 여기서 한 확인을 그래프 State 에 넣지는 않습니다)
+AUTH_TRIES = 3
+button_auth = {"ok": False, "tries": 0}
+
+
 @app.get("/")
 def index():
     return FileResponse(WEB_DIR / "static" / "index.html")
@@ -69,8 +85,7 @@ def summary():
     # 읽기만 하고, 금액은 파일에 있는 값을 그대로 씁니다.
     with bank.work_lock:
         data = data_store.load()
-        # 업무 중간(멈춘 동안)에는 본인 확인 결과가 안쪽 그래프 State 에만 있어서 안쪽까지 봅니다.
-        authenticated = any(values.get("authenticated") for values in state_values())
+        authenticated = is_authenticated()
     me = functions.CURRENT_USER
     mine = lambda items: [item for item in items if item["owner_id"] == me]
 
@@ -118,7 +133,7 @@ def view(name: str):
                  "type": TX_TYPE.get(t["type"], t["type"]), "amount": t["amount"], "merchant": t.get("merchant"),
                  "card": card_names.get(t.get("card_id"))} for t in rows]
     if name == "cards":
-        return [{"name": c["name"], "type": CARD_TYPE.get(c.get("card_type"), c.get("card_type")),
+        return [{"id": c["card_id"], "name": c["name"], "type": CARD_TYPE.get(c.get("card_type"), c.get("card_type")),
                  "bank": c.get("bank_name"), "account": nick.get(c.get("account_id")),
                  "status": c["status"], "label": functions.CARD_STATUS[c["status"]]} for c in mine("cards")]
     if name == "bills":
@@ -135,6 +150,87 @@ def view(name: str):
         return [{"id": r["request_id"], "at": r["created_at"], "task": r["task_type"], "status": r["status"],
                  "content": r["content"]} for r in mine("requests")[::-1]]
     raise HTTPException(status_code=404, detail="없는 화면입니다")
+
+
+def is_authenticated():
+    # 버튼에서 본인 확인을 했거나, 에이전트에서 했으면 True 입니다.
+    # 업무 중간(멈춘 동안)에는 에이전트의 본인 확인 결과가 안쪽 그래프 State 에만 있어서 안쪽까지 봅니다.
+    return button_auth["ok"] or any(values.get("authenticated") for values in state_values())
+
+
+# ---------------------------------------------------------------- 메뉴 화면 버튼 업무
+def action_reply(answer=None, error=None, **extra):
+    return {"answer": answer, "error": error, **extra}
+
+
+@app.post("/api/action/preview")
+def action_preview(body: ActionIn):
+    # 버튼을 누르면 먼저 검사하고 처리안을 돌려줍니다. 화면은 이걸 확인 창으로 보여줍니다.
+    action = actions.ACTIONS.get(body.kind)
+    if not action:
+        raise HTTPException(status_code=404, detail="없는 업무입니다")
+    with bank.work_lock:
+        # 에이전트가 질문·승인을 기다리는 중이면 막습니다. 같은 데이터를 두 곳에서 동시에 바꾸지 않게 합니다.
+        if common_pending_check(bank_graph, bank.config):
+            return action_reply(error="에이전트에서 진행 중인 업무가 있어요. 그 업무를 먼저 끝내거나 취소해 주세요.")
+        error, proposal = action["preview"](data_store.load(), body.target)
+        need_auth = not is_authenticated()
+    if error:
+        return action_reply(error=error)
+    return action_reply(proposal=proposal, need_auth=need_auth)
+
+
+@app.post("/api/action/run")
+def action_run(body: ActionIn):
+    # 확인 창에서 승인(또는 거절)하면 옵니다. 에이전트와 같은 순서입니다.
+    #   본인 확인 → 실행 직전 다시 검사 → 실행 → 처리 기록 → 저장(3번까지) → 안내
+    #   거절 : 바꾸지 않고 처리 기록만 "거절" 로 남깁니다.
+    action = actions.ACTIONS.get(body.kind)
+    if not action:
+        raise HTTPException(status_code=404, detail="없는 업무입니다")
+
+    with bank.work_lock:
+        if common_pending_check(bank_graph, bank.config):
+            return action_reply(error="에이전트에서 진행 중인 업무가 있어요. 그 업무를 먼저 끝내거나 취소해 주세요.")
+        data = data_store.load()
+        error, proposal = action["preview"](data, body.target)      # 실행 직전 다시 검사
+        if error:
+            return action_reply(error=error)
+        task = proposal["task"]
+        log.turn_start("[버튼] %s %s" % (task, "승인" if body.approve else "거절"), bank.thread_id)
+
+        if not body.approve:
+            answer = "%s 요청을 진행하지 않았습니다. 바뀐 것은 없습니다." % task
+            functions.add_request(data, functions.CURRENT_USER, task, dict(proposal["rows"]), "거절", datetime.now().astimezone())
+            result = "거절"
+        else:
+            if not is_authenticated():
+                if not body.secret or not functions.authenticate(functions.CURRENT_USER, body.secret):
+                    button_auth["tries"] += 1
+                    log.note("본인 확인 실패 %d/%d" % (button_auth["tries"], AUTH_TRIES))
+                    if button_auth["tries"] >= AUTH_TRIES:
+                        button_auth["tries"] = 0
+                        log.turn_end("실패")
+                        return action_reply(error="본인 확인에 %d번 실패했습니다. 처음부터 다시 요청해 주세요." % AUTH_TRIES)
+                    log.turn_end("질문 대기")
+                    return action_reply(auth_error="일치하지 않습니다. (%d/%d)" % (button_auth["tries"], AUTH_TRIES))
+                button_auth.update(ok=True, tries=0)
+                log.note("본인 확인 성공")
+            answer = action["apply"](data, body.target)
+            functions.add_request(data, functions.CURRENT_USER, task, dict(proposal["rows"]), "완료", datetime.now().astimezone())
+            result = "완료"
+
+        for attempt in range(1, 4):     # 저장은 3번까지 (에이전트의 common_save 와 같음)
+            try:
+                data_store.save(data)
+                break
+            except data_store.DataStoreError:
+                log.detail("저장 실패 %d/3" % attempt)
+        else:
+            log.turn_end("실패")
+            return action_reply(error="저장에 실패해 처리하지 못했습니다. 바뀐 것은 없습니다.")
+        log.turn_end(result)
+    return action_reply(answer=answer, result=result)
 
 
 def state_values():

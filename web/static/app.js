@@ -33,17 +33,10 @@ function el(tag, className, text) {
   return node;
 }
 
-function addCard(proposal) {
-  const card = el("div", "card");
-  const head = el("div", "card-head", "처리안 확인");
-  const badge = el("span", "badge", "승인 대기");
-  head.appendChild(badge);
-  card.appendChild(head);
-
-  const body = el("div", "card-body");
-  body.appendChild(el("div", "task", proposal.task));
-
+function drawProposal(body, proposal) {
+  // 처리안 내용을 그립니다. 대화의 처리안 카드와 버튼 업무의 확인 창이 같이 씁니다.
   // 금액 칸은 크게, 주의 칸은 노란 안내로, 나머지는 이름 : 값 줄로 보여줍니다.
+  body.appendChild(el("div", "task", proposal.task));
   const amount = proposal.rows.find(([label]) => AMOUNT_LABELS.includes(label));
   if (amount) {
     const big = el("div", "amount mono", amount[1].replace(/원$/, ""));
@@ -58,6 +51,17 @@ function addCard(proposal) {
     row.appendChild(el("span", /[0-9]/.test(value) ? "mono" : "", value));
     body.appendChild(row);
   }
+}
+
+function addCard(proposal) {
+  const card = el("div", "card");
+  const head = el("div", "card-head", "처리안 확인");
+  const badge = el("span", "badge", "승인 대기");
+  head.appendChild(badge);
+  card.appendChild(head);
+
+  const body = el("div", "card-body");
+  drawProposal(body, proposal);
   if (proposal.retry) {
     body.appendChild(el("div", "warn", "답을 알아듣지 못했어요. 버튼을 누르거나 바꿀 내용을 적어 주세요."));
   }
@@ -281,6 +285,85 @@ function table(headers, rows) {
   return t;
 }
 
+// ---------------------------------------------------------------- 버튼 업무 확인 창
+// 표의 버튼으로 바로 하는 업무입니다 (LLM 없음). 서버가 먼저 검사하고 처리안을 주면 확인 창으로 보여주고,
+// 승인하면 본인 확인(아직이면) → 다시 검사 → 실행 → 처리 기록 → 저장 순서로 서버가 처리합니다.
+const modal = document.getElementById("modal");
+const modalBody = document.getElementById("modal-body");
+
+function closeModal() { modal.hidden = true; modalBody.replaceChildren(); }
+
+async function postJSON(url, payload) {
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  return res.json();
+}
+
+function modalMessage(text, cls) {
+  // 확인 창 안에 결과·사유를 보여주고 닫기 버튼만 남깁니다.
+  modalBody.replaceChildren(el("div", "modal-msg " + (cls || ""), text));
+  const close = el("button", "primary", "닫기");
+  close.onclick = closeModal;
+  const actionsRow = el("div", "actions");
+  actionsRow.appendChild(close);
+  modalBody.appendChild(actionsRow);
+  close.focus();
+}
+
+async function openAction(kind, target) {
+  if (busy) return;
+  modal.hidden = false;
+  modalBody.replaceChildren(el("div", "empty", "확인하는 중..."));
+  const pre = await postJSON("/api/action/preview", { kind, target });
+  if (pre.error) { modalMessage(pre.error, "bad"); return; }
+
+  modalBody.replaceChildren();
+  const head = el("div", "modal-head", "처리안 확인");
+  modalBody.appendChild(head);
+  drawProposal(modalBody, pre.proposal);
+
+  let secretInput = null;
+  const authError = el("div", "auth-error");
+  if (pre.need_auth) {
+    modalBody.appendChild(el("div", "auth-label", "본인 확인 : 계좌 비밀번호, PIN, 휴대전화번호, 주민번호 뒷자리 중 하나"));
+    secretInput = el("input");
+    secretInput.type = "password";
+    secretInput.autocomplete = "off";
+    modalBody.append(secretInput, authError);
+  }
+
+  const actionsRow = el("div", "actions");
+  const ok = el("button", "primary", "승인");
+  const no = el("button", "ghost", "거절");
+  actionsRow.append(ok, no);
+  modalBody.appendChild(actionsRow);
+  (secretInput || ok).focus();
+
+  const run = async (approve) => {
+    ok.disabled = no.disabled = true;
+    const res = await postJSON("/api/action/run", { kind, target, approve, secret: secretInput ? secretInput.value : null });
+    if (res.auth_error) {            // 본인 확인이 틀림 : 창은 그대로 두고 다시 입력받습니다
+      authError.textContent = res.auth_error;
+      secretInput.value = "";
+      secretInput.focus();
+      ok.disabled = no.disabled = false;
+      return;
+    }
+    if (res.error) modalMessage(res.error, "bad");
+    else modalMessage(res.answer, res.result === "완료" ? "ok" : "");
+    await loadSummary();
+    if (currentView !== "agent") renderPage(currentView);
+  };
+  ok.onclick = () => run(true);
+  no.onclick = () => run(false);
+  if (secretInput) secretInput.onkeydown = (e) => { if (e.key === "Enter") run(true); };
+}
+
+function button(label, onClick) {
+  const b = el("button", "act", label);
+  b.onclick = onClick;
+  return b;
+}
+
 function badge(text, cls) { return el("span", "badge " + cls, text); }
 function action(label, request) {
   const b = el("button", "act", label);
@@ -324,8 +407,8 @@ const PAGES = {
       [["카드", ""], ["종류", ""], ["연결 계좌", ""], ["상태", ""], ["", "num"]],
       rows.map((c) => [c.name, c.type + (c.bank ? " / " + c.bank : ""), c.account,
                        badge(c.label, CARD_BADGE[c.status] || "b-plain"),
-                       c.status === "active" ? action("잠그기", c.name + " 잠가줘")
-                       : c.status === "locked" ? action("잠금 풀기", c.name + " 잠금 풀어줘")
+                       c.status === "active" ? button("잠그기", () => openAction("card_lock", c.id))
+                       : c.status === "locked" ? button("잠금 풀기", () => openAction("card_unlock", c.id))
                        : c.status === "lost" ? action("재발급", c.name + " 재발급 신청해줘") : ""])),
   },
   bills: {
