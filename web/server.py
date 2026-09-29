@@ -63,7 +63,8 @@ class RecoveryIn(BaseModel):
 
 class ActionIn(BaseModel):
     kind: str                   # actions.ACTIONS 의 이름 (예: card_lock)
-    target: str                 # 대상 ID (카드 ID 등)
+    target: str = ""            # 대상 ID (카드 ID 등)
+    params: dict = {}           # 화면에서 입력받는 값 (이체의 출금·입금·금액·예약 시각)
     approve: bool = True        # False 면 거절
     secret: str | None = None   # 본인 확인 답 (아직 본인 확인 전일 때만)
 
@@ -125,7 +126,7 @@ def view(name: str):
     card_names = {c["card_id"]: c["name"] for c in data["cards"]}
 
     if name == "accounts":
-        return [{"name": a["nickname"], "bank": a["bank_name"], "number": a["account_number"],
+        return [{"id": a["account_id"], "name": a["nickname"], "bank": a["bank_name"], "number": a["account_number"],
                  "purpose": a.get("purpose"), "balance": a["balance"]} for a in mine("accounts")]
     if name == "transactions":
         rows = sorted(mine("transactions"), key=lambda t: t["occurred_at"], reverse=True)
@@ -146,6 +147,13 @@ def view(name: str):
         return [{"id": s["schedule_id"], "at": s["scheduled_at"], "from": nick.get(s["from_account"]),
                  "to": functions.target_name(data, s["to_account"]), "amount": s["amount"], "status": s["status"]}
                 for s in rows]
+    if name == "transfer_options":
+        # 이체 창의 고르기 목록 : 출금은 내 계좌, 입금은 내 계좌 + 등록 계좌(상대 계좌)
+        accounts = [{"id": a["account_id"], "name": a["nickname"], "balance": a["balance"]} for a in mine("accounts")]
+        targets = [{"id": a["id"], "name": a["name"]} for a in accounts]
+        targets += [{"id": r["registered_id"], "name": "%s (%s %s)" % (r["nickname"], r["bank_name"], r["holder_name"])}
+                    for r in mine("registered_accounts")]
+        return {"accounts": accounts, "targets": targets}
     if name == "requests":
         return [{"id": r["request_id"], "at": r["created_at"], "task": r["task_type"], "status": r["status"],
                  "content": r["content"]} for r in mine("requests")[::-1]]
@@ -173,7 +181,7 @@ def action_preview(body: ActionIn):
         # 에이전트가 질문·승인을 기다리는 중이면 막습니다. 같은 데이터를 두 곳에서 동시에 바꾸지 않게 합니다.
         if common_pending_check(bank_graph, bank.config):
             return action_reply(error="에이전트에서 진행 중인 업무가 있어요. 그 업무를 먼저 끝내거나 취소해 주세요.")
-        error, proposal = action["preview"](data_store.load(), body.target)
+        error, proposal = action["preview"](data_store.load(), body.target, body.params)
         need_auth = not is_authenticated()
     if error:
         return action_reply(error=error)
@@ -193,7 +201,7 @@ def action_run(body: ActionIn):
         if common_pending_check(bank_graph, bank.config):
             return action_reply(error="에이전트에서 진행 중인 업무가 있어요. 그 업무를 먼저 끝내거나 취소해 주세요.")
         data = data_store.load()
-        error, proposal = action["preview"](data, body.target)      # 실행 직전 다시 검사
+        error, proposal = action["preview"](data, body.target, body.params)      # 실행 직전 다시 검사
         if error:
             return action_reply(error=error)
         task = proposal["task"]
@@ -216,7 +224,11 @@ def action_run(body: ActionIn):
                     return action_reply(auth_error="일치하지 않습니다. (%d/%d)" % (button_auth["tries"], AUTH_TRIES))
                 button_auth.update(ok=True, tries=0)
                 log.note("본인 확인 성공")
-            answer = action["apply"](data, body.target)
+            try:
+                answer = action["apply"](data, body.target, body.params)
+            except ValueError as e:     # 실행하다 막힌 경우 (예: 이체 직전 잔액) : 저장하지 않습니다
+                log.turn_end("실패")
+                return action_reply(error=str(e))
             functions.add_request(data, functions.CURRENT_USER, task, dict(proposal["rows"]), "완료", datetime.now().astimezone())
             result = "완료"
 

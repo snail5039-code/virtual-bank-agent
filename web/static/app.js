@@ -240,7 +240,11 @@ function fillInput(text) {
 }
 
 document.querySelectorAll(".quick button").forEach((button) => {
-  button.addEventListener("click", () => fillInput(button.dataset.fill));
+  // data-open="transfer" 는 이체 창을 열고, data-fill 은 에이전트 입력칸에 요청을 채웁니다.
+  button.addEventListener("click", () => {
+    if (button.dataset.open === "transfer") openTransfer();
+    else fillInput(button.dataset.fill);
+  });
 });
 
 // ---------------------------------------------------------------- 메뉴 화면
@@ -309,13 +313,17 @@ function modalMessage(text, cls) {
   close.focus();
 }
 
-async function openAction(kind, target) {
+async function openAction(kind, target, params = {}) {
   if (busy) return;
   modal.hidden = false;
   modalBody.replaceChildren(el("div", "empty", "확인하는 중..."));
-  const pre = await postJSON("/api/action/preview", { kind, target });
+  const pre = await postJSON("/api/action/preview", { kind, target, params });
   if (pre.error) { modalMessage(pre.error, "bad"); return; }
+  showConfirm(kind, target, params, pre);
+}
 
+function showConfirm(kind, target, params, pre) {
+  // 처리안 + (본인 확인 칸) + 승인 / 거절. 승인하면 서버가 다시 검사한 뒤 실행합니다.
   modalBody.replaceChildren();
   const head = el("div", "modal-head", "처리안 확인");
   modalBody.appendChild(head);
@@ -340,7 +348,7 @@ async function openAction(kind, target) {
 
   const run = async (approve) => {
     ok.disabled = no.disabled = true;
-    const res = await postJSON("/api/action/run", { kind, target, approve, secret: secretInput ? secretInput.value : null });
+    const res = await postJSON("/api/action/run", { kind, target, params, approve, secret: secretInput ? secretInput.value : null });
     if (res.auth_error) {            // 본인 확인이 틀림 : 창은 그대로 두고 다시 입력받습니다
       authError.textContent = res.auth_error;
       secretInput.value = "";
@@ -356,6 +364,73 @@ async function openAction(kind, target) {
   ok.onclick = () => run(true);
   no.onclick = () => run(false);
   if (secretInput) secretInput.onkeydown = (e) => { if (e.key === "Enter") run(true); };
+}
+
+// 이체 창 : 출금 · 입금 · 금액 · (예약 시각). 다음을 누르면 서버가 검사하고, 되면 처리안 확인으로 넘어갑니다.
+//   options.from     : 미리 골라 둘 출금 계좌 ID (계좌 화면의 이체 버튼)
+//   options.schedule : 예약 시각 칸을 켠 채로 엽니다 (예약 이체 화면의 버튼)
+async function openTransfer(options = {}) {
+  if (busy) return;
+  modal.hidden = false;
+  modalBody.replaceChildren(el("div", "empty", "불러오는 중..."));
+  const opt = await (await fetch("/api/view/transfer_options")).json();
+
+  const field = (label, control) => {
+    const box = el("label", "field");
+    box.append(el("span", "", label), control);
+    return box;
+  };
+  const fromSel = el("select");
+  for (const a of opt.accounts) fromSel.appendChild(new Option(a.name + "  (잔액 " + won(a.balance) + "원)", a.id));
+  if (options.from) fromSel.value = options.from;
+  const toSel = el("select");
+  toSel.appendChild(new Option("입금 계좌를 고르세요", ""));
+  for (const t of opt.targets) toSel.appendChild(new Option(t.name, t.id));
+  const amount = el("input");
+  amount.inputMode = "numeric";
+  amount.placeholder = "예: 100000";
+
+  const useTime = el("input");
+  useTime.type = "checkbox";
+  useTime.checked = !!options.schedule;
+  const at = el("input");
+  at.type = "datetime-local";
+  // 기본값 : 내일 09:00 (이 컴퓨터 날짜 기준. toISOString 은 UTC 라 새벽에는 날짜가 하루 어긋납니다)
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const pad = (n) => String(n).padStart(2, "0");
+  at.value = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T09:00";
+  const timeRow = field("예약 시각", at);
+  timeRow.hidden = !useTime.checked;
+  const head = el("div", "modal-head", useTime.checked ? "예약 이체" : "이체");
+  useTime.onchange = () => {
+    timeRow.hidden = !useTime.checked;
+    head.textContent = useTime.checked ? "예약 이체" : "이체";
+  };
+  const timeToggle = el("label", "check");
+  timeToggle.append(useTime, el("span", "", "예약 이체로 보내기"));
+
+  const formError = el("div", "auth-error");
+  const next = el("button", "primary", "다음");
+  const cancel = el("button", "ghost", "닫기");
+  cancel.onclick = closeModal;
+  const actionsRow = el("div", "actions");
+  actionsRow.append(next, cancel);
+
+  modalBody.replaceChildren(head,
+    field("출금 계좌", fromSel), field("입금 계좌", toSel), field("금액 (원)", amount),
+    timeToggle, timeRow, formError, actionsRow);
+  (options.from ? toSel : fromSel).focus();
+
+  next.onclick = async () => {
+    const params = { from: fromSel.value, to: toSel.value, amount: amount.value, at: useTime.checked ? at.value : "" };
+    next.disabled = true;
+    const pre = await postJSON("/api/action/preview", { kind: "transfer", target: "", params });
+    next.disabled = false;
+    if (pre.error) { formError.textContent = pre.error; return; }     // 창은 그대로 두고 고치게 합니다
+    showConfirm("transfer", "", params, pre);
+  };
+  amount.onkeydown = (e) => { if (e.key === "Enter") next.click(); };
 }
 
 function button(label, onClick) {
@@ -378,7 +453,7 @@ const PAGES = {
     draw: (rows) => table(
       [["계좌", ""], ["은행 / 계좌번호", ""], ["용도", ""], ["잔액", "num"], ["", "num"]],
       rows.map((a) => [a.name, a.bank + " " + a.number, a.purpose, el("span", "mono", won(a.balance) + "원"),
-                       action("이체", a.name + "에서 ")])),
+                       button("이체", () => openTransfer({ from: a.id }))])),
   },
   transactions: {
     title: "거래 내역",
@@ -420,6 +495,7 @@ const PAGES = {
   },
   schedules: {
     title: "예약 이체",
+    tools: () => [button("예약 이체 하기", () => openTransfer({ schedule: true }))],
     draw: (rows) => table(
       [["예약 시각", ""], ["출금 → 입금", ""], ["금액", "num"], ["상태", ""], ["", "num"]],
       rows.map((s) => [el("span", "mono", stamp(s.at)), s.from + " → " + s.to, el("span", "mono", won(s.amount) + "원"),
