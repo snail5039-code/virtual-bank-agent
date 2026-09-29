@@ -1,14 +1,17 @@
-# 웹에서 에이전트를 쓰게 해 주는 서버입니다. (web 1단계 : 서버 + 채팅)
+# 웹에서 에이전트를 쓰게 해 주는 서버입니다.
 # src/ 의 코드는 바꾸지 않고, main.py 가 하는 일을 그대로 가져다 씁니다.
 #   - 입력 한 번 처리 : main.respond (분기 0 → 재개 / 새 요청)
 #   - 턴이 끝난 뒤   : 진행 중 업무 기록(remember_pending), 최근 대화(remember_turn)
 #   - 파일 잠금      : main.work_lock
+#   - 30초 스케줄러  : main.scheduler_loop (결과는 main.outbox 에 쌓이고, 화면이 /api/alerts 로 가져감)
+#   - 재시작 복구    : 켤 때 남아 있던 진행 중 업무를 화면이 처음 열릴 때 묻습니다 (/api/recovery)
 #
 # 실행 : uv run python web/server.py   → 브라우저에서 http://127.0.0.1:8000
 #
 # 지금은 한 사람이 한 창에서 쓰는 것만 생각합니다. (세션은 main.py 처럼 서버를 켤 때 하나)
 
 import sys
+import threading
 from pathlib import Path
 
 WEB_DIR = Path(__file__).resolve().parent
@@ -30,12 +33,29 @@ from agents.supervisor.graph import bank_graph
 log = logger.setup()
 data_store.ensure()
 
+# 켤 때 할 일은 main.main() 과 같은 순서입니다.
+# 1) 꺼져 있던 동안 시각이 지난 예약 이체·분할 회차를 먼저 실행합니다. 결과는 화면 알림으로 보냅니다.
+for line in bank.run_due(log):
+    bank.outbox.put(line)
+# 2) 지난번에 끝나기 전에 꺼진 업무가 있으면 기억해 두고, 화면이 처음 열릴 때 다시 할지 묻습니다.
+#    이 서버에서 새로 멈춘 업무(remember_pending 이 적는 것)와 헷갈리지 않게 켤 때 한 번만 읽습니다.
+try:
+    interrupted = functions.get_pending()
+except data_store.DataStoreError:
+    interrupted = None
+# 3) 켜 있는 동안 30초마다 예약을 확인하는 스레드를 띄웁니다. (서버가 끝나면 같이 끝남)
+threading.Thread(target=bank.scheduler_loop, args=(log,), daemon=True).start()
+
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
 
 
 class ChatIn(BaseModel):
     text: str
+
+
+class RecoveryIn(BaseModel):
+    again: bool     # True : 처음부터 다시 진행 / False : 지우기
 
 
 @app.get("/")
@@ -99,12 +119,48 @@ def waiting_proposal():
 
 @app.post("/api/chat")
 def chat(body: ChatIn):
+    return run_turn(body.text.strip())
+
+
+@app.get("/api/alerts")
+def alerts():
+    # 스케줄러가 입력 없이 실행한 예약 이체·분할 회차 결과를 꺼내 줍니다. 화면이 몇 초마다 부릅니다. (4단계)
+    lines = []
+    while not bank.outbox.empty():
+        lines.append(bank.outbox.get())
+    return {"alerts": lines}
+
+
+@app.get("/api/recovery")
+def recovery():
+    # 켤 때 남아 있던 진행 중 업무를 알려줍니다. 없으면 None. (main.recover_pending 과 같은 내용)
+    if not interrupted:
+        return {"record": None}
+    return {"record": {**interrupted, "when": functions.when_text(interrupted["created_at"])}}
+
+
+@app.post("/api/recovery")
+def recover(body: RecoveryIn):
+    # 다시 하면 원래 요청 문장으로 처음부터 돌립니다. 잔액·상태를 다시 검사하고 승인도 다시 받습니다.
+    # 이전 승인만으로 자동 실행하지 않습니다.
+    global interrupted
+    record, interrupted = interrupted, None
+    if not record:
+        return {"answer": "다시 진행할 업무가 없습니다.", "pending": None, "proposal": None, "notices": []}
+    with bank.work_lock:     # data.json 을 쓰므로 스케줄러와 겹치지 않게
+        log.note("재시작 복구  '%s' → %s" % (record["request_text"], "다시" if body.again else "지움"))
+        functions.clear_pending()
+    if body.again:
+        return run_turn(record["request_text"])
+    return {"answer": "진행 중이던 업무를 지웠습니다. 바뀐 것은 없습니다.", "pending": None, "proposal": None, "notices": []}
+
+
+def run_turn(user_input):
     # main.handle_turn 과 같은 순서로 입력 한 번을 처리하고, 화면에 보여줄 것을 돌려줍니다.
     #   answer   : 답이나 질문·처리안 (글자)
     #   pending  : 멈춰 있으면 그 종류 (approval / question / secret), 끝났으면 None
     #   proposal : 승인 대기면 처리안 값 (카드로 그림), 아니면 None
     #   notices  : 처리 전에 실행된 예약 이체·분할 회차 결과
-    user_input = body.text.strip()
     proposal = None
     with bank.work_lock:
         secret = common_pending_check(bank_graph, bank.config) == SECRET

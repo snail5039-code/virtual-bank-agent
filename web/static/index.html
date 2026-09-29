@@ -46,8 +46,12 @@
   /* 왼쪽 메뉴 */
   .side { background: var(--canvas); border-right: 1px solid var(--line); padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
   .brand { font-size: 15px; font-weight: 500; padding: 0 10px 16px; }
-  .nav { font-size: 13px; padding: 8px 10px; border-radius: 6px; color: var(--muted); }
+  .nav { font-size: 13px; padding: 8px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; }
+  .nav:hover { background: var(--hover); }
   .nav.on { background: var(--hover); color: var(--text); font-weight: 500; }
+  .quick { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .quick button { font-size: 12px; padding: 7px 11px; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+  .quick button:hover { background: var(--hover); }
   .me-box { margin-top: auto; padding: 10px; font-size: 12px; line-height: 1.6; }
   .me-box b { font-weight: 500; }
 
@@ -114,13 +118,14 @@
 
   <aside class="side">
     <div class="brand">가상은행</div>
-    <div class="nav on">에이전트</div>
-    <div class="nav">계좌</div>
-    <div class="nav">거래 내역</div>
-    <div class="nav">카드</div>
-    <div class="nav">카드값</div>
-    <div class="nav">예약 이체</div>
-    <div class="nav">처리 기록</div>
+    <!-- 메뉴는 조회 요청을 바로 보냅니다 (4단계) -->
+    <div class="nav on" data-ask="">에이전트</div>
+    <div class="nav" data-ask="내 계좌 목록과 잔액 보여줘">계좌</div>
+    <div class="nav" data-ask="이번 달 거래 내역 보여줘">거래 내역</div>
+    <div class="nav" data-ask="내 카드 목록과 상태 보여줘">카드</div>
+    <div class="nav" data-ask="카드값 얼마야?">카드값</div>
+    <div class="nav" data-ask="예약 목록 보여줘">예약 이체</div>
+    <div class="nav" data-ask="오늘 처리한 거 다 보여줘">처리 기록</div>
     <div class="me-box"><b id="user">-</b><br><span class="muted" id="auth">본인 확인 전</span></div>
   </aside>
 
@@ -129,6 +134,13 @@
       <div class="top-label">내 계좌 총 잔액 <span class="badge b-warn">가상 데이터</span></div>
       <div class="total"><span class="mono" id="total">-</span><small>원</small></div>
       <div class="accounts" id="accounts"></div>
+      <!-- 빠른 실행 : 데이터를 바꾸는 요청이라 바로 보내지 않고 입력칸에 채워 줍니다. 고쳐서 보내면 됩니다 (4단계) -->
+      <div class="quick">
+        <button type="button" data-fill="생활비에서 저축으로 10만원 옮겨줘">이체</button>
+        <button type="button" data-fill="여행 카드 잠가줘">카드 잠금</button>
+        <button type="button" data-fill="8월 생활비 신용카드 값 내줘">카드값 내기</button>
+        <button type="button" data-fill="잃어버린 생활비 카드를 집으로 재발급받고 싶어">재발급</button>
+      </div>
     </div>
     <div id="log">
       <div class="msg bot">무엇을 도와드릴까요? 예: 내 계좌 목록과 잔액 보여줘</div>

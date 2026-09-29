@@ -158,19 +158,25 @@ function showAlerts(lines) {
 // ---------------------------------------------------------------- 보내기
 async function submit(text, cardLabel) {
   if (busy) return;
-  busy = true;
   add(input.type === "password" ? "****" : text, "me");
   closeCard(cardLabel || "수정 요청");
+  await call("/api/chat", { text });
+}
+
+async function call(url, payload) {
+  // 서버에 보내고, 돌아온 답(answer / pending / proposal / notices)을 화면에 붙입니다.
+  // 채팅과 재시작 복구가 같이 씁니다.
+  busy = true;
   input.value = "";
   input.placeholder = PLACEHOLDER;
   send.disabled = true;
   const waiting = add("에이전트가 작업 중입니다...", "notice");
 
   try {
-    const res = await fetch("/api/chat", {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     waiting.remove();
@@ -179,6 +185,7 @@ async function submit(text, cardLabel) {
     if (data.proposal) addCard(data.proposal);
     else add(data.answer, "bot");
     input.type = data.pending === "secret" ? "password" : "text";
+    lastPending = data.pending;
     showSteps(data.pending);
     await loadSummary();
   } catch (e) {
@@ -196,4 +203,76 @@ form.addEventListener("submit", (event) => {
   if (text) submit(text);
 });
 
+// ---------------------------------------------------------------- 메뉴 · 빠른 실행 (4단계)
+let lastPending = null;     // 지금 멈춰 있는 종류. 멈춘 동안에는 메뉴가 요청을 바로 보내지 않습니다.
+
+function fillInput(text) {
+  input.value = text;
+  input.focus();
+}
+
+document.querySelectorAll(".nav").forEach((nav) => {
+  nav.addEventListener("click", () => {
+    document.querySelectorAll(".nav").forEach((n) => n.classList.remove("on"));
+    nav.classList.add("on");
+    const text = nav.dataset.ask;
+    if (!text) { input.focus(); return; }
+    // 질문·승인을 기다리는 중에 새 요청을 바로 보내면 지금 업무가 "다른 요청" 으로 멈춥니다.
+    // 그래서 그때는 입력칸에만 채우고, 사용자가 직접 보내게 합니다.
+    if (lastPending || busy) fillInput(text);
+    else submit(text);
+  });
+});
+
+document.querySelectorAll(".quick button").forEach((button) => {
+  button.addEventListener("click", () => fillInput(button.dataset.fill));
+});
+
+// ---------------------------------------------------------------- 스케줄러 알림 (4단계)
+// 서버의 30초 스케줄러가 입력 없이 실행한 결과를 10초마다 가져옵니다. 있으면 대화·알림에 붙이고 패널을 다시 읽습니다.
+setInterval(async () => {
+  try {
+    const { alerts } = await (await fetch("/api/alerts")).json();
+    if (!alerts.length) return;
+    for (const text of alerts) add(text, "notice");
+    showAlerts(alerts);
+    await loadSummary();
+  } catch (e) { /* 서버가 꺼져 있으면 다음에 다시 봅니다 */ }
+}, 10000);
+
+// ---------------------------------------------------------------- 재시작 복구 (4단계)
+// 서버를 켤 때 끝나지 않은 업무가 남아 있었으면 먼저 묻습니다. 다시 하면 처음부터 (승인도 다시).
+async function checkRecovery() {
+  const { record } = await (await fetch("/api/recovery")).json();
+  if (!record) return;
+
+  const card = el("div", "card");
+  const head = el("div", "card-head", "진행 중이던 업무");
+  const badge = el("span", "badge b-warn", record.kind);
+  head.appendChild(badge);
+  const body = el("div", "card-body");
+  body.appendChild(el("div", "task", record.when + " 요청이 끝나기 전에 종료되었어요."));
+  body.appendChild(el("div", "amount", record.request_text));
+  body.appendChild(el("div", "warn", "처음부터 다시 진행하면 잔액과 카드 상태를 다시 확인하고, 승인도 다시 받아요."));
+  const actions = el("div", "actions");
+  const again = el("button", "primary", "처음부터 다시");
+  const drop = el("button", "ghost", "지우기");
+  actions.append(again, drop);
+  body.appendChild(actions);
+  card.append(head, body);
+  log.appendChild(card);
+
+  const choose = (yes) => {
+    if (busy) return;
+    [again, drop].forEach((b) => (b.disabled = true));
+    badge.textContent = yes ? "다시 진행" : "지움";
+    badge.className = "badge b-plain";
+    add(yes ? "처음부터 다시" : "지우기", "me");
+    call("/api/recovery", { again: yes });
+  };
+  again.onclick = () => choose(true);
+  drop.onclick = () => choose(false);
+}
+
 loadSummary();
+checkRecovery();
