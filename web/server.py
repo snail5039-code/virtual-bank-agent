@@ -14,7 +14,10 @@
 #     doyoon  / doyoon1234   → user-001 김도윤
 #     seoyeon / seoyeon1234  → user-002 김서연
 #     jiho    / jiho1234     → user-003 박지호
-#     test    / test         → user-005 테스트 (계좌·카드 없음. 본인 확인 PIN 1234, 주민번호 뒷자리 1234567)
+#     test    / test         → user-005 테스트 (본인 확인 PIN 1234, 주민번호 뒷자리 1234567)
+#       한 번에 시험해 보도록 넣어 둔 것 : 계좌 3개(생활비 · 저축 · 여행 자금[정지]), 등록 계좌 2개(친구 민지 · 도윤 생활비),
+#       카드 4장(생활비 체크 · 테스트 신용 · 여행 신용[잠금] · 분실 체크[분실 정지]), 낼 카드값 2건(미납 452,000 · 일부 납부 200,000),
+#       예약 이체 1건(10-05 친구 민지 50,000), 배송지(집 · 회사). 계좌 비밀번호 1111 / 2222 / 3333, 카드 비밀번호 0000
 #   회원가입 : /signup 화면. 이름·휴대전화번호·아이디·비밀번호·PIN(본인 확인용 4자리)·주민번호 뒷자리(7자리)를 받아 users 에 새 사람을 넣고 바로 로그인합니다.
 #   화면(요약·메뉴)과 버튼 업무는 로그인한 사람 것만 보여주고 바꿉니다. (3단계)
 #   에이전트도 사람마다 세션(thread_id)·최근 대화가 따로입니다. 요청마다 로그인한 사람을 State 의 owner_id 로 넣습니다. (4단계)
@@ -304,7 +307,8 @@ def view(name: str, request: Request):
     if name == "cards":
         return [{"id": c["card_id"], "name": c["name"], "type": CARD_TYPE.get(c.get("card_type"), c.get("card_type")),
                  "bank": c.get("bank_name"), "account": nick.get(c.get("account_id")),
-                 "status": c["status"], "label": functions.CARD_STATUS[c["status"]]} for c in mine("cards")]
+                 "status": c["status"], "label": functions.CARD_STATUS[c["status"]]}
+                for c in mine("cards") if not c.get("hidden")]     # 목록에서 지운 해지 카드는 뺍니다
     if name == "bills":
         rows = sorted(mine("card_statements"), key=lambda s: s["billing_month"], reverse=True)
         return [{"id": s["statement_id"], "card": card_names.get(s["card_id"], s["card_id"]), "month": s["billing_month"],
@@ -452,6 +456,24 @@ def waiting_proposal(me):
 @app.post("/api/chat")
 def chat(body: ChatIn, request: Request):
     return run_turn(login_user(request), body.text.strip())
+
+
+@app.post("/api/new_chat")
+def new_chat(request: Request):
+    # "새 대화" : 로그인한 사람의 에이전트 세션을 새로 만듭니다.
+    # 멈춰 있던 질문·승인, 에이전트 본인 확인, 최근 대화가 비워집니다. 진행 중 업무 기록(재시작 복구)도 지웁니다.
+    # 데이터(잔액·카드 등)는 바뀌지 않습니다. 버튼 업무의 본인 확인은 그대로 둡니다.
+    me = login_user(request)
+    with bank.work_lock:
+        old = bank.session(me)["thread_id"]
+        new = bank.new_session(me)["thread_id"]
+        interrupted.pop(me, None)
+        try:
+            functions.clear_pending(me)
+        except data_store.DataStoreError:
+            pass
+        log.note("새 대화  %s  %s → %s" % (me, old, new))
+    return {"ok": True}
 
 
 @app.get("/api/waiting")

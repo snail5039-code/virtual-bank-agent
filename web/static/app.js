@@ -232,6 +232,24 @@ function showReply(data) {
   showSteps(data.pending);
 }
 
+// 새 대화 : 서버의 내 에이전트 세션을 새로 만들고 화면 대화를 비웁니다.
+// 진행 중인 질문·승인이 있으면 그 업무는 취소되므로 먼저 묻습니다. (데이터는 바뀌지 않음)
+document.getElementById("new-chat").addEventListener("click", async () => {
+  if (busy) return;
+  if (lastPending && !confirm("진행 중인 업무가 있어요. 새 대화를 시작하면 그 업무는 취소됩니다. 계속할까요?")) return;
+  await fetch("/api/new_chat", { method: "POST" });
+  log.replaceChildren();
+  add("새 대화를 시작했어요. 무엇을 도와드릴까요? 예: 내 계좌 목록과 잔액 보여줘", "bot");
+  openCard = null;
+  input.value = "";
+  input.type = "text";
+  input.placeholder = PLACEHOLDER;
+  lastPending = null;
+  showSteps(null);
+  await loadSummary();
+  input.focus();
+});
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   const text = input.value.trim();
@@ -604,8 +622,12 @@ async function closeAccount(a) {
 
 function cardButtons(c) {
   // 카드 상태에 따라 할 수 있는 버튼 : 사용 가능 → 잠그기, 잠금 → 잠금 풀기, 분실 정지 → 재발급. 해지 전이면 해지도.
-  if (c.status === "cancelled") return "";
+  // 해지한 카드는 목록에서 지우기만 있습니다.
   const box = el("span", "btns");
+  if (c.status === "cancelled") {
+    box.appendChild(button("지우기", () => openAction("card_hide", c.id)));
+    return box;
+  }
   if (c.status === "active") box.appendChild(button("잠그기", () => openAction("card_lock", c.id)));
   if (c.status === "locked") box.appendChild(button("잠금 풀기", () => openAction("card_unlock", c.id)));
   if (c.status === "lost") box.appendChild(button("재발급", () => openReissue(c)));

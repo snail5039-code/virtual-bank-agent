@@ -13,8 +13,28 @@ CARD_TYPES = {"debit": "체크", "credit": "신용"}
 
 
 def get_cards(owner_id):
+    # 목록에서 지운(hidden) 해지 카드는 뺍니다. 지난 이용 내역·청구서에 남은 카드 이름은 data 에서 그대로 찾습니다.
     data = data_store.load()
-    return [card for card in data["cards"] if card["owner_id"] == owner_id]
+    return [card for card in data["cards"] if card["owner_id"] == owner_id and not card.get("hidden")]
+
+
+# ---------------------------------------------------------------- 해지한 카드 목록에서 지우기
+# 해지한 카드를 카드 목록에서 안 보이게 합니다. 기록을 없애지 않고 hidden 표시만 합니다.
+# (지난 이용 내역·청구서가 이 카드 이름을 쓰므로 지우면 그쪽이 깨집니다)
+def check_card_hide(data, owner_id, card_id):
+    card = next((c for c in data["cards"] if c["card_id"] == card_id and c["owner_id"] == owner_id and not c.get("hidden")), None)
+    if not card:
+        return "카드를 찾지 못했습니다."
+    if card["status"] != "cancelled":
+        return "해지한 카드만 목록에서 지울 수 있습니다. (%s)" % card["name"]
+    if any(s["card_id"] == card_id and s["remaining_amount"] > 0 for s in data["card_statements"]):
+        return "아직 낼 카드값이 남아 있어요. 카드값을 다 낸 뒤 지워 주세요."
+    return None
+
+
+def hide_card(data, card_id):
+    card = next(c for c in data["cards"] if c["card_id"] == card_id)
+    card["hidden"] = True
 
 
 def get_card(owner_id, card_id):
@@ -120,6 +140,8 @@ def check_card_register(owner_id, info):
         return "별칭은 1~%d자로 정해 주세요." % MAX_SETTING_LEN
     # 카드 번호는 사용자와 상관없이 겹치면 안 됩니다. 별칭은 내 카드끼리만 겹치지 않으면 됩니다.
     for card in data_store.load()["cards"]:
+        if card.get("hidden"):          # 목록에서 지운 해지 카드는 번호·별칭을 다시 써도 됩니다
+            continue
         if card["card_number"] == info["card_number"]:
             return "이미 등록된 카드 번호입니다."
         if card["owner_id"] == owner_id and card["name"] == info["name"]:

@@ -54,6 +54,8 @@
   .quick button:hover { background: var(--hover); }
   .me-box { margin-top: auto; padding: 10px; font-size: 12px; line-height: 1.6; }
   .me-box b { font-weight: 500; }
+  #new-chat { background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+  #new-chat:hover { background: var(--hover); color: var(--text); }
   .me-box a { color: var(--muted); text-decoration: underline; cursor: pointer; }
 
   /* 가운데 */
@@ -196,6 +198,7 @@
         <div class="msg bot">무엇을 도와드릴까요? 예: 내 계좌 목록과 잔액 보여줘</div>
       </div>
       <form id="form">
+        <button type="button" id="new-chat" title="대화를 비우고 새로 시작합니다">새 대화</button>
         <input id="text" autocomplete="off" placeholder="요청을 입력하세요">
         <button id="send">보내기</button>
       </form>

@@ -28,7 +28,7 @@ from state import new_request
 #   thread_id : 그 사람의 그래프 State 가 저장되는 칸. 멈춘 질문·처리안, 본인 확인이 사람마다 따로 남습니다.
 #   history   : 그 사람의 최근 대화
 # 처음 요청할 때 만들고, 서버를 끌 때까지 씁니다. 터미널(main)은 functions.CURRENT_USER 한 사람만 씁니다.
-STARTED = datetime.now().strftime("%Y%m%d-%H%M%S")
+# 웹의 "새 대화" 는 new_session 으로 그 사람 세션을 새로 만듭니다 (새 thread_id 라 멈춘 업무·본인 확인·최근 대화가 비워짐).
 sessions = {}
 console = Console()
 
@@ -41,9 +41,16 @@ HISTORY_ANSWER_LINES = 4
 def session(owner_id):
     # 그 사람의 세션을 돌려줍니다. 없으면 만듭니다.  {"thread_id", "config", "history"}
     if owner_id not in sessions:
-        thread_id = "%s-session-%s" % (owner_id, STARTED)
+        # 만들 때 시각(밀리초까지)을 붙여, 새 대화로 다시 만들어도 이전 thread_id 와 겹치지 않게 합니다.
+        thread_id = "%s-session-%s" % (owner_id, datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:-3])
         sessions[owner_id] = {"thread_id": thread_id, "config": {"configurable": {"thread_id": thread_id}}, "history": []}
     return sessions[owner_id]
+
+
+def new_session(owner_id):
+    # 그 사람 세션을 버리고 새로 만듭니다. 이전 thread 에 멈춰 있던 업무는 이어지지 않습니다 (데이터는 바뀌지 않음).
+    sessions.pop(owner_id, None)
+    return session(owner_id)
 
 
 def config_of(owner_id):

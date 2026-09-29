@@ -56,6 +56,24 @@ def card_status_action(action):
     return {"preview": preview, "apply": apply}
 
 
+# ---------------------------------------------------------------- 해지한 카드 목록에서 지우기
+# 해지한 카드만, 낼 카드값이 없을 때만 됩니다. 기록은 남기고 목록에서만 뺍니다. (functions.check_card_hide)
+def card_hide_preview(data, me, card_id, params):
+    error = functions.check_card_hide(data, me, card_id)
+    if error:
+        return error, None
+    card = my_card(data, me, card_id)
+    rows = [card_row(card), ["지금 상태", functions.CARD_STATUS[card["status"]]],
+            ["안내", "카드 목록에서 지웁니다. 지난 이용 내역·청구서는 그대로 남습니다"]]
+    return None, {"task": "해지 카드 지우기", "rows": rows}
+
+
+def card_hide_apply(data, me, card_id, params):
+    card = my_card(data, me, card_id)
+    functions.hide_card(data, card_id)
+    return "카드 목록에서 지웠습니다. (%s)" % card["name"]
+
+
 # ---------------------------------------------------------------- 카드값 전체 결제
 # 남은 금액 전부를 그 카드의 결제 계좌에서 냅니다. (에이전트에서 방식·계좌를 말하지 않았을 때와 같음)
 # 부분·분할·일괄은 금액·개월 수·대상을 골라야 해서 에이전트로 합니다.
@@ -469,6 +487,7 @@ ACTIONS = {
     "account_open": {"preview": account_open_preview, "apply": account_open_apply},
     "registered_delete": {"preview": registered_delete_preview, "apply": registered_delete_apply},
     "card_cancel": card_status_action("해지"),
+    "card_hide": {"preview": card_hide_preview, "apply": card_hide_apply},
     "account_register": {"preview": account_register_preview, "apply": account_register_apply},
     "card_register": {"preview": card_register_preview, "apply": card_register_apply},
     "reissue": {"preview": reissue_preview, "apply": reissue_apply},
