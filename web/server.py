@@ -14,7 +14,7 @@
 #     doyoon  / doyoon1234   → user-001 김도윤
 #     seoyeon / seoyeon1234  → user-002 김서연
 #     jiho    / jiho1234     → user-003 박지호
-#   회원가입 : /signup 화면. 이름·휴대전화번호·아이디·비밀번호·PIN(본인 확인용 4자리)을 받아 users 에 새 사람을 넣고 바로 로그인합니다.
+#   회원가입 : /signup 화면. 이름·휴대전화번호·아이디·비밀번호·PIN(본인 확인용 4자리)·주민번호 뒷자리(7자리)를 받아 users 에 새 사람을 넣고 바로 로그인합니다.
 #   화면(요약·메뉴)과 버튼 업무는 로그인한 사람 것만 보여주고 바꿉니다. (3단계)
 #   에이전트도 사람마다 세션(thread_id)·최근 대화가 따로입니다. 요청마다 로그인한 사람을 State 의 owner_id 로 넣습니다. (4단계)
 #   재시작 복구·스케줄러 알림도 사람별입니다. 복구 기록은 data.json 의 pending 에 사람마다, 알림은 그 예약의 주인에게만. (5단계)
@@ -131,6 +131,7 @@ class SignupIn(BaseModel):
     login_id: str
     password: str
     pin: str
+    ssn_tail: str
 
 
 def check_signup(data, info):
@@ -147,6 +148,8 @@ def check_signup(data, info):
         return "비밀번호는 8자 이상으로 정해 주세요."
     if not re.fullmatch(r"\d{4}", info["pin"]):
         return "PIN 은 숫자 4자리로 정해 주세요."
+    if not re.fullmatch(r"\d{7}", info["ssn_tail"]):
+        return "주민등록번호 뒷자리는 숫자 7자리로 적어 주세요."
     return None
 
 
@@ -159,8 +162,8 @@ def signup_page(request: Request):
 
 @app.post("/api/signup")
 def signup(body: SignupIn):
-    # 새 사람을 users 에 넣습니다. 비밀번호·PIN 은 해시로만 둡니다. 계좌·카드는 없이 시작합니다.
-    # 주민번호 뒷자리는 받지 않아서 비워 둡니다 (본인 확인은 PIN·휴대전화번호·계좌 비밀번호로 함).
+    # 새 사람을 users 에 넣습니다. 비밀번호·PIN·주민번호 뒷자리는 해시로만 둡니다. 계좌·카드는 없이 시작합니다.
+    # 본인 확인은 기존 사람과 같이 PIN·휴대전화번호·주민번호 뒷자리·계좌 비밀번호 중 하나로 합니다.
     info = {key: value.strip() for key, value in body.model_dump().items()}
     with bank.work_lock:
         data = data_store.load()
@@ -171,7 +174,7 @@ def signup(body: SignupIn):
             "owner_id": functions.next_id(data["users"], "owner_id", "user"),
             "name": info["name"],
             "phone": info["phone"],
-            "ssn_tail": None,
+            "ssn_tail": functions.hash_secret(info["ssn_tail"]),
             "pin": functions.hash_secret(info["pin"]),
             "login_id": info["login_id"],
             "password": functions.hash_secret(info["password"]),
