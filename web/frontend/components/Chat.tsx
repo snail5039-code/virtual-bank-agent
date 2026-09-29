@@ -32,9 +32,10 @@ type Props = {
   onChanged: () => void;                     // 데이터가 바뀌었을 수 있음 → 잔액·패널을 다시 읽기
   onPending: (p: Pending | null) => void;    // 오른쪽 진행 상황
   onAlerts: (lines: string[]) => void;       // 오른쪽 알림
+  onBusy: (busy: boolean) => void;           // 답하는 중에는 버튼 업무 창도 열지 않게
 };
 
-export default function Chat({ userName, onChanged, onPending, onAlerts }: Props) {
+export default function Chat({ userName, onChanged, onPending, onAlerts, onBusy }: Props) {
   const [items, setItems] = useState<Item[]>([{ id: 0, kind: "bot", text: WELCOME, domain: null }]);
   const [text, setText] = useState("");
   const [placeholder, setPlaceholder] = useState(PLACEHOLDER);
@@ -73,6 +74,7 @@ export default function Chat({ userName, onChanged, onPending, onAlerts }: Props
     // 서버에 보내고, 돌아온 답을 화면에 붙입니다. 채팅과 재시작 복구가 같이 씁니다.
     busyRef.current = true;
     setBusy(true);
+    onBusy(true);
     setText("");
     setPlaceholder(PLACEHOLDER);
     const waiting = add({ kind: "notice", text: "에이전트가 작업 중입니다..." });
@@ -90,6 +92,7 @@ export default function Chat({ userName, onChanged, onPending, onAlerts }: Props
     }
     busyRef.current = false;
     setBusy(false);
+    onBusy(false);
     if (busyNoteRef.current !== null) {
       remove(busyNoteRef.current);
       busyNoteRef.current = null;

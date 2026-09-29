@@ -164,3 +164,42 @@ button.waiting { opacity: .5; cursor: default; }
 .steps .now { font-weight: 500; }
 .steps .todo { color: var(--muted); }
 .alert { font-size: 12px; line-height: 1.5; background: var(--info-bg); color: var(--info-text); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
+
+/* 빠른 실행 */
+.quick { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.quick button { font-size: 12px; padding: 7px 11px; }
+
+/* 메뉴 화면 */
+.page-tools { margin-left: auto; display: flex; gap: 6px; }
+.page-tools select { font-size: 12px; padding: 6px 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-weight: 400; font-size: 12px; color: var(--muted); padding: 0 10px 8px; border-bottom: 1px solid var(--line); }
+td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+.num { text-align: right; }
+.act { font-size: 12px; padding: 5px 10px; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+.act:hover { background: var(--hover); }
+.btns { display: inline-flex; gap: 6px; }
+.sub-title { font-size: 13px; font-weight: 500; margin: 28px 0 10px; }
+.content { font-size: 12px; color: var(--muted); line-height: 1.6; white-space: pre-wrap; }
+.sub { font-size: 12px; color: var(--muted); }
+
+/* 버튼 업무 확인 창 */
+.modal-back { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); display: flex; align-items: center; justify-content: center; z-index: 10; }
+.modal-box { width: 420px; max-width: calc(100vw - 32px); background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.modal-head { font-size: 14px; font-weight: 500; margin-bottom: 10px; }
+.modal-box > input { width: 100%; margin-top: 6px; }
+.auth-label { font-size: 12px; color: var(--muted); margin-top: 14px; }
+.auth-error { font-size: 12px; color: var(--bad-text); margin-top: 6px; min-height: 16px; }
+.field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); margin-top: 10px; }
+.field select, .field input { width: 100%; }
+.check { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 12px; cursor: pointer; }
+.check input { width: auto; margin: 0; }
+.choices { display: grid; gap: 2px; margin-top: 4px; }
+.pick-list { display: grid; gap: 6px; margin-top: 4px; }
+.pick { display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 10px 12px; text-align: left;
+        background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+.pick:hover { background: var(--hover); }
+.modal-msg { font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.modal-msg.ok { color: var(--ok-text); }
+.modal-msg.bad { color: var(--bad-text); }

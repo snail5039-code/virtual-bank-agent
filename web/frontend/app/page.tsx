@@ -1,23 +1,32 @@
 "use client";
 
-// 첫 화면 : 왼쪽 메뉴 | 가운데 (총 잔액 + 계좌 + 대화) | 오른쪽 패널
-// 메뉴 화면(계좌, 거래 내역 …)과 버튼 업무는 Next 전환 3단계에서 옮깁니다. 지금은 에이전트(대화)만 있습니다.
+// 첫 화면 : 왼쪽 메뉴 | 가운데 (총 잔액 + 계좌 + 빠른 실행 + 대화 또는 메뉴 화면) | 오른쪽 패널
 // 대화는 메뉴를 바꿔도 지워지지 않게 늘 그려 두고 숨기기만 합니다.
+// 데이터가 바뀌었을 수 있으면(대화 답, 버튼 업무, 스케줄러 알림) 요약을 다시 읽고 version 을 올려 메뉴 화면도 다시 읽게 합니다.
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import Chat from "@/components/Chat";
+import MenuPage from "@/components/MenuPage";
+import type { PageName } from "@/components/MenuPage";
 import SidePanel from "@/components/SidePanel";
 import ThemeToggle from "@/components/ThemeToggle";
+import { useActions } from "@/components/useActions";
+import type { QuickKind } from "@/components/useActions";
 import { getJSON, postJSON } from "@/lib/api";
 import type { Pending, Summary } from "@/lib/types";
 import { won } from "@/lib/types";
 
-const MENUS = [
+const MENUS: [View, string][] = [
   ["agent", "에이전트"], ["accounts", "계좌"], ["transactions", "거래 내역"], ["cards", "카드"],
   ["bills", "카드값"], ["schedules", "예약 이체"], ["requests", "처리 기록"],
-] as const;
-type View = (typeof MENUS)[number][0];
+];
+type View = "agent" | PageName;
+
+// 빠른 실행 : 바꾸는 업무라 버튼 업무 창을 엽니다. (이체 창, 또는 대상을 고르는 창)
+const QUICK: [QuickKind, string][] = [
+  ["transfer", "이체"], ["lock", "카드 잠금"], ["bill", "카드값 내기"], ["reissue", "재발급"], ["deposit", "가상 입금"],
+];
 
 export default function Home() {
   const router = useRouter();
@@ -25,10 +34,18 @@ export default function Home() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [alerts, setAlerts] = useState<string[]>([]);
   const [view, setView] = useState<View>("agent");
+  const [version, setVersion] = useState(0);
+  const [busy, setBusy] = useState(false);
 
   // 로그인 전이면 getJSON 이 로그인 화면으로 보냅니다.
   const loadSummary = useCallback(() => { getJSON<Summary>("/api/summary").then(setSummary); }, []);
   useEffect(loadSummary, [loadSummary]);
+  const changed = useCallback(() => {
+    loadSummary();
+    setVersion((v) => v + 1);
+  }, [loadSummary]);
+
+  const actions = useActions(busy, changed);
 
   // 예약 이체·분할 회차가 실행된 결과를 알림에 쌓습니다. (최근 것이 위, 5개까지)
   const addAlerts = useCallback((lines: string[]) => {
@@ -65,20 +82,21 @@ export default function Home() {
                 <div key={i} className="acc"><div>{a.name}</div><div className="mono">{won(a.balance)}</div></div>
               )) : <div className="empty">계좌가 없어요</div>)}
             </div>
+            <div className="quick">
+              {QUICK.map(([kind, label]) => (
+                <button key={kind} type="button" className="ghost" onClick={() => actions.quickAction(kind)}>{label}</button>
+              ))}
+            </div>
           </div>
           <div className="view-wrap" hidden={view !== "agent"}>
-            <Chat userName={summary?.user ?? ""} onChanged={loadSummary} onPending={setPending} onAlerts={addAlerts} />
+            <Chat userName={summary?.user ?? ""} onChanged={changed} onPending={setPending} onAlerts={addAlerts} onBusy={setBusy} />
           </div>
-          {view !== "agent" && (
-            <section className="page-view">
-              <div className="page-head"><h2>{MENUS.find(([key]) => key === view)?.[1]}</h2></div>
-              <div className="empty">이 화면은 다음 단계에서 옮깁니다.</div>
-            </section>
-          )}
+          {view !== "agent" && <MenuPage key={view} name={view} version={version} actions={actions} />}
         </main>
 
         <SidePanel summary={summary} pending={pending} alerts={alerts} />
       </div>
+      {actions.element}
     </div>
   );
 }

@@ -32,3 +32,21 @@ export type Reply = {
 export type RecoveryRecord = { kind: string; request_text: string; when: string };
 
 export const won = (n: number) => n.toLocaleString("ko-KR");
+
+// ---------------------------------------------------------------- 메뉴 화면 (/api/view/<이름>) 의 줄
+export type AccountRow = { id: string; name: string; bank: string; number: string; purpose: string | null; balance: number; status: string; label: string };
+export type RegisteredRow = { id: string; name: string; bank: string; number: string; holder: string };
+export type TxRow = { at: string; account: string; type: string; amount: number; merchant: string | null; card: string | null };
+export type CardRow = { id: string; name: string; type: string; bank: string | null; account: string | null; status: string; label: string };
+export type BillRow = { id: string; card: string; month: string; total: number; remaining: number; due: string; status: string; label: string };
+export type ScheduleRow = { id: string; at: string; from: string | null; to: string; amount: number; status: string };
+export type RequestRow = { id: string; at: string; task: string; status: string; content: Record<string, string> | null };
+export type Bank = { name: string; example: string };
+export type Address = { id: string; label: string; address: string };
+export type TransferOptions = { accounts: { id: string; name: string; balance: number }[]; targets: { id: string; name: string }[] };
+
+// ---------------------------------------------------------------- 버튼 업무 (/api/action/preview, /api/action/run)
+export type Preview = { error: string | null; proposal?: Proposal; need_auth?: boolean };
+export type RunReply = { answer: string | null; error: string | null; auth_error?: string; result?: string };
+
+export const stamp = (iso: string) => iso.slice(0, 10) + " " + iso.slice(11, 16);     // "2026-09-30 09:00"
