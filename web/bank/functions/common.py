@@ -178,7 +178,9 @@ def add_request(data, owner_id, task_type, content, status, now):
 def next_id(items, key, prefix):
     # 목록에서 가장 큰 번호 + 1 로 새 ID 를 만듭니다. 예) reg-003 까지 있으면 reg-004. 비어 있으면 reg-001.
     # 개수 + 1 이 아니라 가장 큰 번호를 보는 이유 : 지운 항목(등록 계좌 삭제)이 있으면 번호가 겹칩니다.
-    numbers = [int(item[key].split("-")[1]) for item in items]
+    # 시험 계정(test)의 미리 넣은 데이터는 use-t01 처럼 숫자가 아닌 ID 라서 번호 셈에서 뺍니다.
+    parts = [item[key].split("-")[1] for item in items]
+    numbers = [int(part) for part in parts if part.isdigit()]
     return "%s-%03d" % (prefix, max(numbers, default=0) + 1)
 
 
