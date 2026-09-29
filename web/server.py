@@ -245,6 +245,12 @@ def agent_pending(me):
     return common_pending_check(bank_graph, bank.config_of(me))
 
 
+def speaker(me):
+    # 방금 답한(또는 멈춰 있는) 업무 분야 : 계좌 / 카드 / 결과 / 없음. 화면이 대화 옆 캐릭터를 고르는 데 씁니다.
+    # 1단 supervisor 가 고른 값이라 바깥 State 에 있습니다. 새 요청마다 비워지므로 지난 업무 값이 남지 않습니다.
+    return bank_graph.get_state(bank.config_of(me)).values.get("domain")
+
+
 @app.get("/")
 def index():
     return FileResponse(WEB_DIR / "static" / "index.html")
@@ -484,10 +490,11 @@ def waiting(request: Request):
     with bank.work_lock:
         pending = agent_pending(me)
         if not pending:
-            return {"pending": None, "answer": None, "proposal": None}
+            return {"pending": None, "answer": None, "proposal": None, "domain": None}
         text = bank_graph.get_state(bank.config_of(me)).interrupts[0].value["text"]
         proposal = waiting_proposal(me) if pending == APPROVAL else None
-    return {"pending": pending, "answer": text, "proposal": proposal}
+        domain = speaker(me)
+    return {"pending": pending, "answer": text, "proposal": proposal, "domain": domain}
 
 
 @app.get("/api/alerts")
@@ -520,13 +527,13 @@ def recover(body: RecoveryIn, request: Request):
     me = login_user(request)
     record = interrupted.pop(me, None)
     if not record:
-        return {"answer": "다시 진행할 업무가 없습니다.", "pending": None, "proposal": None, "notices": []}
+        return {"answer": "다시 진행할 업무가 없습니다.", "pending": None, "proposal": None, "notices": [], "domain": None}
     with bank.work_lock:     # data.json 을 쓰므로 스케줄러와 겹치지 않게
         log.note("재시작 복구  '%s' → %s" % (record["request_text"], "다시" if body.again else "지움"))
         functions.clear_pending(me)
     if body.again:
         return run_turn(me, record["request_text"])
-    return {"answer": "진행 중이던 업무를 지웠습니다. 바뀐 것은 없습니다.", "pending": None, "proposal": None, "notices": []}
+    return {"answer": "진행 중이던 업무를 지웠습니다. 바뀐 것은 없습니다.", "pending": None, "proposal": None, "notices": [], "domain": None}
 
 
 def run_turn(me, user_input):
@@ -535,7 +542,8 @@ def run_turn(me, user_input):
     #   pending  : 멈춰 있으면 그 종류 (approval / question / secret), 끝났으면 None
     #   proposal : 승인 대기면 처리안 값 (카드로 그림), 아니면 None
     #   notices  : 처리 전에 실행된 예약 이체·분할 회차 결과 중 이 사람 것 (다른 사람 것은 그 사람 알림함으로)
-    proposal = None
+    #   domain   : 답한 업무 분야 (계좌 / 카드 / 결과 / 없음). 화면의 캐릭터를 고릅니다
+    proposal = domain = None
     with bank.work_lock:
         secret = agent_pending(me) == SECRET
         log.turn_start("****" if secret else user_input, bank.session(me)["thread_id"])
@@ -551,12 +559,13 @@ def run_turn(me, user_input):
             bank.remember_turn(me, pending)
             if pending == APPROVAL:
                 proposal = waiting_proposal(me)
+            domain = speaker(me)
             log.turn_end(bank.turn_result(pending))
         except Exception as e:
             log.error(e)
             log.turn_end("오류")
             answer, pending = "처리 중 오류가 발생했습니다.", None
-    return {"answer": answer, "pending": pending, "proposal": proposal, "notices": notices}
+    return {"answer": answer, "pending": pending, "proposal": proposal, "notices": notices, "domain": domain}
 
 
 if __name__ == "__main__":

@@ -70,3 +70,97 @@ button:active:not(:disabled) { transform: scale(.98); }
 .auth-form .switch { margin: 6px 0 0; text-align: center; }
 .auth-form .switch a { color: var(--text); }
 .form-error { font-size: 12px; background: var(--bad-bg); color: var(--bad-text); border-radius: 6px; padding: 7px 9px; }
+
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 9999px; white-space: nowrap; }
+.b-warn { background: var(--warn-bg); color: var(--warn-text); }
+.b-ok { background: var(--ok-bg); color: var(--ok-text); }
+.b-bad { background: var(--bad-bg); color: var(--bad-text); }
+.b-plain { background: var(--canvas); color: var(--muted); }
+.empty { font-size: 12px; color: var(--muted); }
+button.ghost { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+button.ghost:hover:not(:disabled) { background: var(--hover); }
+button.waiting { opacity: .5; cursor: default; }
+
+/* 첫 화면 틀 : 왼쪽 메뉴 | 가운데 (잔액 + 대화) | 오른쪽 패널 */
+.app-page { padding: 20px; min-width: 1100px; }
+.app {
+  display: grid; grid-template-columns: 190px minmax(0, 1fr) 270px;
+  height: calc(100dvh - 40px); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+}
+
+/* 왼쪽 메뉴 */
+.side { background: var(--canvas); border-right: 1px solid var(--line); padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
+.brand { font-size: 15px; font-weight: 500; padding: 0 10px 16px; }
+.nav { font-size: 13px; padding: 8px 10px; border-radius: 6px; color: var(--muted); cursor: pointer; }
+.nav:hover { background: var(--hover); }
+.nav.on { background: var(--hover); color: var(--text); font-weight: 500; }
+.me-box { margin-top: auto; padding: 10px; font-size: 12px; line-height: 1.6; }
+.me-box b { font-weight: 500; }
+.me-box a { color: var(--muted); text-decoration: underline; cursor: pointer; }
+.me-tools { margin: 8px 0 6px; }
+
+/* 가운데 */
+.main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.top { padding: 20px 24px 18px; border-bottom: 1px solid var(--line); }
+.top-label { font-size: 12px; color: var(--muted); }
+.total { font-size: 30px; font-weight: 500; letter-spacing: -.02em; margin: 4px 0 14px; }
+.total small { font-size: 15px; margin-left: 3px; }
+.accounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.acc { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.acc div:first-child { font-size: 12px; color: var(--muted); }
+.acc div:last-child { font-size: 14px; margin-top: 3px; }
+.view-wrap, .view { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.view-wrap[hidden] { display: none; }
+.page-view { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px; }
+.page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.page-head h2 { font-size: 16px; font-weight: 500; margin: 0; }
+
+/* 대화 */
+.log { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
+.log > * { flex-shrink: 0; }    /* 대화가 길어져도 말풍선·카드가 눌려 잘리지 않게 */
+.msg { font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.me { background: var(--canvas); border: 1px solid var(--line); padding: 8px 12px; border-radius: 12px; }
+.bot { background: var(--surface); border: 1px solid var(--line); padding: 8px 12px; border-radius: 4px 12px 12px 12px; }
+.notice { align-self: flex-start; font-size: 12px; color: var(--muted); padding-left: 42px; white-space: pre-wrap; }
+
+/* 캐릭터 : 에이전트 말은 왼쪽 (얼굴 + 이름 + 말풍선), 내 말은 오른쪽 (말풍선 + 이름 첫 글자) */
+.bot-row { align-self: flex-start; display: flex; gap: 10px; max-width: 80%; }
+.bot-col { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.speaker { font-size: 11px; color: var(--muted); }
+.me-row { align-self: flex-end; display: flex; gap: 10px; align-items: flex-start; max-width: 80%; }
+.avatar { width: 32px; height: 32px; flex-shrink: 0; }
+.user-avatar {
+  display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px;
+  background: var(--hover); color: var(--text); font-size: 13px; font-weight: 500;
+}
+
+.chat-form { display: flex; gap: 8px; padding: 14px 24px 18px; }
+.chat-form input { flex: 1; }
+.chat-form button.ghost { color: var(--muted); }
+
+/* 처리안 확인 카드 */
+.card { width: 460px; max-width: 100%; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.card-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--canvas); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 500; }
+.card-head .badge { margin-left: auto; font-weight: 400; }
+.card-body { padding: 12px 14px; }
+.task { font-size: 12px; color: var(--muted); }
+.amount { font-size: 22px; font-weight: 500; letter-spacing: -.02em; margin: 2px 0 8px; }
+.amount small { font-size: 13px; margin-left: 2px; }
+.row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; padding: 4px 0; }
+.row span:first-child { color: var(--muted); white-space: nowrap; }
+.row span:last-child { text-align: right; }
+.warn { font-size: 12px; line-height: 1.5; background: var(--warn-bg); color: var(--warn-text); border-radius: 6px; padding: 7px 9px; margin-top: 8px; }
+.actions { display: flex; gap: 6px; margin-top: 12px; }
+.actions button { padding: 8px 12px; }
+.actions .primary { flex: 1; }
+
+/* 오른쪽 패널 */
+.panel { border-left: 1px solid var(--line); padding: 20px 18px; overflow-y: auto; }
+.panel h3 { font-size: 12px; font-weight: 400; color: var(--muted); margin: 0 0 10px; }
+.panel section + section { margin-top: 22px; }
+.line { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+.steps div { font-size: 13px; line-height: 2; }
+.steps .now { font-weight: 500; }
+.steps .todo { color: var(--muted); }
+.alert { font-size: 12px; line-height: 1.5; background: var(--info-bg); color: var(--info-text); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
