@@ -187,7 +187,40 @@ def transfer_apply(data, target, params):
         from_account["nickname"], t["to_name"], format(t["amount"], ","), from_account["nickname"], format(balance, ","))
 
 
+# ---------------------------------------------------------------- 카드 재발급 신청
+# 분실 정지된 카드만, 취소되지 않은 신청이 없을 때만 됩니다. (functions.check_reissue)
+#   params : {"address": 배송지 ID (집 / 회사)}
+def my_address(data, address_id):
+    return next((a for a in data["addresses"] if a["address_id"] == address_id and a["owner_id"] == ME), None)
+
+
+def reissue_preview(data, card_id, params):
+    card = my_card(data, card_id)
+    if not card:
+        return "카드를 찾지 못했습니다.", None
+    error = functions.check_reissue(ME, card)
+    if error:
+        return error, None
+    address = my_address(data, params.get("address"))
+    if not address:
+        return "배송지를 골라 주세요.", None
+    # 에이전트 reissue_propose 의 신청 처리안과 같은 모양입니다.
+    rows = [
+        card_row(card),
+        ["지금 상태", functions.CARD_STATUS[card["status"]]],
+        ["배송지", "%s (%s)" % (address["label"], address["address"])],
+        ["안내", "신청해도 기존 카드의 분실 정지는 그대로입니다"],
+    ]
+    return None, {"task": "카드 재발급 신청", "rows": rows}
+
+
+def reissue_apply(data, card_id, params):
+    app_id = functions.add_reissue(data, ME, card_id, params["address"])
+    return "재발급을 신청했습니다. (%s  [접수])" % app_id
+
+
 ACTIONS = {
+    "reissue": {"preview": reissue_preview, "apply": reissue_apply},
     "card_lock": card_status_action("일시 잠금"),
     "card_unlock": card_status_action("잠금 해제"),
     "bill_pay": {"preview": bill_preview, "apply": bill_apply},

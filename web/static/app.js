@@ -433,6 +433,43 @@ async function openTransfer(options = {}) {
   amount.onkeydown = (e) => { if (e.key === "Enter") next.click(); };
 }
 
+// 재발급 창 : 배송지(집 / 회사)를 고르고 다음을 누르면 서버가 검사하고, 되면 처리안 확인으로 넘어갑니다.
+async function openReissue(card) {
+  if (busy) return;
+  modal.hidden = false;
+  modalBody.replaceChildren(el("div", "empty", "불러오는 중..."));
+  const addresses = await (await fetch("/api/view/addresses")).json();
+
+  const choice = el("div", "choices");
+  let picked = null;
+  for (const a of addresses) {
+    const option = el("label", "check");
+    const radio = el("input");
+    radio.type = "radio";
+    radio.name = "address";
+    radio.onchange = () => { picked = a.id; };
+    option.append(radio, el("span", "", a.label + "  " + a.address));
+    choice.appendChild(option);
+  }
+  const formError = el("div", "auth-error");
+  const next = el("button", "primary", "다음");
+  const cancel = el("button", "ghost", "닫기");
+  cancel.onclick = closeModal;
+  const actionsRow = el("div", "actions");
+  actionsRow.append(next, cancel);
+  modalBody.replaceChildren(el("div", "modal-head", "카드 재발급"),
+    el("div", "task", "새 카드를 받을 배송지를 골라 주세요. (" + card.name + ")"), choice, formError, actionsRow);
+
+  next.onclick = async () => {
+    const params = { address: picked };
+    next.disabled = true;
+    const pre = await postJSON("/api/action/preview", { kind: "reissue", target: card.id, params });
+    next.disabled = false;
+    if (pre.error) { formError.textContent = pre.error; return; }
+    showConfirm("reissue", card.id, params, pre);
+  };
+}
+
 function button(label, onClick) {
   const b = el("button", "act", label);
   b.onclick = onClick;
@@ -440,11 +477,6 @@ function button(label, onClick) {
 }
 
 function badge(text, cls) { return el("span", "badge " + cls, text); }
-function action(label, request) {
-  const b = el("button", "act", label);
-  b.onclick = () => fillInput(request);
-  return b;
-}
 function stamp(iso) { return iso.slice(0, 10) + " " + iso.slice(11, 16); }     // "2026-09-30 09:00"
 
 const PAGES = {
@@ -483,7 +515,7 @@ const PAGES = {
                        badge(c.label, CARD_BADGE[c.status] || "b-plain"),
                        c.status === "active" ? button("잠그기", () => openAction("card_lock", c.id))
                        : c.status === "locked" ? button("잠금 풀기", () => openAction("card_unlock", c.id))
-                       : c.status === "lost" ? action("재발급", c.name + " 재발급 신청해줘") : ""])),
+                       : c.status === "lost" ? button("재발급", () => openReissue(c)) : ""])),
   },
   bills: {
     title: "카드값",

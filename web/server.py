@@ -147,6 +147,9 @@ def view(name: str):
         return [{"id": s["schedule_id"], "at": s["scheduled_at"], "from": nick.get(s["from_account"]),
                  "to": functions.target_name(data, s["to_account"]), "amount": s["amount"], "status": s["status"]}
                 for s in rows]
+    if name == "addresses":
+        # 재발급 창의 배송지 고르기 목록 (집 / 회사)
+        return [{"id": a["address_id"], "label": a["label"], "address": a["address"]} for a in mine("addresses")]
     if name == "transfer_options":
         # 이체 창의 고르기 목록 : 출금은 내 계좌, 입금은 내 계좌 + 등록 계좌(상대 계좌)
         accounts = [{"id": a["account_id"], "name": a["nickname"], "balance": a["balance"]} for a in mine("accounts")]
