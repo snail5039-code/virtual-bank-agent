@@ -3,18 +3,17 @@
 # 처리안 모양, 끝났을 때의 안내 문구, 처리 기록 모양도 에이전트(카드 설정 노드 등)와 같게 맞춥니다.
 #
 # 업무 하나는 두 함수입니다.
-#   preview(data, target, params) : 검사하고 처리안을 만듭니다. 안 되면 (사유, None), 되면 (None, 처리안)
-#   apply(data, target, params)   : data 안에서 바꾸고 안내 문구를 돌려줍니다. 저장은 server.py 가 합니다.
-#   target 은 대상 ID, params 는 이체처럼 화면에서 입력받는 값입니다 (없으면 빈 dict).
+#   preview(data, me, target, params) : 검사하고 처리안을 만듭니다. 안 되면 (사유, None), 되면 (None, 처리안)
+#   apply(data, me, target, params)   : data 안에서 바꾸고 안내 문구를 돌려줍니다. 저장은 server.py 가 합니다.
+#   me 는 로그인한 사람(owner_id), target 은 대상 ID, params 는 이체처럼 화면에서 입력받는 값입니다 (없으면 빈 dict).
+#   내 것만 고르도록 대상을 찾을 때마다 owner_id 가 me 인지 봅니다 (남의 카드 ID 를 보내도 못 찾음).
 # 실행 직전에 preview 를 한 번 더 불러 다시 검사합니다 (처리안을 본 사이에 상태가 바뀌었을 수 있어서).
 
 import functions
 
-ME = functions.CURRENT_USER
 
-
-def my_card(data, card_id):
-    card = next((c for c in data["cards"] if c["card_id"] == card_id and c["owner_id"] == ME), None)
+def my_card(data, me, card_id):
+    card = next((c for c in data["cards"] if c["card_id"] == card_id and c["owner_id"] == me), None)
     return card
 
 
@@ -26,8 +25,8 @@ def card_row(card):
 # ---------------------------------------------------------------- 카드 일시 잠금 / 잠금 해제 / 해지
 def card_status_action(action):
     # action : "일시 잠금" / "잠금 해제" / "해지" (functions.CARD_ACTIONS 의 이름)
-    def preview(data, card_id, params):
-        card = my_card(data, card_id)
+    def preview(data, me, card_id, params):
+        card = my_card(data, me, card_id)
         if not card:
             return "카드를 찾지 못했습니다.", None
         error = functions.check_card_status(card, action)
@@ -45,8 +44,8 @@ def card_status_action(action):
             rows.append(["주의", "해지하면 되돌릴 수 없습니다"])
         return None, {"task": "카드 " + action, "rows": rows}
 
-    def apply(data, card_id, params):
-        card = my_card(data, card_id)
+    def apply(data, me, card_id, params):
+        card = my_card(data, me, card_id)
         old = functions.CARD_STATUS[card["status"]]
         functions.change_card_status(data, card_id, action)
         return "카드 %s 완료 : %s  %s → %s" % (action, card["name"], old, functions.CARD_STATUS[card["status"]])
@@ -57,9 +56,9 @@ def card_status_action(action):
 # ---------------------------------------------------------------- 카드값 전체 결제
 # 남은 금액 전부를 그 카드의 결제 계좌에서 냅니다. (에이전트에서 방식·계좌를 말하지 않았을 때와 같음)
 # 부분·분할·일괄은 금액·개월 수·대상을 골라야 해서 에이전트로 합니다.
-def bill_target(data, statement_id):
+def bill_target(data, me, statement_id):
     statement = next((s for s in data["card_statements"]
-                      if s["statement_id"] == statement_id and s["owner_id"] == ME), None)
+                      if s["statement_id"] == statement_id and s["owner_id"] == me), None)
     if not statement:
         return None, None, None
     card = next(c for c in data["cards"] if c["card_id"] == statement["card_id"])
@@ -67,12 +66,12 @@ def bill_target(data, statement_id):
     return statement, card, account
 
 
-def bill_preview(data, statement_id, params):
-    statement, card, account = bill_target(data, statement_id)
+def bill_preview(data, me, statement_id, params):
+    statement, card, account = bill_target(data, me, statement_id)
     if not statement:
         return "청구서를 찾지 못했습니다.", None
     amount = statement["remaining_amount"]
-    error = functions.check_payment(ME, statement, account["account_id"], amount)
+    error = functions.check_payment(me, statement, account["account_id"], amount)
     if error:
         return error, None
     # 에이전트 billing_propose 의 전체 결제 처리안과 같은 모양입니다.
@@ -88,9 +87,9 @@ def bill_preview(data, statement_id, params):
     return None, {"task": "카드값 전체 결제", "rows": rows}
 
 
-def bill_apply(data, statement_id, params):
+def bill_apply(data, me, statement_id, params):
     # 에이전트 pay_one(전체) 과 같습니다. 잔액 출금, 청구서 납부 처리, 거래 내역 한 줄.
-    statement, card, account = bill_target(data, statement_id)
+    statement, card, account = bill_target(data, me, statement_id)
     amount = statement["remaining_amount"]
     memo = "카드값 %s %s분" % (card["name"], statement["billing_month"])
     functions.pay_statement(data, statement_id, account["account_id"], amount, memo)
@@ -101,13 +100,13 @@ def bill_apply(data, statement_id, params):
 
 # ---------------------------------------------------------------- 예약 이체 취소
 # 아직 실행 전(예약)인 것만 취소합니다. (functions.find_schedules 가 고르는 기준과 같음)
-def my_schedule(data, schedule_id):
+def my_schedule(data, me, schedule_id):
     return next((s for s in data["scheduled_transfers"]
-                 if s["schedule_id"] == schedule_id and s["owner_id"] == ME), None)
+                 if s["schedule_id"] == schedule_id and s["owner_id"] == me), None)
 
 
-def schedule_preview(data, schedule_id, params):
-    s = my_schedule(data, schedule_id)
+def schedule_preview(data, me, schedule_id, params):
+    s = my_schedule(data, me, schedule_id)
     if not s:
         return "예약을 찾지 못했습니다.", None
     if s["status"] != "예약":
@@ -120,7 +119,7 @@ def schedule_preview(data, schedule_id, params):
     return None, {"task": "예약 이체 취소", "rows": [["예약", line]]}
 
 
-def schedule_apply(data, schedule_id, params):
+def schedule_apply(data, me, schedule_id, params):
     functions.cancel_schedule(data, schedule_id)
     return "예약 이체를 취소했습니다. (%s)" % schedule_id
 
@@ -129,15 +128,15 @@ def schedule_apply(data, schedule_id, params):
 # 한 곳, 금액을 정한 이체만 합니다. 예약 시각을 넣으면 예약 이체입니다. (에이전트 예약 규칙과 같음)
 # 조건부("40만원 남기고")·나눠 이체는 에이전트로 합니다.
 #   params : {"from": 출금 계좌 ID, "to": 입금 계좌 ID(내 계좌 acc- / 등록 계좌 reg-), "amount": 금액, "at": 예약 시각 또는 ""}
-def transfer_input(data, params):
+def transfer_input(data, me, params):
     # 화면에서 받은 값을 확인하고 (출금 계좌, 입금 목록, 예약 시각) 을 만듭니다. 안 되면 사유를 돌려줍니다.
     from_account = next((a for a in data["accounts"]
-                         if a["account_id"] == params.get("from") and a["owner_id"] == ME), None)
+                         if a["account_id"] == params.get("from") and a["owner_id"] == me), None)
     if not from_account:
         return "출금 계좌를 골라 주세요.", None
     to_id = params.get("to")
-    mine = any(a["account_id"] == to_id and a["owner_id"] == ME for a in data["accounts"])
-    registered = any(r["registered_id"] == to_id and r["owner_id"] == ME for r in data["registered_accounts"])
+    mine = any(a["account_id"] == to_id and a["owner_id"] == me for a in data["accounts"])
+    registered = any(r["registered_id"] == to_id and r["owner_id"] == me for r in data["registered_accounts"])
     if not (mine or registered):
         return "입금 계좌를 골라 주세요.", None
     try:
@@ -148,13 +147,13 @@ def transfer_input(data, params):
     return None, (from_account, targets, params.get("at") or None)
 
 
-def transfer_preview(data, target, params):
-    error, parsed = transfer_input(data, params)
+def transfer_preview(data, me, target, params):
+    error, parsed = transfer_input(data, me, params)
     if error:
         return error, None
     from_account, targets, at = parsed
     # 검사는 에이전트 transfer_check 와 같은 함수입니다. (금액 0 이하, 같은 계좌, 잔액 부족 / 예약 시각)
-    error = functions.check_transfer(ME, from_account["account_id"], targets, None)
+    error = functions.check_transfer(me, from_account["account_id"], targets, None)
     if not error and at:
         error = functions.check_schedule(at, targets, None)
     if error:
@@ -174,12 +173,12 @@ def transfer_preview(data, target, params):
     return None, proposal
 
 
-def transfer_apply(data, target, params):
+def transfer_apply(data, me, target, params):
     # 에이전트 transfer_execute 와 같습니다. 예약이면 돈은 옮기지 않고 예약만 남깁니다.
-    _, (from_account, targets, at) = transfer_input(data, params)
+    _, (from_account, targets, at) = transfer_input(data, me, params)
     t = targets[0]
     if at:
-        functions.add_schedule(data, ME, from_account["account_id"], t, at)
+        functions.add_schedule(data, me, from_account["account_id"], t, at)
         return "%s → %s  %s원\n%s 에 이체하도록 예약했습니다." % (
             from_account["nickname"], t["to_name"], format(t["amount"], ","), functions.when_text(at))
     error = functions.transfer_all(data, from_account["account_id"], targets, None)
@@ -193,18 +192,18 @@ def transfer_apply(data, target, params):
 # ---------------------------------------------------------------- 카드 재발급 신청
 # 분실 정지된 카드만, 취소되지 않은 신청이 없을 때만 됩니다. (functions.check_reissue)
 #   params : {"address": 배송지 ID (집 / 회사)}
-def my_address(data, address_id):
-    return next((a for a in data["addresses"] if a["address_id"] == address_id and a["owner_id"] == ME), None)
+def my_address(data, me, address_id):
+    return next((a for a in data["addresses"] if a["address_id"] == address_id and a["owner_id"] == me), None)
 
 
-def reissue_preview(data, card_id, params):
-    card = my_card(data, card_id)
+def reissue_preview(data, me, card_id, params):
+    card = my_card(data, me, card_id)
     if not card:
         return "카드를 찾지 못했습니다.", None
-    error = functions.check_reissue(ME, card)
+    error = functions.check_reissue(me, card)
     if error:
         return error, None
-    address = my_address(data, params.get("address"))
+    address = my_address(data, me, params.get("address"))
     if not address:
         return "배송지를 골라 주세요.", None
     # 에이전트 reissue_propose 의 신청 처리안과 같은 모양입니다.
@@ -217,8 +216,8 @@ def reissue_preview(data, card_id, params):
     return None, {"task": "카드 재발급 신청", "rows": rows}
 
 
-def reissue_apply(data, card_id, params):
-    app_id = functions.add_reissue(data, ME, card_id, params["address"])
+def reissue_apply(data, me, card_id, params):
+    app_id = functions.add_reissue(data, me, card_id, params["address"])
     return "재발급을 신청했습니다. (%s  [접수])" % app_id
 
 
@@ -231,9 +230,9 @@ def account_reg_info(params):
     return info
 
 
-def account_register_preview(data, target, params):
+def account_register_preview(data, me, target, params):
     info = account_reg_info(params)
-    error = functions.check_register(ME, info)
+    error = functions.check_register(me, info)
     if error:
         return error, None
     # 에이전트 setting_propose 의 등록 처리안과 같은 모양입니다.
@@ -242,9 +241,9 @@ def account_register_preview(data, target, params):
     return None, {"task": "계좌 등록", "rows": rows}
 
 
-def account_register_apply(data, target, params):
+def account_register_apply(data, me, target, params):
     info = account_reg_info(params)
-    functions.register_account(data, ME, info)
+    functions.register_account(data, me, info)
     return "계좌를 등록했습니다. (%s)" % info["nickname"]
 
 
@@ -258,12 +257,12 @@ def card_reg_info(params):
     return info
 
 
-def card_register_preview(data, target, params):
+def card_register_preview(data, me, target, params):
     info = card_reg_info(params)
-    if info["account_id"] and not any(a["account_id"] == info["account_id"] and a["owner_id"] == ME
+    if info["account_id"] and not any(a["account_id"] == info["account_id"] and a["owner_id"] == me
                                       for a in data["accounts"]):
         return "결제 계좌를 골라 주세요.", None
-    error = functions.check_card_register(ME, info)
+    error = functions.check_card_register(me, info)
     if error:
         return error, None
     account = next(a for a in data["accounts"] if a["account_id"] == info["account_id"])
@@ -273,20 +272,20 @@ def card_register_preview(data, target, params):
     return None, {"task": "카드 등록", "rows": rows}
 
 
-def card_register_apply(data, target, params):
+def card_register_apply(data, me, target, params):
     info = card_reg_info(params)
-    functions.register_card(data, ME, info)
+    functions.register_card(data, me, info)
     return "카드를 등록했습니다. (%s)\n카드 비밀번호는 '비밀번호 변경' 으로 정해 주세요." % info["name"]
 
 
 # ---------------------------------------------------------------- 등록 계좌 삭제
-def my_registered(data, registered_id):
+def my_registered(data, me, registered_id):
     return next((r for r in data["registered_accounts"]
-                 if r["registered_id"] == registered_id and r["owner_id"] == ME), None)
+                 if r["registered_id"] == registered_id and r["owner_id"] == me), None)
 
 
-def registered_delete_preview(data, registered_id, params):
-    r = my_registered(data, registered_id)
+def registered_delete_preview(data, me, registered_id, params):
+    r = my_registered(data, me, registered_id)
     if not r:
         return "등록 계좌를 찾지 못했습니다.", None
     # 에이전트 setting_propose 의 삭제 처리안과 같은 모양입니다.
@@ -295,8 +294,8 @@ def registered_delete_preview(data, registered_id, params):
     return None, {"task": "등록 계좌 삭제", "rows": rows}
 
 
-def registered_delete_apply(data, registered_id, params):
-    nickname = my_registered(data, registered_id)["nickname"]
+def registered_delete_apply(data, me, registered_id, params):
+    nickname = my_registered(data, me, registered_id)["nickname"]
     functions.delete_registered(data, registered_id)
     return "등록 계좌를 삭제했습니다. (%s)" % nickname
 
@@ -320,11 +319,11 @@ def account_open_info(params):
     return {key: (params.get(key) or "").strip() for key in ["nickname", "purpose", "password"]}
 
 
-def account_open_preview(data, target, params):
+def account_open_preview(data, me, target, params):
     info = account_open_info(params)
     if not 1 <= len(info["nickname"]) <= functions.MAX_SETTING_LEN:
         return "별명은 1~%d자로 정해 주세요." % functions.MAX_SETTING_LEN, None
-    if any(a["owner_id"] == ME and a["nickname"] == info["nickname"] for a in data["accounts"]):
+    if any(a["owner_id"] == me and a["nickname"] == info["nickname"] for a in data["accounts"]):
         return "다른 계좌가 이미 '%s' 별명을 쓰고 있습니다." % info["nickname"], None
     if len(info["purpose"]) > functions.MAX_SETTING_LEN:
         return "용도는 %d자까지 쓸 수 있습니다." % functions.MAX_SETTING_LEN, None
@@ -335,12 +334,12 @@ def account_open_preview(data, target, params):
     return None, {"task": "계좌 만들기", "rows": rows}
 
 
-def account_open_apply(data, target, params):
+def account_open_apply(data, me, target, params):
     info = account_open_info(params)
     number = new_account_number(data)
     data["accounts"].append({
         "account_id": functions.next_id(data["accounts"], "account_id", "acc"),
-        "owner_id": ME,
+        "owner_id": me,
         "nickname": info["nickname"],
         "purpose": info["purpose"] or None,
         "balance": 0,

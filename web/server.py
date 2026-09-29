@@ -15,7 +15,8 @@
 #     seoyeon / seoyeon1234  → user-002 김서연
 #     jiho    / jiho1234     → user-003 박지호
 #   회원가입 : /signup 화면. 이름·휴대전화번호·아이디·비밀번호·PIN(본인 확인용 4자리)을 받아 users 에 새 사람을 넣고 바로 로그인합니다.
-#   아직은 로그인만 합니다. 화면·업무·에이전트는 그대로 user-001 기준입니다 (3~5단계에서 사람별로 바꿈).
+#   화면(요약·메뉴)과 버튼 업무는 로그인한 사람 것만 보여주고 바꿉니다. (3단계)
+#   에이전트는 아직 하나라서 user-001 만 씁니다. 다른 사람에게는 안내만 합니다 (4~5단계에서 사람별로 바꿈).
 
 import re
 import secrets
@@ -207,9 +208,23 @@ class ActionIn(BaseModel):
 
 
 # 버튼 업무의 본인 확인 : 에이전트처럼 한 번 맞히면 서버를 끌 때까지 다시 묻지 않고, 3번 틀리면 처음부터 다시입니다.
+# 사람마다 따로 기억합니다. {owner_id: {"ok": 맞혔는지, "tries": 틀린 횟수}}
 # 에이전트에서 이미 본인 확인을 했으면 그것도 인정합니다. (반대로 여기서 한 확인을 그래프 State 에 넣지는 않습니다)
 AUTH_TRIES = 3
-button_auth = {"ok": False, "tries": 0}
+button_auth = {}
+
+# 에이전트(그래프·대화 기록)는 아직 하나라서 이 사람만 씁니다. (4단계에서 사람별로 바꿈)
+AGENT_USER = functions.CURRENT_USER
+AGENT_ONLY = "에이전트는 아직 김도윤 계정에서만 쓸 수 있어요. 메뉴 화면의 버튼으로 업무를 해 주세요."
+
+
+def auth_of(me):
+    return button_auth.setdefault(me, {"ok": False, "tries": 0})
+
+
+def agent_pending(me):
+    # 에이전트가 이 사람 업무로 질문·승인을 기다리는 중이면 그 종류, 아니면 None.
+    return common_pending_check(bank_graph, bank.config) if me == AGENT_USER else None
 
 
 @app.get("/")
@@ -218,13 +233,13 @@ def index():
 
 
 @app.get("/api/summary")
-def summary():
+def summary(request: Request):
     # 화면 옆 패널(총 잔액, 계좌, 카드, 카드값, 예약 이체, 최근 처리)에 쓸 값을 data.json 에서 모읍니다. (3단계)
     # 읽기만 하고, 금액은 파일에 있는 값을 그대로 씁니다.
     with bank.work_lock:
         data = data_store.load()
-        authenticated = is_authenticated()
-    me = functions.CURRENT_USER
+        me = login_user(request)
+        authenticated = is_authenticated(me)
     mine = lambda items: [item for item in items if item["owner_id"] == me]
 
     accounts = mine(data["accounts"])
@@ -252,12 +267,12 @@ CARD_TYPE = {"credit": "신용", "debit": "체크"}
 
 
 @app.get("/api/view/{name}")
-def view(name: str):
+def view(name: str, request: Request):
     # 왼쪽 메뉴 화면(계좌, 거래 내역, 카드, 카드값, 예약 이체, 처리 기록)에 쓸 목록입니다.
     # LLM 을 거치지 않고 data.json 을 읽기만 합니다. 바꾸는 일은 에이전트(승인 흐름)로만 합니다.
     with bank.work_lock:
         data = data_store.load()
-    me = functions.CURRENT_USER
+    me = login_user(request)
     mine = lambda key: [item for item in data[key] if item["owner_id"] == me]
     nick = {a["account_id"]: a["nickname"] for a in data["accounts"]}
     card_names = {c["card_id"]: c["name"] for c in data["cards"]}
@@ -304,10 +319,12 @@ def view(name: str):
     raise HTTPException(status_code=404, detail="없는 화면입니다")
 
 
-def is_authenticated():
-    # 버튼에서 본인 확인을 했거나, 에이전트에서 했으면 True 입니다.
+def is_authenticated(me):
+    # 버튼에서 본인 확인을 했거나, 에이전트에서 했으면 True 입니다. (에이전트 쪽은 에이전트를 쓰는 사람일 때만)
     # 업무 중간(멈춘 동안)에는 에이전트의 본인 확인 결과가 안쪽 그래프 State 에만 있어서 안쪽까지 봅니다.
-    return button_auth["ok"] or any(values.get("authenticated") for values in state_values())
+    if auth_of(me)["ok"]:
+        return True
+    return me == AGENT_USER and any(values.get("authenticated") for values in state_values())
 
 
 # ---------------------------------------------------------------- 메뉴 화면 버튼 업무
@@ -316,24 +333,25 @@ def action_reply(answer=None, error=None, **extra):
 
 
 @app.post("/api/action/preview")
-def action_preview(body: ActionIn):
+def action_preview(body: ActionIn, request: Request):
     # 버튼을 누르면 먼저 검사하고 처리안을 돌려줍니다. 화면은 이걸 확인 창으로 보여줍니다.
     action = actions.ACTIONS.get(body.kind)
     if not action:
         raise HTTPException(status_code=404, detail="없는 업무입니다")
+    me = login_user(request)
     with bank.work_lock:
-        # 에이전트가 질문·승인을 기다리는 중이면 막습니다. 같은 데이터를 두 곳에서 동시에 바꾸지 않게 합니다.
-        if common_pending_check(bank_graph, bank.config):
+        # 내 업무로 에이전트가 질문·승인을 기다리는 중이면 막습니다. 같은 데이터를 두 곳에서 동시에 바꾸지 않게 합니다.
+        if agent_pending(me):
             return action_reply(error="에이전트에서 진행 중인 업무가 있어요. 그 업무를 먼저 끝내거나 취소해 주세요.")
-        error, proposal = action["preview"](data_store.load(), body.target, body.params)
-        need_auth = not is_authenticated()
+        error, proposal = action["preview"](data_store.load(), me, body.target, body.params)
+        need_auth = not is_authenticated(me)
     if error:
         return action_reply(error=error)
     return action_reply(proposal=proposal, need_auth=need_auth)
 
 
 @app.post("/api/action/run")
-def action_run(body: ActionIn):
+def action_run(body: ActionIn, request: Request):
     # 확인 창에서 승인(또는 거절)하면 옵니다. 에이전트와 같은 순서입니다.
     #   본인 확인 → 실행 직전 다시 검사 → 실행 → 처리 기록 → 저장(3번까지) → 안내
     #   거절 : 바꾸지 않고 처리 기록만 "거절" 로 남깁니다.
@@ -341,39 +359,41 @@ def action_run(body: ActionIn):
     if not action:
         raise HTTPException(status_code=404, detail="없는 업무입니다")
 
+    me = login_user(request)
+    auth = auth_of(me)
     with bank.work_lock:
-        if common_pending_check(bank_graph, bank.config):
+        if agent_pending(me):
             return action_reply(error="에이전트에서 진행 중인 업무가 있어요. 그 업무를 먼저 끝내거나 취소해 주세요.")
         data = data_store.load()
-        error, proposal = action["preview"](data, body.target, body.params)      # 실행 직전 다시 검사
+        error, proposal = action["preview"](data, me, body.target, body.params)      # 실행 직전 다시 검사
         if error:
             return action_reply(error=error)
         task = proposal["task"]
-        log.turn_start("[버튼] %s %s" % (task, "승인" if body.approve else "거절"), bank.thread_id)
+        log.turn_start("[버튼 %s] %s %s" % (me, task, "승인" if body.approve else "거절"), bank.thread_id)
 
         if not body.approve:
             answer = "%s 요청을 진행하지 않았습니다. 바뀐 것은 없습니다." % task
-            functions.add_request(data, functions.CURRENT_USER, task, dict(proposal["rows"]), "거절", datetime.now().astimezone())
+            functions.add_request(data, me, task, dict(proposal["rows"]), "거절", datetime.now().astimezone())
             result = "거절"
         else:
-            if not is_authenticated():
-                if not body.secret or not functions.authenticate(functions.CURRENT_USER, body.secret):
-                    button_auth["tries"] += 1
-                    log.note("본인 확인 실패 %d/%d" % (button_auth["tries"], AUTH_TRIES))
-                    if button_auth["tries"] >= AUTH_TRIES:
-                        button_auth["tries"] = 0
+            if not is_authenticated(me):
+                if not body.secret or not functions.authenticate(me, body.secret):
+                    auth["tries"] += 1
+                    log.note("본인 확인 실패 %d/%d" % (auth["tries"], AUTH_TRIES))
+                    if auth["tries"] >= AUTH_TRIES:
+                        auth["tries"] = 0
                         log.turn_end("실패")
                         return action_reply(error="본인 확인에 %d번 실패했습니다. 처음부터 다시 요청해 주세요." % AUTH_TRIES)
                     log.turn_end("질문 대기")
-                    return action_reply(auth_error="일치하지 않습니다. (%d/%d)" % (button_auth["tries"], AUTH_TRIES))
-                button_auth.update(ok=True, tries=0)
+                    return action_reply(auth_error="일치하지 않습니다. (%d/%d)" % (auth["tries"], AUTH_TRIES))
+                auth.update(ok=True, tries=0)
                 log.note("본인 확인 성공")
             try:
-                answer = action["apply"](data, body.target, body.params)
+                answer = action["apply"](data, me, body.target, body.params)
             except ValueError as e:     # 실행하다 막힌 경우 (예: 이체 직전 잔액) : 저장하지 않습니다
                 log.turn_end("실패")
                 return action_reply(error=str(e))
-            functions.add_request(data, functions.CURRENT_USER, task, dict(proposal["rows"]), "완료", datetime.now().astimezone())
+            functions.add_request(data, me, task, dict(proposal["rows"]), "완료", datetime.now().astimezone())
             result = "완료"
 
         for attempt in range(1, 4):     # 저장은 3번까지 (에이전트의 common_save 와 같음)
@@ -413,16 +433,18 @@ def waiting_proposal():
 
 
 @app.post("/api/chat")
-def chat(body: ChatIn):
+def chat(body: ChatIn, request: Request):
+    if login_user(request) != AGENT_USER:
+        return {"answer": AGENT_ONLY, "pending": None, "proposal": None, "notices": []}
     return run_turn(body.text.strip())
 
 
 @app.get("/api/waiting")
-def waiting():
+def waiting(request: Request):
     # 화면을 새로 열었을 때(새로고침) 그래프가 멈춰 있으면, 멈춘 질문이나 처리안을 다시 그리게 알려줍니다.
     # 그래프는 서버에 그대로 멈춰 있으므로 다음 입력은 그 답으로 들어갑니다.
     with bank.work_lock:
-        pending = common_pending_check(bank_graph, bank.config)
+        pending = agent_pending(login_user(request))
         if not pending:
             return {"pending": None, "answer": None, "proposal": None}
         text = bank_graph.get_state(bank.config).interrupts[0].value["text"]
@@ -431,8 +453,11 @@ def waiting():
 
 
 @app.get("/api/alerts")
-def alerts():
+def alerts(request: Request):
     # 스케줄러가 입력 없이 실행한 예약 이체·분할 회차 결과를 꺼내 줍니다. 화면이 몇 초마다 부릅니다. (4단계)
+    # 결과 줄에 누구 것인지가 없어서, 아직은 에이전트를 쓰는 사람에게만 줍니다. (5단계에서 사람별로)
+    if login_user(request) != AGENT_USER:
+        return {"alerts": []}
     lines = []
     while not bank.outbox.empty():
         lines.append(bank.outbox.get())
@@ -440,18 +465,20 @@ def alerts():
 
 
 @app.get("/api/recovery")
-def recovery():
+def recovery(request: Request):
     # 켤 때 남아 있던 진행 중 업무를 알려줍니다. 없으면 None. (main.recover_pending 과 같은 내용)
-    if not interrupted:
+    if not interrupted or login_user(request) != AGENT_USER:
         return {"record": None}
     return {"record": {**interrupted, "when": functions.when_text(interrupted["created_at"])}}
 
 
 @app.post("/api/recovery")
-def recover(body: RecoveryIn):
+def recover(body: RecoveryIn, request: Request):
     # 다시 하면 원래 요청 문장으로 처음부터 돌립니다. 잔액·상태를 다시 검사하고 승인도 다시 받습니다.
     # 이전 승인만으로 자동 실행하지 않습니다.
     global interrupted
+    if login_user(request) != AGENT_USER:
+        return {"answer": AGENT_ONLY, "pending": None, "proposal": None, "notices": []}
     record, interrupted = interrupted, None
     if not record:
         return {"answer": "다시 진행할 업무가 없습니다.", "pending": None, "proposal": None, "notices": []}
