@@ -50,9 +50,11 @@ def authenticate(owner_id, value):
     data = data_store.load()
     user = next(u for u in data["users"] if u["owner_id"] == owner_id)
     value = value.replace("-", "").strip()
-    if value == user["phone"].replace("-", ""):
+    # 웹의 간단 계정은 휴대전화번호·주민번호 뒷자리 없이 만들 수 있어서, 빈 값끼리 맞았다고 보지 않게 막습니다.
+    phone = (user.get("phone") or "").replace("-", "")
+    if value and phone and value == phone:
         return True
-    hashes = [user["pin"], user["ssn_tail"]]
+    hashes = [user["pin"], user.get("ssn_tail")]
     hashes += [a["account_password"] for a in data["accounts"] if a["owner_id"] == owner_id]
     return any(check_secret(value, stored) for stored in hashes)
 

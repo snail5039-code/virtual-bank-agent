@@ -209,3 +209,14 @@ tr:last-child td { border-bottom: none; }
 .profile-form .sub-title .muted { font-weight: 400; font-size: 12px; }
 .profile-form .modal-msg { margin-top: 12px; }
 .profile-form .actions button { padding: 9px 16px; }
+
+/* 첫 화면 : 계정 고르기 (왼쪽) + 새 계정 (오른쪽) */
+.pick-page { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 760px; }
+.pick-users { flex: 1; min-width: 300px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 28px 24px; }
+.pick-users h1 { font-size: 17px; font-weight: 500; margin: 0 0 4px; }
+.pick-users p { font-size: 12px; margin: 0 0 16px; line-height: 1.5; }
+.user-list { display: grid; gap: 8px; }
+.user-card { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 10px; width: 100%; padding: 10px 12px;
+             text-align: left; background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+.user-card:hover:not(:disabled) { background: var(--hover); }
+.user-name { font-size: 14px; font-weight: 500; }

@@ -70,7 +70,7 @@ export default function Home() {
             <b>{summary?.user ?? "-"}</b><br />
             <span className="muted">{summary?.authenticated ? "본인 확인 완료" : "본인 확인 전"}</span>
             <div className="me-tools"><ThemeToggle /></div>
-            <a onClick={logout}>로그아웃</a>
+            <a onClick={logout}>다른 계정으로</a>
           </div>
         </aside>
 

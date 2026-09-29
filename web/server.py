@@ -11,19 +11,16 @@
 # 화면은 Next 앱(web/frontend)입니다 : npm --prefix web/frontend run dev → 브라우저에서 http://localhost:3000
 #   Next 가 /api/... 요청을 이 서버로 넘겨 줍니다 (web/frontend/next.config.ts).
 #
-# 로그인 (여러 사람용 2단계) : /login 화면에서 아이디·로그인 비밀번호로 들어옵니다. 로그인하지 않으면 화면과 /api 를 못 씁니다.
-#   시험용 계정 (web/data 에는 비밀번호가 해시로만 있음)
-#     doyoon  / doyoon1234   → user-001 김도윤
-#     seoyeon / seoyeon1234  → user-002 김서연
-#     jiho    / jiho1234     → user-003 박지호
-#     test    / test         → user-005 테스트 (본인 확인 PIN 1234, 주민번호 뒷자리 1234567)
+# 들어가기 (여러 사람용) : 첫 화면에서 있는 계정을 골라 바로 들어옵니다. 가상 은행이라 로그인 비밀번호는 없습니다.
+#   대신 돈·상태가 바뀌는 업무는 본인 확인(PIN · 계좌 비밀번호 등)을 따로 거칩니다. 고르지 않으면 /api 를 못 씁니다.
+#   새 계정 : 첫 화면 옆 칸에서 이름 · PIN(본인 확인용 4자리)만 받아 users 에 넣고 바로 들어갑니다. 계좌·카드는 없이 시작합니다.
+#   시험용 계정 : user-005 테스트 (본인 확인 PIN 1234, 주민번호 뒷자리 1234567)
 #       한 번에 시험해 보도록 넣어 둔 것 : 계좌 3개(생활비 · 저축 · 여행 자금[정지]), 등록 계좌 2개(친구 민지 · 도윤 생활비),
 #       카드 4장(생활비 체크 · 테스트 신용 · 여행 신용[잠금] · 분실 체크[분실 정지]), 낼 카드값 2건(미납 452,000 · 일부 납부 200,000),
 #       예약 이체 1건(10-05 친구 민지 50,000), 배송지(집 · 회사). 계좌 비밀번호 1111 / 2222 / 3333, 카드 비밀번호 0000
-#   회원가입 : /signup 화면. 이름·휴대전화번호·아이디·비밀번호·PIN(본인 확인용 4자리)·주민번호 뒷자리(7자리)를 받아 users 에 새 사람을 넣고 바로 로그인합니다.
-#   화면(요약·메뉴)과 버튼 업무는 로그인한 사람 것만 보여주고 바꿉니다. (3단계)
-#   에이전트도 사람마다 세션(thread_id)·최근 대화가 따로입니다. 요청마다 로그인한 사람을 State 의 owner_id 로 넣습니다. (4단계)
-#   재시작 복구·스케줄러 알림도 사람별입니다. 복구 기록은 data.json 의 pending 에 사람마다, 알림은 그 예약의 주인에게만. (5단계)
+#   화면(요약·메뉴)과 버튼 업무는 들어온 사람 것만 보여주고 바꿉니다.
+#   에이전트도 사람마다 세션(thread_id)·최근 대화가 따로입니다. 요청마다 들어온 사람을 State 의 owner_id 로 넣습니다.
+#   재시작 복구·스케줄러 알림도 사람별입니다. 복구 기록은 data.json 의 pending 에 사람마다, 알림은 그 예약의 주인에게만.
 
 import re
 import secrets
@@ -70,48 +67,33 @@ threading.Thread(target=bank.scheduler_loop, args=(log,), daemon=True).start()
 app = FastAPI()
 
 
-# ---------------------------------------------------------------- 로그인
-# 세션 : 로그인하면 임의의 글자(토큰)를 만들어 쿠키로 주고, 서버는 {토큰: owner_id} 로 기억합니다.
-# 서버 메모리에만 두므로 서버를 다시 켜면 모두 로그아웃됩니다.
+# ---------------------------------------------------------------- 들어가기
+# 세션 : 계정을 고르면 임의의 글자(토큰)를 만들어 쿠키로 주고, 서버는 {토큰: owner_id} 로 기억합니다.
+# 서버 메모리에만 두므로 서버를 다시 켜면 모두 첫 화면으로 돌아갑니다.
 SESSION_COOKIE = "session"
 sessions = {}
 
 
 def login_user(request: Request):
-    # 요청의 쿠키로 로그인한 사람(owner_id)을 찾습니다. 없으면 None.
+    # 요청의 쿠키로 들어온 사람(owner_id)을 찾습니다. 없으면 None.
     return sessions.get(request.cookies.get(SESSION_COOKIE))
+
+
+# 들어오기 전에도 쓸 수 있는 것 : 계정 목록 보기·새 계정 만들기(/api/users), 골라서 들어가기(/api/enter)
+OPEN_PATHS = ("/api/users", "/api/enter")
 
 
 @app.middleware("http")
 async def require_login(request: Request, call_next):
-    # 로그인·회원가입 요청 말고는 로그인해야 씁니다. 아니면 401 을 돌려줍니다.
-    # 화면(web/frontend/lib/api.ts)이 401 을 보면 로그인 화면으로 보냅니다.
-    if request.url.path in ("/api/login", "/api/signup") or login_user(request):
+    # 계정 고르기 말고는 들어와야 씁니다. 아니면 401 을 돌려줍니다.
+    # 화면(web/frontend/lib/api.ts)이 401 을 보면 첫 화면(계정 고르기)으로 보냅니다.
+    if request.url.path in OPEN_PATHS or login_user(request):
         return await call_next(request)
-    return JSONResponse({"detail": "로그인이 필요합니다"}, status_code=401)
-
-
-class LoginIn(BaseModel):
-    login_id: str
-    password: str
-
-
-@app.post("/api/login")
-def login(body: LoginIn):
-    # 아이디로 사람을 찾고, 로그인 비밀번호를 해시로 비교합니다. (본인 확인 PIN 과는 다른 값)
-    # 아이디가 없을 때와 비밀번호가 틀렸을 때 같은 문구를 써서, 어떤 아이디가 있는지 알 수 없게 합니다.
-    with bank.work_lock:
-        data = data_store.load()
-    user = next((u for u in data["users"] if u.get("login_id") == body.login_id.strip()), None)
-    if not user or not functions.check_secret(body.password, user.get("password")):
-        log.note("로그인 실패  %s" % body.login_id.strip())
-        return JSONResponse({"error": "아이디 또는 비밀번호가 맞지 않습니다."}, status_code=401)
-    log.note("로그인  %s (%s)" % (user["login_id"], user["owner_id"]))
-    return start_session(user)
+    return JSONResponse({"detail": "계정을 먼저 골라 주세요"}, status_code=401)
 
 
 def start_session(user):
-    # 토큰을 만들어 기억하고 쿠키로 줍니다. 로그인과 회원가입이 같이 씁니다.
+    # 토큰을 만들어 기억하고 쿠키로 줍니다. 골라서 들어가기와 새 계정 만들기가 같이 씁니다.
     token = secrets.token_hex(16)
     sessions[token] = user["owner_id"]
     response = JSONResponse({"name": user["name"]})
@@ -119,118 +101,124 @@ def start_session(user):
     return response
 
 
-class SignupIn(BaseModel):
-    name: str
-    phone: str
-    login_id: str
-    password: str
-    pin: str
-    ssn_tail: str
-
-
-def check_name_phone(info):
-    # 이름·휴대전화번호 검사. 회원가입과 개인정보 수정이 같이 씁니다.
-    if not 1 <= len(info["name"]) <= 20:
-        return "이름을 1~20자로 적어 주세요."
-    if not re.fullmatch(r"010-\d{4}-\d{4}", info["phone"]):
-        return "휴대전화번호는 010-1234-5678 모양으로 적어 주세요."
-    return None
-
-
-def check_signup(data, info):
-    # 회원가입 값 검사. 문제가 있으면 사유, 없으면 None.
-    error = check_name_phone(info)
-    if error:
-        return error
-    if not re.fullmatch(r"[a-z0-9]{4,20}", info["login_id"]):
-        return "아이디는 영어 소문자·숫자 4~20자로 정해 주세요."
-    if any(u.get("login_id") == info["login_id"] for u in data["users"]):
-        return "이미 쓰는 아이디입니다."
-    if len(info["password"]) < 8:
-        return "비밀번호는 8자 이상으로 정해 주세요."
-    if not re.fullmatch(r"\d{4}", info["pin"]):
-        return "PIN 은 숫자 4자리로 정해 주세요."
-    if not re.fullmatch(r"\d{7}", info["ssn_tail"]):
-        return "주민등록번호 뒷자리는 숫자 7자리로 적어 주세요."
-    return None
-
-
-@app.post("/api/signup")
-def signup(body: SignupIn):
-    # 새 사람을 users 에 넣습니다. 비밀번호·PIN·주민번호 뒷자리는 해시로만 둡니다. 계좌·카드는 없이 시작합니다.
-    # 본인 확인은 기존 사람과 같이 PIN·휴대전화번호·주민번호 뒷자리·계좌 비밀번호 중 하나로 합니다.
-    info = {key: value.strip() for key, value in body.model_dump().items()}
+@app.get("/api/users")
+def users():
+    # 첫 화면의 계정 목록 : 이름과 계좌 수·총 잔액만 보여줍니다. (PIN 같은 값은 해시라도 보내지 않음)
     with bank.work_lock:
         data = data_store.load()
-        error = check_signup(data, info)
-        if error:
-            return JSONResponse({"error": error}, status_code=400)
+    result = []
+    for u in data["users"]:
+        accounts = [a for a in data["accounts"] if a["owner_id"] == u["owner_id"]]
+        result.append({"id": u["owner_id"], "name": u["name"], "accounts": len(accounts),
+                       "total": sum(a["balance"] for a in accounts)})
+    return result
+
+
+class EnterIn(BaseModel):
+    id: str     # 고른 계정 (owner_id)
+
+
+@app.post("/api/enter")
+def enter(body: EnterIn):
+    with bank.work_lock:
+        user = next((u for u in data_store.load()["users"] if u["owner_id"] == body.id), None)
+    if not user:
+        return JSONResponse({"error": "없는 계정입니다."}, status_code=404)
+    log.note("들어옴  %s (%s)" % (user["name"], user["owner_id"]))
+    return start_session(user)
+
+
+class NewUserIn(BaseModel):
+    name: str
+    pin: str
+
+
+def check_name(name):
+    if not 1 <= len(name) <= 20:
+        return "이름을 1~20자로 적어 주세요."
+    return None
+
+
+def check_phone(phone):
+    # 휴대전화번호는 비워 둘 수 있습니다. (새 계정은 없이 시작)
+    if phone and not re.fullmatch(r"010-\d{4}-\d{4}", phone):
+        return "휴대전화번호는 010-1234-5678 모양으로 적어 주세요. (없으면 비워 두세요)"
+    return None
+
+
+def check_pin(pin):
+    if not re.fullmatch(r"\d{4}", pin):
+        return "PIN 은 숫자 4자리로 정해 주세요."
+    return None
+
+
+@app.post("/api/users")
+def new_user(body: NewUserIn):
+    # 새 계정 : 이름과 PIN 만 받습니다. PIN 은 해시로만 둡니다. 휴대전화번호·주민번호 뒷자리는 없이 시작합니다.
+    # 본인 확인은 PIN 또는 (계좌를 만든 뒤) 계좌 비밀번호로 합니다. 휴대전화번호는 개인정보 화면에서 넣을 수 있습니다.
+    name, pin = body.name.strip(), body.pin.strip()
+    error = check_name(name) or check_pin(pin)
+    if error:
+        return JSONResponse({"error": error}, status_code=400)
+    with bank.work_lock:
+        data = data_store.load()
         user = {
             "owner_id": functions.next_id(data["users"], "owner_id", "user"),
-            "name": info["name"],
-            "phone": info["phone"],
-            "ssn_tail": functions.hash_secret(info["ssn_tail"]),
-            "pin": functions.hash_secret(info["pin"]),
-            "login_id": info["login_id"],
-            "password": functions.hash_secret(info["password"]),
+            "name": name,
+            "phone": "",
+            "ssn_tail": None,
+            "pin": functions.hash_secret(pin),
         }
         data["users"].append(user)
         try:
             data_store.save(data)
         except data_store.DataStoreError:
-            return JSONResponse({"error": "저장에 실패해 가입하지 못했습니다."}, status_code=500)
-    log.note("회원가입  %s (%s)" % (user["login_id"], user["owner_id"]))
+            return JSONResponse({"error": "저장에 실패해 만들지 못했습니다."}, status_code=500)
+    log.note("새 계정  %s (%s)" % (user["name"], user["owner_id"]))
     return start_session(user)
 
 
 class ProfileIn(BaseModel):
-    current_password: str       # 지금 로그인 비밀번호 (바꾸기 전에 꼭 확인)
+    current_pin: str            # 지금 PIN (바꾸기 전에 꼭 확인)
     name: str
-    phone: str
-    new_password: str = ""      # 비워 두면 그대로
+    phone: str = ""             # 비워 두면 없음
     new_pin: str = ""           # 비워 두면 그대로
 
 
 @app.get("/api/profile")
 def profile(request: Request):
-    # 개인정보 화면에 채워 둘 값. 비밀번호·PIN·주민번호 뒷자리는 해시라 보여주지 않습니다.
+    # 개인정보 화면에 채워 둘 값. PIN·주민번호 뒷자리는 해시라 보여주지 않습니다.
     me = login_user(request)
     with bank.work_lock:
         user = next(u for u in data_store.load()["users"] if u["owner_id"] == me)
-    return {"name": user["name"], "phone": user["phone"], "login_id": user.get("login_id")}
+    return {"name": user["name"], "phone": user.get("phone") or ""}
 
 
 @app.post("/api/profile")
 def update_profile(body: ProfileIn, request: Request):
-    # 개인정보 수정 : 지금 로그인 비밀번호 확인 → 값 검사 → 바꾸기 → 처리 기록 → 저장.
-    # 바꿀 수 있는 것 : 이름, 휴대전화번호, 로그인 비밀번호, 본인 확인 PIN. (아이디·주민번호 뒷자리는 못 바꿈)
-    # 처리 기록에는 비밀번호·PIN 값을 남기지 않고 "바꿈" 으로만 적습니다.
+    # 개인정보 수정 : 지금 PIN 확인 → 값 검사 → 바꾸기 → 처리 기록 → 저장.
+    # 바꿀 수 있는 것 : 이름, 휴대전화번호, 본인 확인 PIN. (주민번호 뒷자리는 못 바꿈)
+    # 처리 기록에는 PIN 값을 남기지 않고 "바꿈" 으로만 적습니다.
     me = login_user(request)
     info = {key: value.strip() for key, value in body.model_dump().items()}
     with bank.work_lock:
         data = data_store.load()
         user = next(u for u in data["users"] if u["owner_id"] == me)
-        if not functions.check_secret(body.current_password, user.get("password")):
-            log.note("개인정보 수정 실패 (비밀번호 틀림)  %s" % me)
-            return JSONResponse({"error": "지금 로그인 비밀번호가 맞지 않습니다."}, status_code=400)
-        error = check_name_phone(info)
-        if not error and info["new_password"] and len(info["new_password"]) < 8:
-            error = "새 비밀번호는 8자 이상으로 정해 주세요."
-        if not error and info["new_pin"] and not re.fullmatch(r"\d{4}", info["new_pin"]):
-            error = "새 PIN 은 숫자 4자리로 정해 주세요."
+        if not functions.check_secret(info["current_pin"], user.get("pin")):
+            log.note("개인정보 수정 실패 (PIN 틀림)  %s" % me)
+            return JSONResponse({"error": "지금 PIN 이 맞지 않습니다."}, status_code=400)
+        error = check_name(info["name"]) or check_phone(info["phone"]) or (info["new_pin"] and check_pin(info["new_pin"]))
         if error:
-            return JSONResponse({"error": error}, status_code=400)
+            return JSONResponse({"error": error.replace("PIN 은", "새 PIN 은")}, status_code=400)
 
         changes = {}
+        old_phone = user.get("phone") or ""
         if info["name"] != user["name"]:
             changes["이름"] = "%s → %s" % (user["name"], info["name"])
             user["name"] = info["name"]
-        if info["phone"] != user["phone"]:
-            changes["휴대전화번호"] = "%s → %s" % (user["phone"], info["phone"])
+        if info["phone"] != old_phone:
+            changes["휴대전화번호"] = "%s → %s" % (old_phone or "없음", info["phone"] or "없음")
             user["phone"] = info["phone"]
-        if info["new_password"]:
-            changes["로그인 비밀번호"] = "바꿈"
-            user["password"] = functions.hash_secret(info["new_password"])
         if info["new_pin"]:
             changes["PIN"] = "바꿈"
             user["pin"] = functions.hash_secret(info["new_pin"])
