@@ -25,7 +25,7 @@ const input = document.getElementById("text");
 const send = document.getElementById("send");
 
 // 처리안에서 크게 보여줄 금액 칸 이름 (업무마다 이름이 다릅니다)
-const AMOUNT_LABELS = ["총액", "낼 금액", "합계"];
+const AMOUNT_LABELS = ["총액", "낼 금액", "합계", "입금액"];
 const PLACEHOLDER = "요청을 입력하세요";
 
 let openCard = null;    // 지금 답을 기다리는 처리안 카드
@@ -474,7 +474,7 @@ async function openReissue(card) {
 const ACCOUNT_FORM = {
   title: "상대 계좌 등록", kind: "account_register",
   fields: [
-    { key: "bank_name", label: "은행", placeholder: "예: 미래은행" },
+    { key: "bank_name", label: "은행", banks: true },
     { key: "account_number", label: "계좌번호", placeholder: "예: 210-11-223344" },
     { key: "holder_name", label: "예금주", placeholder: "예: 이영희" },
     { key: "nickname", label: "별명 (안 쓰면 예금주 이름)", placeholder: "예: 친구 영희", optional: true },
@@ -483,6 +483,7 @@ const ACCOUNT_FORM = {
 const OPEN_FORM = {
   title: "내 계좌 만들기", kind: "account_open",
   fields: [
+    { key: "bank_name", label: "은행", banks: true },
     { key: "nickname", label: "별명", placeholder: "예: 비상금" },
     { key: "purpose", label: "용도 (선택)", placeholder: "예: 급할 때 쓰는 돈", optional: true },
     { key: "password", label: "계좌 비밀번호 (숫자 4자리)", secret: true },
@@ -491,22 +492,34 @@ const OPEN_FORM = {
 const CARD_FORM = {
   title: "카드 등록", kind: "card_register",
   fields: [
-    { key: "bank_name", label: "은행", placeholder: "예: 미래은행" },
+    { key: "bank_name", label: "은행", banks: true },
     { key: "card_number", label: "카드 번호 (16자리)", placeholder: "예: 1234-5678-1234-5678" },
     { key: "card_type", label: "종류", options: [["체크", "체크카드"], ["신용", "신용카드"]] },
     { key: "account_id", label: "결제 계좌", options: [] },
     { key: "name", label: "별칭 (안 쓰면 은행 + 종류)", placeholder: "예: 장보기 카드", optional: true },
   ],
 };
+const DEPOSIT_FORM = {
+  title: "가상 입금", kind: "deposit",
+  fields: [
+    { key: "account", label: "입금할 내 계좌", options: [] },
+    { key: "amount", label: "금액 (한 번에 1,000만원까지)", placeholder: "예: 100000" },
+  ],
+};
 
-function openForm(form) {
+async function openForm(form) {
   if (busy) return;
+  // 은행 칸(banks: true)은 서버의 은행 목록(/api/view/banks)으로 고르기를 만듭니다.
+  const banks = form.fields.some((f) => f.banks) ? await (await fetch("/api/view/banks")).json() : [];
   modal.hidden = false;
   const inputs = {};
   const parts = [el("div", "modal-head", form.title)];
   for (const f of form.fields) {
     let control;
-    if (f.options) {
+    if (f.banks) {
+      control = el("select");
+      for (const name of banks) control.appendChild(new Option(name, name));
+    } else if (f.options) {
       control = el("select");
       for (const [value, text] of f.options) control.appendChild(new Option(text, value));
     } else {
@@ -547,6 +560,13 @@ function button(label, onClick) {
 
 function badge(text, cls) { return el("span", "badge " + cls, text); }
 
+function accountButtons(a) {
+  // 내 계좌 한 줄의 버튼 : 이체, 해지 (해지는 잔액 0원 등 조건을 서버가 검사합니다)
+  const box = el("span", "btns");
+  box.append(button("이체", () => openTransfer({ from: a.id })), button("해지", () => openAction("account_close", a.id)));
+  return box;
+}
+
 function cardButtons(c) {
   // 카드 상태에 따라 할 수 있는 버튼 : 사용 가능 → 잠그기, 잠금 → 잠금 풀기, 분실 정지 → 재발급. 해지 전이면 해지도.
   if (c.status === "cancelled") return "";
@@ -579,6 +599,13 @@ function openPicker(title, items, emptyText) {
 
 async function quickAction(kind) {
   if (kind === "transfer") { openTransfer(); return; }
+  if (kind === "deposit") {
+    const opt = await (await fetch("/api/view/transfer_options")).json();     // 내 계좌
+    if (!opt.accounts.length) { openPicker("가상 입금", [], "계좌가 없어요. 계좌 화면에서 '내 계좌 만들기' 를 먼저 해 주세요"); return; }
+    openForm({ ...DEPOSIT_FORM, fields: DEPOSIT_FORM.fields.map((f) => f.key === "account"
+      ? { ...f, options: opt.accounts.map((a) => [a.id, a.name + "  (잔액 " + won(a.balance) + "원)"]) } : f) });
+    return;
+  }
   if (kind === "bill") {
     const bills = (await (await fetch("/api/view/bills")).json()).filter((s) => s.remaining > 0);
     openPicker("어떤 카드값을 낼까요?", bills.map((s) => ({
@@ -611,7 +638,7 @@ const PAGES = {
       box.appendChild(table(
         [["계좌", ""], ["은행 / 계좌번호", ""], ["용도", ""], ["잔액", "num"], ["", "num"]],
         rows.map((a) => [a.name, a.bank + " " + a.number, a.purpose, el("span", "mono", won(a.balance) + "원"),
-                         button("이체", () => openTransfer({ from: a.id }))])));
+                         accountButtons(a)])));
       box.appendChild(el("h3", "sub-title", "등록 계좌"));
       box.appendChild(registered.length ? table(
         [["별명", ""], ["은행 / 계좌번호", ""], ["예금주", ""], ["", "num"]],

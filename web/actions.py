@@ -11,6 +11,26 @@
 
 import functions
 
+# 고를 수 있는 은행과 은행 코드입니다. (계좌 만들기, 상대 계좌 등록, 카드 등록)
+# 실제 은행처럼 보이게 실제 은행 이름과 표준 은행 코드를 씁니다. 가상은행은 처음 데이터가 쓰는 이 앱의 은행입니다.
+# 실제 은행과 연결되지는 않습니다. 이름과 계좌번호 모양만 빌려 씁니다.
+BANKS = {
+    "가상은행": "001",
+    "KB국민은행": "004",
+    "신한은행": "088",
+    "우리은행": "020",
+    "하나은행": "081",
+    "NH농협은행": "011",
+    "IBK기업은행": "003",
+    "SC제일은행": "023",
+    "카카오뱅크": "090",
+    "케이뱅크": "089",
+    "토스뱅크": "092",
+    "iM뱅크": "031",
+    "부산은행": "032",
+    "우체국": "071",
+}
+
 
 def my_card(data, me, card_id):
     card = next((c for c in data["cards"] if c["card_id"] == card_id and c["owner_id"] == me), None)
@@ -232,6 +252,8 @@ def account_reg_info(params):
 
 def account_register_preview(data, me, target, params):
     info = account_reg_info(params)
+    if info["bank_name"] not in BANKS:
+        return "은행을 골라 주세요.", None
     error = functions.check_register(me, info)
     if error:
         return error, None
@@ -259,6 +281,8 @@ def card_reg_info(params):
 
 def card_register_preview(data, me, target, params):
     info = card_reg_info(params)
+    if info["bank_name"] not in BANKS:
+        return "은행을 골라 주세요.", None
     if info["account_id"] and not any(a["account_id"] == info["account_id"] and a["owner_id"] == me
                                       for a in data["accounts"]):
         return "결제 계좌를 골라 주세요.", None
@@ -305,22 +329,22 @@ def registered_delete_apply(data, me, registered_id, params):
 # 규칙은 기존 것과 맞춥니다.
 #   별명   : 앞뒤 공백을 뗀 1~20자, 내 다른 계좌와 겹치면 안 됨 (functions.check_setting 과 같은 기준)
 #   비밀번호 : 숫자 4자리, 평문이 아니라 해시로 저장 (functions.hash_secret). 처리안·처리 기록에는 **** 로만
-#   계좌번호 : 가상은행 계좌 중 가장 큰 번호 + 1 (예: 110-001-100005 까지 있으면 110-001-100006), 잔액 0원
-#   params : {"nickname", "purpose"(선택), "password"}
-BANK_CODE, BANK_NAME = "001", "가상은행"
-
-
-def new_account_number(data):
-    numbers = [int(a["account_number"].split("-")[-1]) for a in data["accounts"] if a["bank_code"] == BANK_CODE]
-    return "110-001-%06d" % (max(numbers, default=100000) + 1)
+#   은행   : BANKS 에서 고릅니다
+#   계좌번호 : 110-은행 코드-번호. 번호는 그 은행 계좌 중 가장 큰 번호 + 1 (예: 110-001-100005 까지 있으면 110-001-100006), 잔액 0원
+#   params : {"bank_name", "nickname", "purpose"(선택), "password"}
+def new_account_number(data, bank_code):
+    numbers = [int(a["account_number"].split("-")[-1]) for a in data["accounts"] if a["bank_code"] == bank_code]
+    return "110-%s-%06d" % (bank_code, max(numbers, default=100000) + 1)
 
 
 def account_open_info(params):
-    return {key: (params.get(key) or "").strip() for key in ["nickname", "purpose", "password"]}
+    return {key: (params.get(key) or "").strip() for key in ["bank_name", "nickname", "purpose", "password"]}
 
 
 def account_open_preview(data, me, target, params):
     info = account_open_info(params)
+    if info["bank_name"] not in BANKS:
+        return "은행을 골라 주세요.", None
     if not 1 <= len(info["nickname"]) <= functions.MAX_SETTING_LEN:
         return "별명은 1~%d자로 정해 주세요." % functions.MAX_SETTING_LEN, None
     if any(a["owner_id"] == me and a["nickname"] == info["nickname"] for a in data["accounts"]):
@@ -329,29 +353,114 @@ def account_open_preview(data, me, target, params):
         return "용도는 %d자까지 쓸 수 있습니다." % functions.MAX_SETTING_LEN, None
     if not (len(info["password"]) == 4 and info["password"].isdigit()):
         return "계좌 비밀번호는 숫자 4자리여야 합니다.", None
-    rows = [["은행", BANK_NAME], ["계좌번호", new_account_number(data)], ["별명", info["nickname"]],
+    rows = [["은행", info["bank_name"]], ["계좌번호", new_account_number(data, BANKS[info["bank_name"]])], ["별명", info["nickname"]],
             ["용도", info["purpose"] or "-"], ["비밀번호", "****"], ["잔액", "0원으로 시작합니다"]]
     return None, {"task": "계좌 만들기", "rows": rows}
 
 
 def account_open_apply(data, me, target, params):
     info = account_open_info(params)
-    number = new_account_number(data)
+    code = BANKS[info["bank_name"]]
+    number = new_account_number(data, code)
     data["accounts"].append({
         "account_id": functions.next_id(data["accounts"], "account_id", "acc"),
         "owner_id": me,
         "nickname": info["nickname"],
         "purpose": info["purpose"] or None,
         "balance": 0,
-        "bank_code": BANK_CODE,
-        "bank_name": BANK_NAME,
+        "bank_code": code,
+        "bank_name": info["bank_name"],
         "account_number": number,
         "account_password": functions.hash_secret(info["password"]),
     })
-    return "계좌를 만들었습니다. (%s  %s %s)" % (info["nickname"], BANK_NAME, number)
+    return "계좌를 만들었습니다. (%s  %s %s)" % (info["nickname"], info["bank_name"], number)
+
+
+# ---------------------------------------------------------------- 내 계좌 해지 (웹에만 있는 기능)
+# 에이전트의 "삭제" 는 등록 계좌(상대 계좌)만 지웁니다. 내 계좌를 없애는 것은 이 버튼으로 합니다.
+# 실제 은행처럼 아래가 남아 있으면 해지할 수 없습니다.
+#   잔액 (0원이어야 함) / 이 계좌를 결제 계좌로 쓰는 카드 (해지된 카드는 괜찮음) / 이 계좌의 예약 이체 / 이 계좌로 내는 분할 결제
+# 해지하면 계좌를 목록에서 뺍니다. 지난 거래 내역은 그대로 둡니다.
+# 다른 사람이 이 계좌를 등록 계좌로 이어 두었으면 연결만 끊습니다 (다른 은행 계좌처럼 됨. 끊지 않으면 그쪽 이체가 오류가 남).
+def my_account(data, me, account_id):
+    return next((a for a in data["accounts"] if a["account_id"] == account_id and a["owner_id"] == me), None)
+
+
+def account_close_preview(data, me, account_id, params):
+    account = my_account(data, me, account_id)
+    if not account:
+        return "계좌를 찾지 못했습니다.", None
+    if account["balance"] > 0:
+        return "잔액이 %s원 남아 있어요. 다른 계좌로 옮긴 뒤 해지해 주세요." % format(account["balance"], ","), None
+    cards = [c["name"] for c in data["cards"] if c.get("account_id") == account_id and c["status"] != "cancelled"]
+    if cards:
+        return "이 계좌를 결제 계좌로 쓰는 카드가 있어요. (%s) 카드를 먼저 해지해 주세요." % ", ".join(cards), None
+    if any(s["status"] == "예약" and account_id in (s["from_account"], s["to_account"]) for s in data["scheduled_transfers"]):
+        return "이 계좌의 예약 이체가 있어요. 예약을 먼저 취소해 주세요.", None
+    paying = {s["statement_id"] for s in data["card_statements"] if s.get("paid_account") == account_id}
+    if any(i["status"] == "active" and i["statement_id"] in paying for i in data["card_installments"]):
+        return "이 계좌로 내는 분할 결제가 끝나지 않았어요.", None
+    rows = [
+        ["계좌", "%s (%s %s)" % (account["nickname"], account["bank_name"], account["account_number"])],
+        ["잔액", "0원"],
+        ["주의", "해지하면 되돌릴 수 없습니다"],
+    ]
+    return None, {"task": "계좌 해지", "rows": rows}
+
+
+def account_close_apply(data, me, account_id, params):
+    account = my_account(data, me, account_id)
+    data["accounts"].remove(account)
+    for r in data["registered_accounts"]:
+        if r.get("account_id") == account_id:
+            r["account_id"] = None
+    return "계좌를 해지했습니다. (%s  %s %s)" % (account["nickname"], account["bank_name"], account["account_number"])
+
+
+# ---------------------------------------------------------------- 가상 입금 (웹에만 있는 기능)
+# 실제 은행과 연결되어 있지 않아서, 시험해 볼 돈을 내 계좌에 가상으로 넣습니다.
+# 다른 버튼 업무처럼 처리안 → 본인 확인 → 승인 뒤에 넣고, 거래 내역(입금 · 가상 입금)과 처리 기록을 남깁니다.
+#   params : {"account": 내 계좌 ID, "amount": 금액}
+DEPOSIT_MAX = 10_000_000     # 한 번에 넣을 수 있는 금액 (1,000만원)
+
+
+def deposit_input(data, me, params):
+    account = next((a for a in data["accounts"] if a["account_id"] == params.get("account") and a["owner_id"] == me), None)
+    if not account:
+        return "입금할 내 계좌를 골라 주세요.", None
+    try:
+        amount = int(str(params.get("amount") or "").replace(",", ""))
+    except ValueError:
+        return "금액은 숫자로 입력해 주세요.", None
+    if not 1 <= amount <= DEPOSIT_MAX:
+        return "가상 입금은 한 번에 1원부터 %s원까지 할 수 있습니다." % format(DEPOSIT_MAX, ","), None
+    return None, (account, amount)
+
+
+def deposit_preview(data, me, target, params):
+    error, parsed = deposit_input(data, me, params)
+    if error:
+        return error, None
+    account, amount = parsed
+    rows = [
+        ["입금 계좌", "%s (%s %s)" % (account["nickname"], account["bank_name"], account["account_number"])],
+        ["입금액", format(amount, ",") + "원"],
+        ["입금 후 잔액", format(account["balance"] + amount, ",") + "원"],
+        ["주의", "실제 돈이 아닌 시험용 가상 입금입니다"],
+    ]
+    return None, {"task": "가상 입금", "rows": rows}
+
+
+def deposit_apply(data, me, target, params):
+    _, (account, amount) = deposit_input(data, me, params)
+    account["balance"] += amount
+    functions.add_transaction(data, account, "deposit", amount, functions.now_text(), "가상 입금")
+    return "가상 입금했습니다. %s  + %s원 → 잔액 %s원" % (account["nickname"], format(amount, ","), format(account["balance"], ","))
 
 
 ACTIONS = {
+    "account_close": {"preview": account_close_preview, "apply": account_close_apply},
+    "deposit": {"preview": deposit_preview, "apply": deposit_apply},
     "account_open": {"preview": account_open_preview, "apply": account_open_apply},
     "registered_delete": {"preview": registered_delete_preview, "apply": registered_delete_apply},
     "card_cancel": card_status_action("해지"),

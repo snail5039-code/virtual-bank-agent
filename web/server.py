@@ -317,6 +317,9 @@ def view(name: str, request: Request):
         # 등록 계좌 (돈을 보낼 상대 계좌 주소록)
         return [{"id": r["registered_id"], "name": r["nickname"], "bank": r["bank_name"], "number": r["account_number"],
                  "holder": r["holder_name"]} for r in mine("registered_accounts")]
+    if name == "banks":
+        # 계좌 만들기·상대 계좌 등록·카드 등록 창의 은행 고르기 목록
+        return list(actions.BANKS)
     if name == "addresses":
         # 재발급 창의 배송지 고르기 목록 (집 / 회사)
         return [{"id": a["address_id"], "label": a["label"], "address": a["address"]} for a in mine("addresses")]

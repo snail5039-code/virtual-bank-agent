@@ -170,6 +170,11 @@ def setting_check_node(state: BankState):
                 found = functions.find_registered(state["owner_id"], state["target_name"])
                 log.resolve(state["target_name"], len(found), found[0]["registered_id"] if found else None)
                 if not found:
+                    # 내 계좌 이름이면, 삭제는 등록 계좌만 된다고 알려줍니다. 내 계좌 해지는 웹 계좌 화면의 버튼으로 합니다.
+                    if functions.find_accounts(state["owner_id"], state["target_name"]):
+                        update["error"] = ("'%s' 은(는) 내 계좌예요. 여기서 지우는 것은 등록 계좌(상대 계좌)만 됩니다.\n"
+                                           "내 계좌는 계좌 화면의 '해지' 버튼으로 해지해 주세요. (잔액이 0원이어야 합니다)" % state["target_name"])
+                        return update
                     update["error"] = "'%s' 등록 계좌를 찾을 수 없습니다." % state["target_name"]
                     return update
                 if len(found) > 1:
