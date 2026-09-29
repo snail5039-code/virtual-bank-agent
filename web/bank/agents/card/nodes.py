@@ -1,0 +1,221 @@
+# 카드 에이전트(2단)의 노드 함수입니다.
+#
+#   card_router : 카드 요청이 조회 / 결제 / 설정 / 재발급 중 무엇인지 고릅니다
+#   card_extract: 무엇을 볼지(목록 / 결제 계좌 / 카드 번호 / 멤버십 / 이용 내역)와 조건을 뽑습니다
+#   card_query  : 조건으로 카드를 걸러 볼 것을 보여줍니다. 카드 번호는 본인 확인 뒤에만 옵니다
+#   card_to_reissue : 분실 신고가 끝난 뒤 재발급으로 넘어갈 때 State 를 재발급용으로 바꿉니다 (4-7)
+#   (설정·재발급·결제는 각 에이전트 그래프로 넘깁니다)
+
+from datetime import date
+from typing import Literal, Optional
+
+from langchain_core.exceptions import OutputParserException
+from langchain_core.messages import HumanMessage, SystemMessage
+from langgraph.graph import END
+from pydantic import BaseModel, Field, ValidationError
+
+import functions
+import logger
+from agents.card.prompts import card_prompt, card_query_prompt
+from model import llm
+from state import BankState
+
+
+class CardDecision(BaseModel):
+    task: Literal["조회", "결제", "설정", "재발급", "계좌 업무"] = Field(description="카드 요청의 업무 종류")
+    reason: str = Field(description="그 업무를 고른 이유")
+
+
+llm_with_card_output = llm.with_structured_output(CardDecision)
+
+
+def card_router_node(state: BankState):
+    log = logger.get_logger()
+    with log.node("card_router"):
+        result = llm_with_card_output.invoke([
+            SystemMessage(content=card_prompt),
+            HumanMessage(content=state["query"]),
+        ])
+        log.route(2, result.task, result.reason)
+
+    return {"task": result.task}
+
+
+class CardFilter(BaseModel):
+    info: Literal["목록", "결제 계좌", "카드 번호", "멤버십", "이용 내역"] = Field(
+        default="목록", description="카드의 무엇을 볼지")
+    bank_names: Optional[list[str]] = Field(default=None, description="물어본 은행 이름 목록. 여러 곳이면 모두")
+    exclude_banks: Optional[list[str]] = Field(default=None, description="'~ 말고', '~ 빼고' 로 뺀 은행 이름 목록")
+    card_name: Optional[str] = Field(default=None, description="카드 이름")
+    card_type: Optional[Literal["체크", "신용"]] = Field(default=None, description="카드 종류")
+    status: Optional[Literal["사용 가능", "일시 잠금", "분실 정지", "해지"]] = Field(default=None, description="카드 상태")
+    # 이용 내역의 기간입니다. 계좌 거래내역과 같은 방식입니다.
+    period: functions.Period = Field(default="전체", description="기간")
+    start_date: Optional[date] = Field(default=None, description="직접 말한 시작일 YYYY-MM-DD")
+    end_date: Optional[date] = Field(default=None, description="직접 말한 종료일 YYYY-MM-DD")
+
+
+llm_with_filter_output = llm.with_structured_output(CardFilter)
+
+
+def card_extract_node(state: BankState):
+    # 무엇을 볼지와 조건을 LLM 이 뽑습니다. 카드 번호면 다음에 본인 확인을 거치므로 State 에 남겨 둡니다.
+    log = logger.get_logger()
+    with log.node("card_extract"):
+        # LLM 이 형식을 어기면 검증 오류가 나므로, 오류 대신 안내로 끝냅니다.
+        try:
+            f = llm_with_filter_output.invoke([
+                SystemMessage(content=card_query_prompt.format(year=functions.base_date().year, today=functions.base_date())),
+                HumanMessage(content=state["query"]),
+            ])
+        except (ValidationError, OutputParserException) as e:
+            log.detail("조건 형식 오류  %s" % type(e).__name__)
+            return {"error": "조건을 알아듣지 못했습니다. (예: 가상은행 카드 / 신용카드 결제 계좌 / 이번 달 카드 이용 내역)"}
+        log.detail("조건  볼것=%s 은행=%s 뺄은행=%s 이름=%s 종류=%s 상태=%s 기간=%s %s~%s" % (
+            f.info, f.bank_names, f.exclude_banks, f.card_name, f.card_type, f.status, f.period, f.start_date, f.end_date))
+
+    return {"card_filter": f.model_dump()}
+
+
+def card_query_node(state: BankState):
+    # 뽑아 둔 조건으로 카드를 거르고, 볼 것(info)에 맞춰 답을 만듭니다. 거르기와 계산은 functions 가 합니다.
+    if state.get("error"):
+        return {"answer": state["error"]}
+
+    f = state["card_filter"]
+    with logger.get_logger().node("card_query"):
+        # 은행을 말했으면 은행마다 따로 걸러 은행별로 나눠 보여줍니다. 카드가 없는 은행은 없다고 짚어 줍니다.
+        # "OO은행 말고" 면 그 은행 카드를 빼고, 남은 카드를 은행별로 나눠 보여줍니다. 기준 은행은 사용자가 말한 은행입니다.
+        # 은행을 말하지 않았으면("내 카드") 은행을 거르지 않고 한 번에 보여줍니다.
+        exclude = f.get("exclude_banks") or []
+        other_filter = f["card_name"] or f["card_type"] or f["status"]
+        parts = []
+        if exclude and not f["bank_names"]:
+            cards = functions.find_cards(functions.CURRENT_USER, None, f["card_name"], f["card_type"], f["status"], exclude)
+            if not cards:
+                return {"answer": "%s 말고 다른 은행%s 없습니다." % (
+                    ", ".join(exclude), "에는 조건에 맞는 카드가" if other_filter else " 카드는")}
+            banks = list(dict.fromkeys(c["bank_name"] for c in cards))     # 남은 카드의 은행 (나온 순서대로, 겹치지 않게)
+            for bank in banks:
+                lines = card_lines(f, [c for c in cards if c["bank_name"] == bank])
+                lines[0] = "[%s] %s" % (bank, lines[0])
+                parts.append("\n".join(lines))
+            return {"answer": "\n\n".join(parts)}
+
+        banks = f["bank_names"] or [None]
+        for bank in banks:
+            cards = functions.find_cards(functions.CURRENT_USER, bank, f["card_name"], f["card_type"], f["status"], exclude)
+            if not cards:
+                if not bank:
+                    parts.append("조건에 맞는 카드가 없습니다.")
+                elif other_filter:
+                    parts.append("%s에는 조건에 맞는 카드가 없습니다." % bank)
+                else:
+                    parts.append("%s 카드는 없습니다." % bank)
+                continue
+            lines = card_lines(f, cards)
+            if len(banks) > 1:
+                lines[0] = "[%s] %s" % (bank, lines[0])     # 여러 은행이면 은행 이름을 앞에 붙입니다
+            parts.append("\n".join(lines))
+
+    return {"answer": "\n\n".join(parts)}
+
+
+def card_lines(f, cards):
+    # 걸러 낸 카드로 볼 것(info)에 맞춘 답을 줄 목록으로 만듭니다. 은행마다 한 번씩 부릅니다.
+    accounts = {a["account_id"]: a for a in functions.get_accounts(functions.CURRENT_USER)}
+    names = {c["card_id"]: c["name"] for c in cards}
+    info = f["info"]
+
+    if info == "결제 계좌":
+        lines = ["카드 %d장의 결제 계좌입니다." % len(cards)]
+        for card in cards:
+            account = accounts[card["account_id"]]
+            lines.append("- %s : %s (%s %s)" % (
+                card["name"], account["nickname"], account["bank_name"], account["account_number"]))
+
+    elif info == "카드 번호":
+        # 본인 확인을 마친 뒤에만 여기 옵니다. 그래서 가리지 않고 전체를 보여줍니다. (기획서 5.1)
+        lines = ["카드 %d장의 카드 번호입니다." % len(cards)]
+        for card in cards:
+            lines.append("- %s : %s  [%s]" % (card["name"], card["card_number"], functions.CARD_STATUS[card["status"]]))
+
+    elif info == "멤버십":
+        memberships = functions.get_memberships(functions.CURRENT_USER, list(names))
+        if not memberships:
+            return ["멤버십이 연결된 카드가 없습니다."]
+        lines = ["멤버십 %d개입니다." % len(memberships)]
+        for m in memberships:
+            lines.append("- %s : %s %s등급  %sP" % (names[m["card_id"]], m["name"], m["grade"], format(m["points"], ",")))
+
+    elif info == "이용 내역":
+        start, end = functions.date_range(f["period"], f["start_date"], f["end_date"])
+        found = functions.get_card_history(functions.CURRENT_USER, list(names), start, end)
+        if not found:
+            return ["조건에 맞는 카드 이용 내역이 없습니다."]
+        lines = ["카드 이용 내역 %d건 (최근순)" % len(found)]
+        for item in found:
+            lines.append("- %s  %s  %s원  %s" % (
+                item["occurred_at"][:16].replace("T", " "), names[item["card_id"]],
+                format(item["amount"], ","), item["merchant"] or ""))
+        # 합계는 Python 이 더합니다. LLM 이 계산하지 않습니다 (원칙 6).
+        lines.append("합계 : %s원" % format(sum(item["amount"] for item in found), ","))
+
+    else:   # 목록
+        lines = ["카드 %d장입니다." % len(cards)]
+        for card in cards:
+            if card["card_type"] == "credit":
+                # 직접 등록한 카드는 한도를 모릅니다 (credit_limit 이 비어 있음).
+                extra = "한도 %s원" % format(card["credit_limit"], ",") if card["credit_limit"] else "한도 정보 없음"
+            else:
+                extra = "연결 계좌 %s" % accounts[card["account_id"]]["nickname"]
+            # 잠금·분실·해지 카드는 사용할 수 없다고 같이 보여줍니다. (안내만 합니다. 기획서 12장)
+            lines.append("- %s (%s %s) : %s  [%s]%s" % (
+                card["name"], card["bank_name"], functions.CARD_TYPES[card["card_type"]],
+                extra, functions.CARD_STATUS[card["status"]], "" if card["status"] == "active" else " (사용 불가)"))
+
+    return lines
+
+
+def card_to_reissue_node(state: BankState):
+    # 정지 후 재발급 연속 처리 (4-7). 분실 신고 저장이 끝난 뒤 재발급 신청으로 넘어가기 전에 State 를 바꿔 줍니다.
+    # 두 업무가 설정 칸을 같이 쓰므로, 분실 신고 값(할 일, 사유)을 재발급 값(신청, 배송지)으로 바꾸고
+    # 처리안·승인 값은 비웁니다. 카드 이름(target_name)과 세션 인증은 그대로 둡니다.
+    with logger.get_logger().node("card_to_reissue"):
+        return {"setting_action": "신청", "new_value": state.get("reissue_address"), "target_account": None,
+                "proposal": None, "approval": None, "result": None, "error": None, "new_data": None}
+
+
+def route_by_task(state: BankState):
+    # 고른 업무에 따라 다음 노드를 정합니다. 설정·재발급·결제는 각 에이전트 그래프로 넘깁니다.
+    # "계좌 업무" 는 1단이 잘못 보낸 요청입니다. 일을 하지 않고 나가면 supervisor 그래프가 계좌로 다시 보냅니다. (도메인 반송)
+    if state["task"] == "계좌 업무":
+        return END
+    if state["task"] == "조회":
+        return "card_extract"
+    if state["task"] == "설정":
+        return "card_setting"
+    if state["task"] == "재발급":
+        return "reissue"
+    return "billing"
+
+
+def route_after_setting(state: BankState):
+    # 분실 신고가 저장까지 끝났고 재발급도 원했으면 이어서 재발급으로 갑니다. 거절·실패면 여기서 끝납니다.
+    if state.get("reissue_next") and state.get("result") == "완료":
+        return "card_to_reissue"
+    return END
+
+
+def route_after_extract(state: BankState):
+    # 카드 번호는 본인 확인을 먼저 받습니다. 나머지는 바로 보여줍니다.
+    if not state.get("error") and state["card_filter"]["info"] == "카드 번호":
+        return "common_authenticate"
+    return "card_query"
+
+
+def route_after_authenticate(state: BankState):
+    # 맞혔거나 취소·3번 실패(error)면 card_query 로 갑니다. card_query 가 error 를 보고 안내로 끝냅니다.
+    if state.get("error") or state.get("authenticated"):
+        return "card_query"
+    return "common_authenticate"        # 틀렸으면 다시 묻습니다

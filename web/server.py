@@ -1,5 +1,6 @@
 # 웹에서 에이전트를 쓰게 해 주는 서버입니다.
-# src/ 의 코드는 바꾸지 않고, main.py 가 하는 일을 그대로 가져다 씁니다.
+# 에이전트 코드는 src 를 복사해 온 web/bank 를 씁니다 (src 는 터미널 버전으로 그대로 둠). main.py 가 하는 일을 그대로 가져다 씁니다.
+# 데이터도 웹 전용 web/data 를 씁니다 (web/bank/data_store.py 가 자기 위치 기준으로 찾음).
 #   - 입력 한 번 처리 : main.respond (분기 0 → 재개 / 새 요청)
 #   - 턴이 끝난 뒤   : 진행 중 업무 기록(remember_pending), 최근 대화(remember_turn)
 #   - 파일 잠금      : main.work_lock
@@ -15,7 +16,7 @@ import threading
 from pathlib import Path
 
 WEB_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(WEB_DIR.parent / "src"))     # src 의 모듈(main, data_store …)을 불러오기 위해
+sys.path.insert(0, str(WEB_DIR / "bank"))     # web/bank : src 를 복사해 온 웹 전용 에이전트 코드 (src 는 터미널 버전으로 그대로 둠)
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -29,7 +30,7 @@ import actions          # web/actions.py : 메뉴 화면 버튼 업무
 import data_store
 import functions
 import logger
-import main as bank     # src/main.py
+import main as bank     # web/bank/main.py
 from agents.common.nodes import APPROVAL, SECRET, common_pending_check
 from agents.supervisor.graph import bank_graph
 
