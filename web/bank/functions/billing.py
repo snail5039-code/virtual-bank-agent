@@ -120,7 +120,7 @@ def pay_due_installments(data, now):
     #   낼 수 있으면 : 낸 회차 +1, 다음 납부일을 한 달 뒤로. 마지막 회차면 pay_statement 가 분할을 끝냅니다 (남은 금액 0)
     #   잔액이 모자라면 : 내지 않고 실패로 기록하고, 다음 납부일을 하루 뒤로 미뤄 다시 시도합니다
     #                    (미루지 않으면 입력할 때마다 같은 실패가 반복해서 뜹니다)
-    # 처리한 결과를 한 줄씩 돌려줍니다.
+    # 처리한 결과를 (owner_id, 한 줄) 로 돌려줍니다. (run_due_schedules 와 같은 모양)
     cards = {c["card_id"]: c["name"] for c in data["cards"]}
     lines = []
     for i in data["card_installments"]:
@@ -138,15 +138,15 @@ def pay_due_installments(data, now):
             status = "실패"
             reason = "잔액이 부족합니다. (%s 잔액 %s원)" % (account["nickname"], format(account["balance"], ","))
             i["next_due_at"] = (now + timedelta(days=1)).isoformat(timespec="seconds")
-            lines.append("[분할 회차 실패] %s  %s원  %s 내일 다시 시도합니다." % (name, format(amount, ","), reason))
+            lines.append((statement["owner_id"], "[분할 회차 실패] %s  %s원  %s 내일 다시 시도합니다." % (name, format(amount, ","), reason)))
         else:
             status = "완료"
             reason = None
             pay_statement(data, statement["statement_id"], account["account_id"], amount, "카드값 " + name)
             i["paid_count"] = number
             i["next_due_at"] = add_month(parse_time(i["next_due_at"])).isoformat(timespec="seconds")
-            lines.append("[분할 회차 완료] %s  %s원  (%s)%s" % (
-                name, format(amount, ","), account["nickname"], "  분할 끝" if i["status"] == "paid" else ""))
+            lines.append((statement["owner_id"], "[분할 회차 완료] %s  %s원  (%s)%s" % (
+                name, format(amount, ","), account["nickname"], "  분할 끝" if i["status"] == "paid" else "")))
 
         content = {"분할": i["installment_id"], "청구서": name, "금액": format(amount, ",") + "원",
                    "결제 계좌": account["nickname"]}

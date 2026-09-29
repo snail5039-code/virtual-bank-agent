@@ -95,19 +95,20 @@ def run_due(log):
     # 시각이 지난 예약 이체·분할 회차를 실행하고 결과 줄을 로그에 남긴 뒤 돌려줍니다. 그래프를 거치지 않습니다.
     # 승인은 예약할 때(분할을 걸 때) 받았기 때문입니다.
     # 여기서 예외가 나도 프로그램·스케줄러 스레드가 죽지 않게 막습니다. 다음 확인 때 다시 봅니다.
+    # 돌려주는 것 : [(owner_id, 한 줄), ...]  누구 것도 아닌 줄(오류)은 owner_id 가 None 입니다.
     try:
         lines = functions.run_due_schedules()
     except Exception as e:
         log.error(e)
-        lines = ["[예약 이체·분할 회차] 확인 중 오류가 나 처리하지 못했습니다. 다음 확인 때 다시 봅니다."]
-    for line in lines:
-        log.note(line)
+        lines = [(None, "[예약 이체·분할 회차] 확인 중 오류가 나 처리하지 못했습니다. 다음 확인 때 다시 봅니다.")]
+    for owner_id, line in lines:
+        log.note("%s  %s" % (owner_id, line) if owner_id else line)
     return lines
 
 
 def run_schedules(log):
     # 켤 때와 입력을 처리하기 전에 부릅니다. 결과를 바로 화면에 보여줍니다.
-    for line in run_due(log):
+    for _, line in run_due(log):
         print(line)
 
 
@@ -118,15 +119,15 @@ def scheduler_loop(log):
     while not stop_event.wait(SCHEDULE_SECONDS):
         with work_lock, log.background("스케줄러") as job:
             lines = run_due(log)
-            for line in lines:
-                outbox.put(line)
+            for item in lines:
+                outbox.put(item)     # (owner_id, 한 줄)
             job["keep"] = bool(lines)
 
 
 def show_outbox():
     # 스케줄러가 모아 둔 결과를 보여줍니다. 입력을 받은 직후, 답을 보여주기 전에 부릅니다.
     while not outbox.empty():
-        print(outbox.get())
+        print(outbox.get()[1])
 
 
 def read_input():
@@ -141,7 +142,7 @@ def read_input():
 def remember_pending(owner_id, kind):
     # [재시작 복구] 턴이 끝났을 때 그래프가 승인·질문을 기다리고 있으면(kind) 진행 중 업무로 적어 두고,
     # 기다리는 것이 없으면(끝났으면) 지웁니다. 예약 이체처럼 data.json 에 남겨 켤 때 확인합니다.
-    saved = functions.get_pending()
+    saved = functions.get_pending(owner_id)
     if kind:
         snapshot = bank_graph.get_state(config_of(owner_id))
         # 업무 이름은 멈출 때 보여준 처리안 제목에서 꺼냅니다. 예) "[이체 처리안]" → 이체
@@ -154,9 +155,9 @@ def remember_pending(owner_id, kind):
         }
         if not saved or {k: saved.get(k) for k in record} != record:     # 같은 업무면 다시 쓰지 않습니다
             record["created_at"] = functions.now_text()
-            functions.set_pending(record)
+            functions.set_pending(owner_id, record)
     elif saved:
-        functions.clear_pending()
+        functions.clear_pending(owner_id)
 
 
 def remember_turn(owner_id, pending):
@@ -209,7 +210,7 @@ def recover_pending(log):
     # 다시 하면 원래 요청 문장을 새 요청으로 처음부터 돌립니다. 지금 잔액·상태로 다시 검사하고, 승인도 다시 받습니다.
     # 이전 승인만으로 자동 실행하지 않습니다. (예약 이체는 예약할 때 승인을 받았으므로 켤 때 바로 실행하는 것과 다릅니다)
     try:
-        record = functions.get_pending()
+        record = functions.get_pending(functions.CURRENT_USER)
     except data_store.DataStoreError:
         return
     if not record:
@@ -220,7 +221,7 @@ def recover_pending(log):
     print("  처음부터 다시 진행할까요? 잔액·카드 상태를 다시 확인하고 승인도 다시 받습니다. (예 / 아니오)")
     answer = read_input().lower()
     log.note("재시작 복구  '%s' → %s" % (record["request_text"], answer))
-    functions.clear_pending()
+    functions.clear_pending(functions.CURRENT_USER)
     if answer.startswith(YES_WORDS):
         print()
         handle_turn(record["request_text"], log)

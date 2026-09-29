@@ -4,7 +4,7 @@
 #   - 입력 한 번 처리 : main.respond (분기 0 → 재개 / 새 요청)
 #   - 턴이 끝난 뒤   : 진행 중 업무 기록(remember_pending), 최근 대화(remember_turn)
 #   - 파일 잠금      : main.work_lock
-#   - 30초 스케줄러  : main.scheduler_loop (결과는 main.outbox 에 쌓이고, 화면이 /api/alerts 로 가져감)
+#   - 30초 스케줄러  : main.scheduler_loop (결과는 main.outbox 에 쌓이고, /api/alerts 가 사람별로 나눠 줌)
 #   - 재시작 복구    : 켤 때 남아 있던 진행 중 업무를 화면이 처음 열릴 때 묻습니다 (/api/recovery)
 #
 # 실행 : uv run python web/server.py   → 브라우저에서 http://127.0.0.1:8000
@@ -17,7 +17,7 @@
 #   회원가입 : /signup 화면. 이름·휴대전화번호·아이디·비밀번호·PIN(본인 확인용 4자리)을 받아 users 에 새 사람을 넣고 바로 로그인합니다.
 #   화면(요약·메뉴)과 버튼 업무는 로그인한 사람 것만 보여주고 바꿉니다. (3단계)
 #   에이전트도 사람마다 세션(thread_id)·최근 대화가 따로입니다. 요청마다 로그인한 사람을 State 의 owner_id 로 넣습니다. (4단계)
-#   재시작 복구·스케줄러 알림은 아직 한 사람(user-001)만 받습니다 (5단계에서 사람별로 바꿈).
+#   재시작 복구·스케줄러 알림도 사람별입니다. 복구 기록은 data.json 의 pending 에 사람마다, 알림은 그 예약의 주인에게만. (5단계)
 
 import re
 import secrets
@@ -49,14 +49,16 @@ data_store.ensure()
 
 # 켤 때 할 일은 main.main() 과 같은 순서입니다.
 # 1) 꺼져 있던 동안 시각이 지난 예약 이체·분할 회차를 먼저 실행합니다. 결과는 화면 알림으로 보냅니다.
-for line in bank.run_due(log):
-    bank.outbox.put(line)
-# 2) 지난번에 끝나기 전에 꺼진 업무가 있으면 기억해 두고, 화면이 처음 열릴 때 다시 할지 묻습니다.
+#    결과는 (owner_id, 한 줄) 이고, 그 사람이 로그인해 화면을 열면 /api/alerts 로 받습니다.
+for item in bank.run_due(log):
+    bank.outbox.put(item)
+# 2) 지난번에 끝나기 전에 꺼진 업무가 있으면 기억해 두고, 그 사람이 화면을 처음 열 때 다시 할지 묻습니다.
 #    이 서버에서 새로 멈춘 업무(remember_pending 이 적는 것)와 헷갈리지 않게 켤 때 한 번만 읽습니다.
+#    interrupted : {owner_id: 기록}
 try:
-    interrupted = functions.get_pending()
+    interrupted = functions.pending_records(data_store.load())
 except data_store.DataStoreError:
-    interrupted = None
+    interrupted = {}
 # 3) 켜 있는 동안 30초마다 예약을 확인하는 스레드를 띄웁니다. (서버가 끝나면 같이 끝남)
 threading.Thread(target=bank.scheduler_loop, args=(log,), daemon=True).start()
 
@@ -214,8 +216,17 @@ class ActionIn(BaseModel):
 AUTH_TRIES = 3
 button_auth = {}
 
-# 재시작 복구 기록(진행 중 업무)과 스케줄러 알림은 아직 누구 것인지 적혀 있지 않아서 이 사람만 받습니다. (5단계에서 사람별로 바꿈)
-ONE_USER = functions.CURRENT_USER
+# 스케줄러 알림 : 사람마다 아직 안 가져간 알림 줄 {owner_id: [줄, ...]}
+alert_box = {}
+
+
+def deliver(items):
+    # (owner_id, 한 줄) 들을 그 사람 알림함에 넣습니다.
+    # 누구 것도 아닌 줄(저장 실패 같은 오류, owner_id 가 None)은 모든 사람에게 넣습니다.
+    for owner_id, line in items:
+        owners = [owner_id] if owner_id else [u["owner_id"] for u in data_store.load()["users"]]
+        for owner in owners:
+            alert_box.setdefault(owner, []).append(line)
 
 
 def auth_of(me):
@@ -452,38 +463,39 @@ def waiting(request: Request):
 @app.get("/api/alerts")
 def alerts(request: Request):
     # 스케줄러가 입력 없이 실행한 예약 이체·분할 회차 결과를 꺼내 줍니다. 화면이 몇 초마다 부릅니다. (4단계)
-    # 결과 줄에 누구 것인지가 없어서, 아직은 한 사람에게만 줍니다. (5단계에서 사람별로)
-    if login_user(request) != ONE_USER:
-        return {"alerts": []}
-    lines = []
-    while not bank.outbox.empty():
-        lines.append(bank.outbox.get())
+    # 스케줄러가 쌓은 것을 먼저 사람별 알림함으로 나누고, 로그인한 사람 것만 꺼내 줍니다.
+    # 다른 사람 것은 그 사람이 화면을 열 때까지 알림함에 남습니다.
+    with bank.work_lock:
+        items = []
+        while not bank.outbox.empty():
+            items.append(bank.outbox.get())
+        deliver(items)
+        lines = alert_box.pop(login_user(request), [])
     return {"alerts": lines}
 
 
 @app.get("/api/recovery")
 def recovery(request: Request):
-    # 켤 때 남아 있던 진행 중 업무를 알려줍니다. 없으면 None. (main.recover_pending 과 같은 내용)
-    if not interrupted or login_user(request) != ONE_USER:
+    # 켤 때 남아 있던 이 사람의 진행 중 업무를 알려줍니다. 없으면 None. (main.recover_pending 과 같은 내용)
+    record = interrupted.get(login_user(request))
+    if not record:
         return {"record": None}
-    return {"record": {**interrupted, "when": functions.when_text(interrupted["created_at"])}}
+    return {"record": {**record, "when": functions.when_text(record["created_at"])}}
 
 
 @app.post("/api/recovery")
 def recover(body: RecoveryIn, request: Request):
     # 다시 하면 원래 요청 문장으로 처음부터 돌립니다. 잔액·상태를 다시 검사하고 승인도 다시 받습니다.
     # 이전 승인만으로 자동 실행하지 않습니다.
-    global interrupted
-    if login_user(request) != ONE_USER:
-        return {"answer": "다시 진행할 업무가 없습니다.", "pending": None, "proposal": None, "notices": []}
-    record, interrupted = interrupted, None
+    me = login_user(request)
+    record = interrupted.pop(me, None)
     if not record:
         return {"answer": "다시 진행할 업무가 없습니다.", "pending": None, "proposal": None, "notices": []}
     with bank.work_lock:     # data.json 을 쓰므로 스케줄러와 겹치지 않게
         log.note("재시작 복구  '%s' → %s" % (record["request_text"], "다시" if body.again else "지움"))
-        functions.clear_pending()
+        functions.clear_pending(me)
     if body.again:
-        return run_turn(ONE_USER, record["request_text"])
+        return run_turn(me, record["request_text"])
     return {"answer": "진행 중이던 업무를 지웠습니다. 바뀐 것은 없습니다.", "pending": None, "proposal": None, "notices": []}
 
 
@@ -492,20 +504,20 @@ def run_turn(me, user_input):
     #   answer   : 답이나 질문·처리안 (글자)
     #   pending  : 멈춰 있으면 그 종류 (approval / question / secret), 끝났으면 None
     #   proposal : 승인 대기면 처리안 값 (카드로 그림), 아니면 None
-    #   notices  : 처리 전에 실행된 예약 이체·분할 회차 결과
+    #   notices  : 처리 전에 실행된 예약 이체·분할 회차 결과 중 이 사람 것 (다른 사람 것은 그 사람 알림함으로)
     proposal = None
     with bank.work_lock:
         secret = agent_pending(me) == SECRET
         log.turn_start("****" if secret else user_input, bank.session(me)["thread_id"])
-        notices = bank.run_due(log)
+        deliver(bank.run_due(log))
+        notices = alert_box.pop(me, [])
         try:
             answer = bank.respond(me, user_input, log)
             pending = agent_pending(me)
-            if me == ONE_USER:      # 재시작 복구 기록은 아직 한 사람 것만 (5단계)
-                try:
-                    bank.remember_pending(me, pending)
-                except data_store.DataStoreError:
-                    pass
+            try:
+                bank.remember_pending(me, pending)
+            except data_store.DataStoreError:
+                pass
             bank.remember_turn(me, pending)
             if pending == APPROVAL:
                 proposal = waiting_proposal(me)

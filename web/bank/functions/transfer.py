@@ -212,7 +212,8 @@ def run_due_schedules():
     # 승인은 예약할 때 받았으므로 다시 묻지 않습니다. 잔액이 모자라면 이체하지 않고 실패로 남깁니다.
     # 실행 결과는 처리 기록(requests)에도 한 줄 남깁니다. 그래야 "아까 이체 됐어?"(5-1)에 예약 실행 결과도 나옵니다.
     # (예약을 걸 때 남는 "예약 이체" 기록은 예약을 건 것이고, 이 "예약 이체 실행" 기록은 실제로 돈이 나간 것입니다)
-    # 처리한 결과를 한 줄씩 돌려줍니다. 처리할 게 없으면 빈 목록입니다.
+    # 처리한 결과를 (누구 것인지 owner_id, 한 줄) 로 돌려줍니다. 처리할 게 없으면 빈 목록입니다.
+    # 누구 것인지를 같이 주는 이유 : 웹에서 그 사람 화면에만 알림을 보내려고 (저장 실패 줄은 누구 것도 아니라 None)
     data = data_store.load()
     now = datetime.now().astimezone()
     nicknames = {a["account_id"]: a["nickname"] for a in data["accounts"]}
@@ -224,9 +225,9 @@ def run_due_schedules():
         s["status"] = "실패" if error else "완료"
         when = when_text(s["scheduled_at"])
         to_name = target_name(data, s["to_account"])
-        lines.append("[예약 이체 %s] %s → %s  %s원  (%s)%s" % (
+        lines.append((s["owner_id"], "[예약 이체 %s] %s → %s  %s원  (%s)%s" % (
             s["status"], nicknames[s["from_account"]], to_name, format(s["amount"], ","),
-            when, "  " + error if error else ""))
+            when, "  " + error if error else "")))
 
         # 처리 기록 한 줄. 모양은 common_log_request 와 같습니다.
         content = {"예약 번호": s["schedule_id"], "예약 시각": when, "출금": nicknames[s["from_account"]],
@@ -241,5 +242,5 @@ def run_due_schedules():
         try:
             data_store.save(data)
         except data_store.DataStoreError:
-            return ["[예약 이체·분할 회차] 저장에 실패해 처리하지 못했습니다. 다음 입력 때 다시 확인합니다."]
+            return [(None, "[예약 이체·분할 회차] 저장에 실패해 처리하지 못했습니다. 다음 입력 때 다시 확인합니다.")]
     return lines

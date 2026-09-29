@@ -114,25 +114,44 @@ def find_requests(owner_id, keyword=None, start=None, end=None, target=None):
 
 
 # ---------------------------------------------------------------- 진행 중 업무 (재시작 복구, 5-2)
-# 승인·질문을 기다리며 멈춘 업무를 data.json 의 "pending" 에 한 건 적어 둡니다. 예약 이체와 같은 방식입니다.
+# 승인·질문을 기다리며 멈춘 업무를 data.json 의 "pending" 에 사람마다 한 건씩 적어 둡니다. 예약 이체와 같은 방식입니다.
+#   모양 : {"user-001": 기록, "user-002": 기록}   (웹 여러 사람용. 터미널 버전은 기록 하나였습니다)
 # 켤 때 남아 있으면 main.py 가 알려주고, 다시 하겠다고 하면 원래 요청을 처음부터 다시 돌립니다.
 # 이전 승인은 쓰지 않습니다. 꺼져 있는 동안 잔액·카드 상태가 바뀌었을 수 있기 때문입니다. (기획서 recovery)
 
-def get_pending():
-    return data_store.load().get("pending")
+def pending_records(data):
+    # 사람별 기록을 {owner_id: 기록} 으로 돌려줍니다.
+    # 예전 모양(기록 하나)이 남아 있으면 그때는 한 사람만 썼으므로 CURRENT_USER 것으로 봅니다.
+    value = data.get("pending") or {}
+    if "request_text" in value:
+        return {CURRENT_USER: value}
+    return dict(value)
 
 
-def set_pending(record):
+def get_pending(owner_id):
+    return pending_records(data_store.load()).get(owner_id)
+
+
+def set_pending(owner_id, record):
     # record : {request_text(원래 요청 문장), task(업무 이름), kind(승인 / 질문 대기), created_at}
     data = data_store.load()
-    data["pending"] = record
+    records = pending_records(data)
+    records[owner_id] = record
+    data["pending"] = records
     data_store.save(data)
 
 
-def clear_pending():
+def drop_pending(data, owner_id):
+    # data 안에서 그 사람 기록만 지웁니다. 지운 게 있으면 True. (저장은 부르는 쪽이 합니다)
+    records = pending_records(data)
+    found = records.pop(owner_id, None)
+    data["pending"] = records or None
+    return found is not None
+
+
+def clear_pending(owner_id):
     data = data_store.load()
-    if data.get("pending"):
-        data["pending"] = None
+    if drop_pending(data, owner_id):
         data_store.save(data)
 
 
