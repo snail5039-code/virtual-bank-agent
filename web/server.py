@@ -138,12 +138,20 @@ class SignupIn(BaseModel):
     ssn_tail: str
 
 
-def check_signup(data, info):
-    # 회원가입 값 검사. 문제가 있으면 사유, 없으면 None.
+def check_name_phone(info):
+    # 이름·휴대전화번호 검사. 회원가입과 개인정보 수정이 같이 씁니다.
     if not 1 <= len(info["name"]) <= 20:
         return "이름을 1~20자로 적어 주세요."
     if not re.fullmatch(r"010-\d{4}-\d{4}", info["phone"]):
         return "휴대전화번호는 010-1234-5678 모양으로 적어 주세요."
+    return None
+
+
+def check_signup(data, info):
+    # 회원가입 값 검사. 문제가 있으면 사유, 없으면 None.
+    error = check_name_phone(info)
+    if error:
+        return error
     if not re.fullmatch(r"[a-z0-9]{4,20}", info["login_id"]):
         return "아이디는 영어 소문자·숫자 4~20자로 정해 주세요."
     if any(u.get("login_id") == info["login_id"] for u in data["users"]):
@@ -190,6 +198,69 @@ def signup(body: SignupIn):
             return JSONResponse({"error": "저장에 실패해 가입하지 못했습니다."}, status_code=500)
     log.note("회원가입  %s (%s)" % (user["login_id"], user["owner_id"]))
     return start_session(user)
+
+
+class ProfileIn(BaseModel):
+    current_password: str       # 지금 로그인 비밀번호 (바꾸기 전에 꼭 확인)
+    name: str
+    phone: str
+    new_password: str = ""      # 비워 두면 그대로
+    new_pin: str = ""           # 비워 두면 그대로
+
+
+@app.get("/api/profile")
+def profile(request: Request):
+    # 개인정보 화면에 채워 둘 값. 비밀번호·PIN·주민번호 뒷자리는 해시라 보여주지 않습니다.
+    me = login_user(request)
+    with bank.work_lock:
+        user = next(u for u in data_store.load()["users"] if u["owner_id"] == me)
+    return {"name": user["name"], "phone": user["phone"], "login_id": user.get("login_id")}
+
+
+@app.post("/api/profile")
+def update_profile(body: ProfileIn, request: Request):
+    # 개인정보 수정 : 지금 로그인 비밀번호 확인 → 값 검사 → 바꾸기 → 처리 기록 → 저장.
+    # 바꿀 수 있는 것 : 이름, 휴대전화번호, 로그인 비밀번호, 본인 확인 PIN. (아이디·주민번호 뒷자리는 못 바꿈)
+    # 처리 기록에는 비밀번호·PIN 값을 남기지 않고 "바꿈" 으로만 적습니다.
+    me = login_user(request)
+    info = {key: value.strip() for key, value in body.model_dump().items()}
+    with bank.work_lock:
+        data = data_store.load()
+        user = next(u for u in data["users"] if u["owner_id"] == me)
+        if not functions.check_secret(body.current_password, user.get("password")):
+            log.note("개인정보 수정 실패 (비밀번호 틀림)  %s" % me)
+            return JSONResponse({"error": "지금 로그인 비밀번호가 맞지 않습니다."}, status_code=400)
+        error = check_name_phone(info)
+        if not error and info["new_password"] and len(info["new_password"]) < 8:
+            error = "새 비밀번호는 8자 이상으로 정해 주세요."
+        if not error and info["new_pin"] and not re.fullmatch(r"\d{4}", info["new_pin"]):
+            error = "새 PIN 은 숫자 4자리로 정해 주세요."
+        if error:
+            return JSONResponse({"error": error}, status_code=400)
+
+        changes = {}
+        if info["name"] != user["name"]:
+            changes["이름"] = "%s → %s" % (user["name"], info["name"])
+            user["name"] = info["name"]
+        if info["phone"] != user["phone"]:
+            changes["휴대전화번호"] = "%s → %s" % (user["phone"], info["phone"])
+            user["phone"] = info["phone"]
+        if info["new_password"]:
+            changes["로그인 비밀번호"] = "바꿈"
+            user["password"] = functions.hash_secret(info["new_password"])
+        if info["new_pin"]:
+            changes["PIN"] = "바꿈"
+            user["pin"] = functions.hash_secret(info["new_pin"])
+        if not changes:
+            return JSONResponse({"error": "바뀐 것이 없습니다."}, status_code=400)
+
+        functions.add_request(data, me, "개인정보 변경", changes, "완료", datetime.now().astimezone())
+        try:
+            data_store.save(data)
+        except data_store.DataStoreError:
+            return JSONResponse({"error": "저장에 실패해 바꾸지 못했습니다."}, status_code=500)
+    log.note("개인정보 변경  %s  %s" % (me, ", ".join(changes)))
+    return {"answer": "개인정보를 바꿨습니다. (%s)" % ", ".join(changes)}
 
 
 @app.post("/api/logout")

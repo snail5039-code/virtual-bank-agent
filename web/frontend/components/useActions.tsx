@@ -159,7 +159,7 @@ export function useActions(busy: boolean, onChanged: () => void) {
         return <Confirm kind={m.kind} target={m.target} params={m.params} pre={m.pre} onFinish={(text, tone) => {
           onChanged();     // 잔액·패널·보고 있던 메뉴 화면을 새 값으로
           setModal({ type: "message", text, tone });
-        }} />;
+        }} onClose={close} />;
       case "transfer": return <TransferForm opt={m.opt} from={m.from} schedule={m.schedule} onPreviewed={toConfirm} onClose={close} />;
       case "reissue": return <ReissueForm card={m.card} addresses={m.addresses} onPreviewed={toConfirm} onClose={close} />;
       case "form": return <FieldsForm form={m.form} banks={m.banks} onPreviewed={toConfirm} onClose={close} />;

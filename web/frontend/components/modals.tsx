@@ -45,9 +45,11 @@ export function Message({ text, tone, onClose }: { text: string; tone?: "ok" | "
 
 // ---------------------------------------------------------------- 처리안 확인 : 처리안 + (본인 확인 칸) + 승인 / 거절
 type ConfirmProps = { kind: string; target: string; params: Params; pre: Preview;
-                      onFinish: (text: string, tone?: "ok" | "bad") => void };
+                      onFinish: (text: string, tone?: "ok" | "bad") => void; onClose: () => void };
 
-export function Confirm({ kind, target, params, pre, onFinish }: ConfirmProps) {
+// 닫기 : 승인도 거절도 하지 않고 창만 닫습니다. (서버에 아무것도 보내지 않아 처리 기록도 남지 않음)
+// 거절 : "거절" 로 처리 기록을 남깁니다.
+export function Confirm({ kind, target, params, pre, onFinish, onClose }: ConfirmProps) {
   const [secret, setSecret] = useState("");
   const [authError, setAuthError] = useState("");
   const [sending, setSending] = useState(false);
@@ -82,6 +84,7 @@ export function Confirm({ kind, target, params, pre, onFinish }: ConfirmProps) {
       <div className="actions">
         <button type="button" className="primary" disabled={sending} autoFocus={!pre.need_auth} onClick={() => run(true)}>승인</button>
         <button type="button" className="ghost" disabled={sending} onClick={() => run(false)}>거절</button>
+        <button type="button" className="ghost" disabled={sending} onClick={onClose}>닫기</button>
       </div>
     </>
   );

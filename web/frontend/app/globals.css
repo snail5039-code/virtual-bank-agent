@@ -203,3 +203,9 @@ tr:last-child td { border-bottom: none; }
 .modal-msg { font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
 .modal-msg.ok { color: var(--ok-text); }
 .modal-msg.bad { color: var(--bad-text); }
+
+/* 개인정보 */
+.profile-form { max-width: 420px; }
+.profile-form .sub-title .muted { font-weight: 400; font-size: 12px; }
+.profile-form .modal-msg { margin-top: 12px; }
+.profile-form .actions button { padding: 9px 16px; }

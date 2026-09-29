@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import Chat from "@/components/Chat";
 import MenuPage from "@/components/MenuPage";
 import type { PageName } from "@/components/MenuPage";
+import ProfilePage from "@/components/ProfilePage";
 import SidePanel from "@/components/SidePanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useActions } from "@/components/useActions";
@@ -19,9 +20,9 @@ import { won } from "@/lib/types";
 
 const MENUS: [View, string][] = [
   ["agent", "에이전트"], ["accounts", "계좌"], ["transactions", "거래 내역"], ["cards", "카드"],
-  ["bills", "카드값"], ["schedules", "예약 이체"], ["requests", "처리 기록"],
+  ["bills", "카드값"], ["schedules", "예약 이체"], ["requests", "처리 기록"], ["profile", "개인정보"],
 ];
-type View = "agent" | PageName;
+type View = "agent" | "profile" | PageName;
 
 // 빠른 실행 : 바꾸는 업무라 버튼 업무 창을 엽니다. (이체 창, 또는 대상을 고르는 창)
 const QUICK: [QuickKind, string][] = [
@@ -91,7 +92,8 @@ export default function Home() {
           <div className="view-wrap" hidden={view !== "agent"}>
             <Chat userName={summary?.user ?? ""} onChanged={changed} onPending={setPending} onAlerts={addAlerts} onBusy={setBusy} />
           </div>
-          {view !== "agent" && <MenuPage key={view} name={view} version={version} actions={actions} />}
+          {view === "profile" && <ProfilePage onChanged={changed} />}
+          {view !== "agent" && view !== "profile" && <MenuPage key={view} name={view} version={version} actions={actions} />}
         </main>
 
         <SidePanel summary={summary} pending={pending} alerts={alerts} />
