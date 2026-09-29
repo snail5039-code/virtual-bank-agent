@@ -130,6 +130,7 @@ export default function MenuPage({ name, version, actions }: Props) {
 
     if (name === "bills") {
       const rows = data.rows as BillRow[];
+      tools = <Act label="가상 카드값" onClick={actions.openBillAdd} />;
       content = rows.length ? <Table headers={[["카드", ""], ["청구 월", ""], ["청구액", "num"], ["남은 금액", "num"], ["기한", ""], ["상태", ""], ["", "num"]]}
         rows={rows.map((s) => [s.card, s.month, <Money key="t">{won(s.total)}</Money>, <Money key="r">{won(s.remaining)}</Money>,
           <Money key="d">{s.due}</Money>,

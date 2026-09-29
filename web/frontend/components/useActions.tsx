@@ -114,6 +114,19 @@ export function useActions(busy: boolean, onChanged: () => void) {
     });
   }
 
+  async function openBillAdd() {
+    // 가상 카드값 : 신용카드를 골라 이번 달 청구서에 시험용 금액을 더합니다. (만든 뒤 "전체 내기" 로 냅니다)
+    const cards = (await getJSON<CardRow[]>("/api/view/cards")).filter((c) => c.type === "신용" && c.status !== "cancelled");
+    if (!cards.length) { openPicker("가상 카드값", [], "신용카드가 없어요. 카드 화면에서 신용카드를 먼저 등록해 주세요"); return; }
+    openForm({
+      title: "가상 카드값", kind: "bill_add",
+      fields: [
+        { key: "card", label: "신용카드", options: cards.map((c) => [c.id, c.name + (c.account ? "  (결제 계좌 " + c.account + ")" : "")]) },
+        { key: "amount", label: "금액 (한 번에 1,000만원까지)", placeholder: "예: 150000" },
+      ],
+    });
+  }
+
   async function quickAction(kind: QuickKind) {
     // 위쪽 빠른 실행 : 이체는 이체 창, 가상 입금은 입력 창, 나머지는 대상을 고르는 창을 엽니다.
     if (busy) return;
@@ -174,7 +187,7 @@ export function useActions(busy: boolean, onChanged: () => void) {
   );
 
   return {
-    element, openAction, openTransfer, openReissue, closeAccount, quickAction, openCardRegister,
+    element, openAction, openTransfer, openReissue, closeAccount, quickAction, openCardRegister, openBillAdd,
     openOpenForm: () => openForm(OPEN_FORM), openAccountForm: () => openForm(ACCOUNT_FORM),
   };
 }

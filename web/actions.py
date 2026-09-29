@@ -9,6 +9,8 @@
 #   내 것만 고르도록 대상을 찾을 때마다 owner_id 가 me 인지 봅니다 (남의 카드 ID 를 보내도 못 찾음).
 # 실행 직전에 preview 를 한 번 더 불러 다시 검사합니다 (처리안을 본 사이에 상태가 바뀌었을 수 있어서).
 
+from datetime import datetime, timedelta
+
 import functions
 
 # 고를 수 있는 은행 목록은 에이전트와 같이 씁니다. (functions/account.py)
@@ -479,11 +481,76 @@ def deposit_apply(data, me, target, params):
     return "가상 입금했습니다. %s  + %s원 → 잔액 %s원" % (account["nickname"], format(amount, ","), format(account["balance"], ","))
 
 
+# ---------------------------------------------------------------- 가상 카드값 (시험용)
+# 낼 카드값을 만들어 두는 버튼입니다. 신용카드에 "가상 사용" 한 줄을 넣고 이번 달 청구서에 더합니다.
+#   그 카드의 이번 달 청구서가 있으면 거기에 더하고(낸 것이 있으면 일부 납부), 없으면 새 청구서를 만듭니다.
+#   기한은 다음 달 15일 (다른 청구서와 같은 규칙). 만든 뒤에는 "전체 내기" 나 에이전트로 냅니다.
+def bill_add_input(data, me, params):
+    card = next((c for c in data["cards"] if c["card_id"] == params.get("card") and c["owner_id"] == me), None)
+    if not card:
+        return "카드값을 만들 카드를 골라 주세요.", None
+    if card.get("card_type") != "credit":
+        return "카드값(청구서)은 신용카드에만 생깁니다.", None
+    if card["status"] == "cancelled":
+        return "해지한 카드에는 카드값을 만들 수 없습니다.", None
+    try:
+        amount = int(str(params.get("amount") or "").replace(",", ""))
+    except ValueError:
+        return "금액은 숫자로 입력해 주세요.", None
+    if not 1 <= amount <= DEPOSIT_MAX:
+        return "가상 카드값은 한 번에 1원부터 %s원까지 만들 수 있습니다." % format(DEPOSIT_MAX, ","), None
+    now = datetime.now().astimezone()
+    month = now.strftime("%Y-%m")
+    due = (now.replace(day=1) + timedelta(days=32)).replace(day=15).strftime("%Y-%m-%d")
+    statement = next((s for s in data["card_statements"] if s["card_id"] == card["card_id"] and s["billing_month"] == month), None)
+    return None, (card, amount, month, due, statement)
+
+
+def bill_add_preview(data, me, target, params):
+    error, parsed = bill_add_input(data, me, params)
+    if error:
+        return error, None
+    card, amount, month, due, statement = parsed
+    if statement:
+        where = "이번 달 청구서에 더함  남은 금액 %s원 → %s원" % (
+            format(statement["remaining_amount"], ","), format(statement["remaining_amount"] + amount, ","))
+    else:
+        where = "새 청구서를 만듦"
+    rows = [
+        ["카드", card["name"]],
+        ["청구액", format(amount, ",") + "원"],
+        ["청구 월", "%s (기한 %s)" % (month, statement["due_date"] if statement else due)],
+        ["청구서", where],
+        ["주의", "실제 돈이 아닌 시험용 가상 카드값입니다"],
+    ]
+    return None, {"task": "가상 카드값", "rows": rows}
+
+
+def bill_add_apply(data, me, target, params):
+    _, (card, amount, month, due, statement) = bill_add_input(data, me, params)
+    usage_id = functions.next_id(data["card_usages"], "usage_id", "use")
+    data["card_usages"].append({"usage_id": usage_id, "owner_id": me, "card_id": card["card_id"], "amount": amount,
+                                "occurred_at": functions.now_text(), "merchant": "가상 사용"})
+    if not statement:
+        statement = {"statement_id": functions.next_id(data["card_statements"], "statement_id", "stmt"),
+                     "card_id": card["card_id"], "owner_id": me, "billing_month": month,
+                     "total_amount": 0, "paid_amount": 0, "remaining_amount": 0, "due_date": due,
+                     "status": "unpaid", "items": [], "paid_at": None, "paid_account": None}
+        data["card_statements"].append(statement)
+    statement["total_amount"] += amount
+    statement["remaining_amount"] += amount
+    statement["status"] = "unpaid" if statement["paid_amount"] == 0 else "partial"
+    statement["items"].append(usage_id)
+    return "가상 카드값을 만들었습니다. %s %s분  + %s원 → 남은 금액 %s원" % (
+        card["name"], month, format(amount, ","), format(statement["remaining_amount"], ","))
+
+
 ACTIONS = {
     "account_close": {"preview": account_close_preview, "apply": account_close_apply},
     "account_suspend": account_status_action("정지"),
     "account_resume": account_status_action("정지 해제"),
     "deposit": {"preview": deposit_preview, "apply": deposit_apply},
+    "bill_add": {"preview": bill_add_preview, "apply": bill_add_apply},
     "account_open": {"preview": account_open_preview, "apply": account_open_apply},
     "registered_delete": {"preview": registered_delete_preview, "apply": registered_delete_apply},
     "card_cancel": card_status_action("해지"),

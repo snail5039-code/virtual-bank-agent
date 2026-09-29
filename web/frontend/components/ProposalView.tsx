@@ -4,7 +4,7 @@
 import type { Proposal } from "@/lib/types";
 
 // 처리안에서 크게 보여줄 금액 칸 이름 (업무마다 이름이 다릅니다)
-const AMOUNT_LABELS = ["총액", "낼 금액", "합계", "입금액"];
+const AMOUNT_LABELS = ["총액", "낼 금액", "합계", "입금액", "청구액"];
 
 export default function ProposalView({ proposal }: { proposal: Proposal }) {
   const amount = proposal.rows.find(([label]) => AMOUNT_LABELS.includes(label));
