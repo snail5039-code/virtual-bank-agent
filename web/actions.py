@@ -23,9 +23,9 @@ def card_row(card):
     return ["카드", "%s (%s)" % (card["name"], card["card_number"])]
 
 
-# ---------------------------------------------------------------- 카드 일시 잠금 / 잠금 해제
+# ---------------------------------------------------------------- 카드 일시 잠금 / 잠금 해제 / 해지
 def card_status_action(action):
-    # action : "일시 잠금" / "잠금 해제" (functions.CARD_ACTIONS 의 이름)
+    # action : "일시 잠금" / "잠금 해제" / "해지" (functions.CARD_ACTIONS 의 이름)
     def preview(data, card_id, params):
         card = my_card(data, card_id)
         if not card:
@@ -38,8 +38,11 @@ def card_status_action(action):
             ["지금 상태", functions.CARD_STATUS[card["status"]]],
             ["바뀔 상태", functions.CARD_STATUS[functions.CARD_ACTIONS[action]]],
         ]
+        # 주의 문구는 에이전트 card_setting_propose 와 같습니다.
         if action == "일시 잠금":
             rows.append(["주의", "잠금을 풀기 전까지 이 카드는 사용할 수 없습니다"])
+        if action == "해지":
+            rows.append(["주의", "해지하면 되돌릴 수 없습니다"])
         return None, {"task": "카드 " + action, "rows": rows}
 
     def apply(data, card_id, params):
@@ -276,7 +279,83 @@ def card_register_apply(data, target, params):
     return "카드를 등록했습니다. (%s)\n카드 비밀번호는 '비밀번호 변경' 으로 정해 주세요." % info["name"]
 
 
+# ---------------------------------------------------------------- 등록 계좌 삭제
+def my_registered(data, registered_id):
+    return next((r for r in data["registered_accounts"]
+                 if r["registered_id"] == registered_id and r["owner_id"] == ME), None)
+
+
+def registered_delete_preview(data, registered_id, params):
+    r = my_registered(data, registered_id)
+    if not r:
+        return "등록 계좌를 찾지 못했습니다.", None
+    # 에이전트 setting_propose 의 삭제 처리안과 같은 모양입니다.
+    rows = [["별명", r["nickname"]],
+            ["계좌", "%s %s (예금주 %s)" % (r["bank_name"], r["account_number"], r["holder_name"])]]
+    return None, {"task": "등록 계좌 삭제", "rows": rows}
+
+
+def registered_delete_apply(data, registered_id, params):
+    nickname = my_registered(data, registered_id)["nickname"]
+    functions.delete_registered(data, registered_id)
+    return "등록 계좌를 삭제했습니다. (%s)" % nickname
+
+
+# ---------------------------------------------------------------- 내 계좌 새로 만들기 (웹에만 있는 기능)
+# src/functions 에는 계좌를 새로 만드는 함수가 없어서 여기서 만듭니다. (에이전트는 별명·용도 변경까지만 합니다)
+# 규칙은 기존 것과 맞춥니다.
+#   별명   : 앞뒤 공백을 뗀 1~20자, 내 다른 계좌와 겹치면 안 됨 (functions.check_setting 과 같은 기준)
+#   비밀번호 : 숫자 4자리, 평문이 아니라 해시로 저장 (functions.hash_secret). 처리안·처리 기록에는 **** 로만
+#   계좌번호 : 가상은행 계좌 중 가장 큰 번호 + 1 (예: 110-001-100005 까지 있으면 110-001-100006), 잔액 0원
+#   params : {"nickname", "purpose"(선택), "password"}
+BANK_CODE, BANK_NAME = "001", "가상은행"
+
+
+def new_account_number(data):
+    numbers = [int(a["account_number"].split("-")[-1]) for a in data["accounts"] if a["bank_code"] == BANK_CODE]
+    return "110-001-%06d" % (max(numbers, default=100000) + 1)
+
+
+def account_open_info(params):
+    return {key: (params.get(key) or "").strip() for key in ["nickname", "purpose", "password"]}
+
+
+def account_open_preview(data, target, params):
+    info = account_open_info(params)
+    if not 1 <= len(info["nickname"]) <= functions.MAX_SETTING_LEN:
+        return "별명은 1~%d자로 정해 주세요." % functions.MAX_SETTING_LEN, None
+    if any(a["owner_id"] == ME and a["nickname"] == info["nickname"] for a in data["accounts"]):
+        return "다른 계좌가 이미 '%s' 별명을 쓰고 있습니다." % info["nickname"], None
+    if len(info["purpose"]) > functions.MAX_SETTING_LEN:
+        return "용도는 %d자까지 쓸 수 있습니다." % functions.MAX_SETTING_LEN, None
+    if not (len(info["password"]) == 4 and info["password"].isdigit()):
+        return "계좌 비밀번호는 숫자 4자리여야 합니다.", None
+    rows = [["은행", BANK_NAME], ["계좌번호", new_account_number(data)], ["별명", info["nickname"]],
+            ["용도", info["purpose"] or "-"], ["비밀번호", "****"], ["잔액", "0원으로 시작합니다"]]
+    return None, {"task": "계좌 만들기", "rows": rows}
+
+
+def account_open_apply(data, target, params):
+    info = account_open_info(params)
+    number = new_account_number(data)
+    data["accounts"].append({
+        "account_id": functions.next_id(data["accounts"], "account_id", "acc"),
+        "owner_id": ME,
+        "nickname": info["nickname"],
+        "purpose": info["purpose"] or None,
+        "balance": 0,
+        "bank_code": BANK_CODE,
+        "bank_name": BANK_NAME,
+        "account_number": number,
+        "account_password": functions.hash_secret(info["password"]),
+    })
+    return "계좌를 만들었습니다. (%s  %s %s)" % (info["nickname"], BANK_NAME, number)
+
+
 ACTIONS = {
+    "account_open": {"preview": account_open_preview, "apply": account_open_apply},
+    "registered_delete": {"preview": registered_delete_preview, "apply": registered_delete_apply},
+    "card_cancel": card_status_action("해지"),
     "account_register": {"preview": account_register_preview, "apply": account_register_apply},
     "card_register": {"preview": card_register_preview, "apply": card_register_apply},
     "reissue": {"preview": reissue_preview, "apply": reissue_apply},

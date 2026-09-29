@@ -224,27 +224,12 @@ form.addEventListener("submit", (event) => {
   if (text) submit(text);
 });
 
-// ---------------------------------------------------------------- 메뉴 · 빠른 실행 (4단계)
-let lastPending = null;     // 지금 멈춰 있는 종류. 멈춘 동안에는 메뉴가 요청을 바로 보내지 않습니다.
-
-function fillInput(text) {
-  // 데이터를 바꾸는 요청은 바로 보내지 않고 에이전트 화면 입력칸에 채웁니다. 사용자가 확인하고 보냅니다.
-  showView("agent");
-  if (lastPending) {
-    add("지금 진행 중인 업무가 있어요. 먼저 답하거나 '취소'를 입력한 뒤 보내 주세요.", "notice");
-    // 본인 확인을 묻는 중이면 채우지 않습니다. 채운 요청이 비밀번호 답으로 들어가면 안 되기 때문입니다.
-    if (lastPending === "secret") { input.focus(); return; }
-  }
-  input.value = text;
-  input.focus();
-}
+// ---------------------------------------------------------------- 빠른 실행
+let lastPending = null;     // 지금 에이전트가 멈춰 있는 종류 (question / secret / approval / null)
 
 document.querySelectorAll(".quick button").forEach((button) => {
-  // data-open="transfer" 는 이체 창을 열고, data-fill 은 에이전트 입력칸에 요청을 채웁니다.
-  button.addEventListener("click", () => {
-    if (button.dataset.open === "transfer") openTransfer();
-    else fillInput(button.dataset.fill);
-  });
+  // 빠른 실행도 버튼 업무입니다. 이체는 이체 창을, 나머지는 대상을 고르는 창을 엽니다.
+  button.addEventListener("click", () => quickAction(button.dataset.open));
 });
 
 // ---------------------------------------------------------------- 메뉴 화면
@@ -481,6 +466,14 @@ const ACCOUNT_FORM = {
     { key: "nickname", label: "별명 (안 쓰면 예금주 이름)", placeholder: "예: 친구 영희", optional: true },
   ],
 };
+const OPEN_FORM = {
+  title: "내 계좌 만들기", kind: "account_open",
+  fields: [
+    { key: "nickname", label: "별명", placeholder: "예: 비상금" },
+    { key: "purpose", label: "용도 (선택)", placeholder: "예: 급할 때 쓰는 돈", optional: true },
+    { key: "password", label: "계좌 비밀번호 (숫자 4자리)", secret: true },
+  ],
+};
 const CARD_FORM = {
   title: "카드 등록", kind: "card_register",
   fields: [
@@ -506,6 +499,7 @@ function openForm(form) {
       control = el("input");
       control.placeholder = f.placeholder || "";
       control.autocomplete = "off";
+      if (f.secret) control.type = "password";      // 비밀번호 칸은 가립니다
     }
     inputs[f.key] = control;
     const box = el("label", "field");
@@ -538,13 +532,66 @@ function button(label, onClick) {
 }
 
 function badge(text, cls) { return el("span", "badge " + cls, text); }
+
+function cardButtons(c) {
+  // 카드 상태에 따라 할 수 있는 버튼 : 사용 가능 → 잠그기, 잠금 → 잠금 풀기, 분실 정지 → 재발급. 해지 전이면 해지도.
+  if (c.status === "cancelled") return "";
+  const box = el("span", "btns");
+  if (c.status === "active") box.appendChild(button("잠그기", () => openAction("card_lock", c.id)));
+  if (c.status === "locked") box.appendChild(button("잠금 풀기", () => openAction("card_unlock", c.id)));
+  if (c.status === "lost") box.appendChild(button("재발급", () => openReissue(c)));
+  box.appendChild(button("해지", () => openAction("card_cancel", c.id)));
+  return box;
+}
+
+// 고르기 창 : 위쪽 빠른 실행(카드 잠금, 카드값 내기, 재발급)에서 대상을 먼저 고르게 합니다.
+//   items : [{label, sub, pick}]  pick 을 누르면 그 대상의 버튼 업무로 넘어갑니다
+function openPicker(title, items, emptyText) {
+  if (busy) return;
+  modal.hidden = false;
+  const list = el("div", "pick-list");
+  for (const item of items) {
+    const row = el("button", "pick");
+    row.append(el("span", "", item.label), el("span", "sub", item.sub || ""));
+    row.onclick = item.pick;
+    list.appendChild(row);
+  }
+  const cancel = el("button", "ghost", "닫기");
+  cancel.onclick = closeModal;
+  const actionsRow = el("div", "actions");
+  actionsRow.appendChild(cancel);
+  modalBody.replaceChildren(el("div", "modal-head", title), items.length ? list : el("div", "empty", emptyText), actionsRow);
+}
+
+async function quickAction(kind) {
+  if (kind === "transfer") { openTransfer(); return; }
+  if (kind === "bill") {
+    const bills = (await (await fetch("/api/view/bills")).json()).filter((s) => s.remaining > 0);
+    openPicker("어떤 카드값을 낼까요?", bills.map((s) => ({
+      label: s.card + " " + s.month, sub: won(s.remaining) + "원  기한 " + s.due,
+      pick: () => openAction("bill_pay", s.id),
+    })), "낼 카드값이 없어요");
+    return;
+  }
+  const cards = await (await fetch("/api/view/cards")).json();
+  if (kind === "lock") {
+    openPicker("어떤 카드를 잠글까요?", cards.filter((c) => c.status === "active").map((c) => ({
+      label: c.name, sub: c.type + " / " + c.account, pick: () => openAction("card_lock", c.id),
+    })), "잠글 수 있는 카드가 없어요");
+  }
+  if (kind === "reissue") {
+    openPicker("어떤 카드를 재발급할까요? (분실 정지 카드)", cards.filter((c) => c.status === "lost").map((c) => ({
+      label: c.name, sub: c.type + " / " + c.account, pick: () => openReissue(c),
+    })), "분실 정지된 카드가 없어요. 먼저 분실 신고를 해 주세요");
+  }
+}
 function stamp(iso) { return iso.slice(0, 10) + " " + iso.slice(11, 16); }     // "2026-09-30 09:00"
 
 const PAGES = {
   accounts: {
     title: "계좌",
     also: "registered",     // 아래에 등록 계좌(상대 계좌)도 같이 보여줍니다
-    tools: () => [button("상대 계좌 등록", () => openForm(ACCOUNT_FORM))],
+    tools: () => [button("내 계좌 만들기", () => openForm(OPEN_FORM)), button("상대 계좌 등록", () => openForm(ACCOUNT_FORM))],
     draw: (rows, registered) => {
       const box = el("div");
       box.appendChild(table(
@@ -553,8 +600,9 @@ const PAGES = {
                          button("이체", () => openTransfer({ from: a.id }))])));
       box.appendChild(el("h3", "sub-title", "등록 계좌"));
       box.appendChild(registered.length ? table(
-        [["별명", ""], ["은행 / 계좌번호", ""], ["예금주", ""]],
-        registered.map((r) => [r.name, r.bank + " " + r.number, r.holder])) : el("div", "empty", "등록한 상대 계좌가 없어요"));
+        [["별명", ""], ["은행 / 계좌번호", ""], ["예금주", ""], ["", "num"]],
+        registered.map((r) => [r.name, r.bank + " " + r.number, r.holder,
+                               button("삭제", () => openAction("registered_delete", r.id))])) : el("div", "empty", "등록한 상대 계좌가 없어요"));
       return box;
     },
   },
@@ -589,9 +637,7 @@ const PAGES = {
       [["카드", ""], ["종류", ""], ["연결 계좌", ""], ["상태", ""], ["", "num"]],
       rows.map((c) => [c.name, c.type + (c.bank ? " / " + c.bank : ""), c.account,
                        badge(c.label, CARD_BADGE[c.status] || "b-plain"),
-                       c.status === "active" ? button("잠그기", () => openAction("card_lock", c.id))
-                       : c.status === "locked" ? button("잠금 풀기", () => openAction("card_unlock", c.id))
-                       : c.status === "lost" ? button("재발급", () => openReissue(c)) : ""])),
+                       cardButtons(c)])),
   },
   bills: {
     title: "카드값",

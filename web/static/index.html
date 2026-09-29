@@ -137,6 +137,11 @@
   .check { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 12px; cursor: pointer; }
   .check input { width: auto; margin: 0; }
   .choices { display: grid; gap: 2px; margin-top: 4px; }
+  .btns { display: inline-flex; gap: 6px; }
+  .pick-list { display: grid; gap: 6px; margin-top: 4px; }
+  .pick { display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 10px 12px; text-align: left;
+          background: var(--surface); color: var(--text); border: 1px solid var(--line); }
+  .pick:hover { background: var(--hover); }
   .modal-msg { font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
   .modal-msg.ok { color: var(--ok-text); }
   .modal-msg.bad { color: var(--bad-text); }
@@ -178,9 +183,9 @@
       <!-- 빠른 실행 : 데이터를 바꾸는 요청이라 바로 보내지 않고 입력칸에 채워 줍니다. 고쳐서 보내면 됩니다 (4단계) -->
       <div class="quick">
         <button type="button" data-open="transfer">이체</button>
-        <button type="button" data-fill="여행 카드 잠가줘">카드 잠금</button>
-        <button type="button" data-fill="8월 생활비 신용카드 값 내줘">카드값 내기</button>
-        <button type="button" data-fill="잃어버린 생활비 카드를 집으로 재발급받고 싶어">재발급</button>
+        <button type="button" data-open="lock">카드 잠금</button>
+        <button type="button" data-open="bill">카드값 내기</button>
+        <button type="button" data-open="reissue">재발급</button>
       </div>
     </div>
     <!-- 에이전트 화면 (대화). 다른 메뉴에 갔다 와도 그대로 남아 있습니다 -->
