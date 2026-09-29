@@ -424,7 +424,7 @@ const PAGES = {
       [["예약 시각", ""], ["출금 → 입금", ""], ["금액", "num"], ["상태", ""], ["", "num"]],
       rows.map((s) => [el("span", "mono", stamp(s.at)), s.from + " → " + s.to, el("span", "mono", won(s.amount) + "원"),
                        badge(s.status, s.status === "완료" ? "b-ok" : s.status === "실패" ? "b-bad" : s.status === "예약" ? "b-warn" : "b-plain"),
-                       s.status === "예약" ? action("취소", s.id + " 예약 취소해줘") : ""])),
+                       s.status === "예약" ? button("취소", () => openAction("schedule_cancel", s.id)) : ""])),
   },
   requests: {
     title: "처리 기록",

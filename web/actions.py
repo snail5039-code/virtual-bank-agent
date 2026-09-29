@@ -95,8 +95,35 @@ def bill_apply(data, statement_id):
         functions.STATEMENT_STATUS[statement["status"]])
 
 
+# ---------------------------------------------------------------- 예약 이체 취소
+# 아직 실행 전(예약)인 것만 취소합니다. (functions.find_schedules 가 고르는 기준과 같음)
+def my_schedule(data, schedule_id):
+    return next((s for s in data["scheduled_transfers"]
+                 if s["schedule_id"] == schedule_id and s["owner_id"] == ME), None)
+
+
+def schedule_preview(data, schedule_id):
+    s = my_schedule(data, schedule_id)
+    if not s:
+        return "예약을 찾지 못했습니다.", None
+    if s["status"] != "예약":
+        return "이미 %s된 예약이라 취소할 수 없습니다. (%s)" % (s["status"], schedule_id), None
+    # 에이전트 계좌 설정의 예약 취소 처리안(schedule_text)과 같은 한 줄입니다.
+    line = "%s  %s  %s → %s  %s원  [%s]" % (
+        s["schedule_id"], functions.when_text(s["scheduled_at"]),
+        functions.target_name(data, s["from_account"]), functions.target_name(data, s["to_account"]),
+        format(s["amount"], ","), s["status"])
+    return None, {"task": "예약 이체 취소", "rows": [["예약", line]]}
+
+
+def schedule_apply(data, schedule_id):
+    functions.cancel_schedule(data, schedule_id)
+    return "예약 이체를 취소했습니다. (%s)" % schedule_id
+
+
 ACTIONS = {
     "card_lock": card_status_action("일시 잠금"),
     "card_unlock": card_status_action("잠금 해제"),
     "bill_pay": {"preview": bill_preview, "apply": bill_apply},
+    "schedule_cancel": {"preview": schedule_preview, "apply": schedule_apply},
 }
