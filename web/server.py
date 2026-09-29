@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import data_store
+import functions
 import logger
 import main as bank     # src/main.py
 from agents.common.nodes import APPROVAL, SECRET, common_pending_check
@@ -42,17 +43,57 @@ def index():
     return FileResponse(WEB_DIR / "static" / "index.html")
 
 
-def waiting_proposal():
-    # 승인을 기다리는 처리안을 꺼냅니다. 화면이 글자 상자 대신 카드로 그리게 합니다.
-    # 처리안은 3단 그래프(안쪽) State 에만 있어서, 안쪽 State 까지 따라 들어가 가장 안쪽 값을 씁니다.
-    #   {"task": "이체", "rows": [["출금", "생활비 (…)"], …], "retry": 답을 못 알아들어 다시 묻는 중인지}
+@app.get("/api/summary")
+def summary():
+    # 화면 옆 패널(총 잔액, 계좌, 카드, 카드값, 예약 이체, 최근 처리)에 쓸 값을 data.json 에서 모읍니다. (3단계)
+    # 읽기만 하고, 금액은 파일에 있는 값을 그대로 씁니다.
+    with bank.work_lock:
+        data = data_store.load()
+        # 업무 중간(멈춘 동안)에는 본인 확인 결과가 안쪽 그래프 State 에만 있어서 안쪽까지 봅니다.
+        authenticated = any(values.get("authenticated") for values in state_values())
+    me = functions.CURRENT_USER
+    mine = lambda items: [item for item in items if item["owner_id"] == me]
+
+    accounts = mine(data["accounts"])
+    names = {a["account_id"]: a["nickname"] for a in accounts}
+    names.update({r["registered_id"]: r["nickname"] for r in mine(data["registered_accounts"])})
+    unpaid = [s for s in mine(data["card_statements"]) if s["status"] != "paid"]
+
+    return {
+        "user": next(u["name"] for u in data["users"] if u["owner_id"] == me),
+        "authenticated": authenticated,
+        "total": sum(a["balance"] for a in accounts),
+        "accounts": [{"name": a["nickname"], "balance": a["balance"]} for a in accounts],
+        "cards": [{"name": c["name"], "status": c["status"], "label": functions.CARD_STATUS[c["status"]]}
+                  for c in mine(data["cards"]) if c["status"] != "cancelled"],
+        "bills": {"count": len(unpaid), "amount": sum(s["remaining_amount"] for s in unpaid)},
+        "schedules": [{"at": s["scheduled_at"], "to": names.get(s["to_account"], s["to_account"]), "amount": s["amount"]}
+                      for s in mine(data["scheduled_transfers"]) if s["status"] == "예약"],
+        "requests": [{"task": r["task_type"], "status": r["status"], "at": r["created_at"]}
+                     for r in mine(data["requests"])[-5:][::-1]],
+    }
+
+
+def state_values():
+    # 바깥(1단) State 부터 멈춘 안쪽 그래프(2단, 3단) State 까지의 값을 차례로 돌려줍니다.
+    # 그래프가 멈춰 있는 동안 안쪽에서 바뀐 값(처리안, 본인 확인)은 바깥 State 에 아직 없기 때문입니다.
     snapshot = bank_graph.get_state(bank.config, subgraphs=True)
-    found = None
+    values = []
     while snapshot:
-        if snapshot.values.get("proposal"):
-            found = {**snapshot.values["proposal"], "retry": snapshot.values.get("approval") == "모름"}
+        values.append(snapshot.values)
         inner = [task.state for task in snapshot.tasks if task.state]
         snapshot = inner[0] if inner else None
+    return values
+
+
+def waiting_proposal():
+    # 승인을 기다리는 처리안을 꺼냅니다. 화면이 글자 상자 대신 카드로 그리게 합니다.
+    # 처리안은 3단 그래프(안쪽) State 에만 있어서, 가장 안쪽 값을 씁니다.
+    #   {"task": "이체", "rows": [["출금", "생활비 (…)"], …], "retry": 답을 못 알아들어 다시 묻는 중인지}
+    found = None
+    for values in state_values():
+        if values.get("proposal"):
+            found = {**values["proposal"], "retry": values.get("approval") == "모름"}
     return found
 
 

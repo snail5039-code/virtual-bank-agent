@@ -2,6 +2,8 @@
 // 1단계 : 본인 확인을 묻는 중(pending = "secret")이면 입력칸을 비밀번호 칸으로 바꾸고, 대화에는 "****" 로만 남깁니다.
 // 2단계 : 승인을 기다리면(pending = "approval") 글자 상자 대신 처리안 확인 카드를 그립니다.
 //         버튼은 입력칸에 "승인" / "거절" 을 치는 것과 같습니다. 수정은 입력칸에 바꿀 내용을 적게 합니다.
+// 3단계 : 옆 패널(총 잔액, 계좌, 카드, 카드값, 예약 이체, 최근 처리)을 /api/summary 로 채웁니다.
+//         켤 때와 답을 받을 때마다 다시 읽습니다. 진행 상황은 멈춘 종류(pending)로 표시합니다.
 
 const log = document.getElementById("log");
 const form = document.getElementById("form");
@@ -88,6 +90,72 @@ function closeCard(label) {
   openCard = null;
 }
 
+// ---------------------------------------------------------------- 옆 패널 (3단계)
+const won = (n) => n.toLocaleString("ko-KR");
+const CARD_BADGE = { active: "b-ok", locked: "b-warn", lost: "b-bad" };
+const REQUEST_BADGE = { "완료": "b-ok", "실패": "b-bad" };     // 그 밖(거절·취소)은 옅은 회색
+
+// 진행 상황 : 변경 업무의 순서입니다. 멈춘 종류로 지금 어디인지 정합니다.
+const STEPS = ["요청 이해", "검사", "본인 확인", "승인 대기", "실행과 저장"];
+const NOW_STEP = { question: 0, secret: 2, approval: 3 };
+
+function line(name, right) {
+  const div = el("div", "line");
+  div.appendChild(el("span", "", name));
+  div.appendChild(right);
+  return div;
+}
+
+function fill(id, nodes, emptyText) {
+  const box = document.getElementById(id);
+  box.replaceChildren(...(nodes.length ? nodes : [el("div", "empty", emptyText)]));
+}
+
+function shortTime(iso) {
+  // "2026-09-30T09:00:00" → "09-30 09:00"
+  return iso.slice(5, 10) + " " + iso.slice(11, 16);
+}
+
+async function loadSummary() {
+  const s = await (await fetch("/api/summary")).json();
+  document.getElementById("user").textContent = s.user;
+  document.getElementById("auth").textContent = s.authenticated ? "본인 확인 완료" : "본인 확인 전";
+  document.getElementById("total").textContent = won(s.total);
+
+  fill("accounts", s.accounts.map((a) => {
+    const box = el("div", "acc");
+    box.append(el("div", "", a.name), el("div", "mono", won(a.balance)));
+    return box;
+  }), "계좌가 없어요");
+  fill("cards", s.cards.map((c) => line(c.name, el("span", "badge " + (CARD_BADGE[c.status] || "b-plain"), c.label))), "카드가 없어요");
+  fill("bills", s.bills.count ? [line("낼 돈이 남은 청구서 " + s.bills.count + "건", el("span", "mono", won(s.bills.amount) + "원"))] : [], "낼 카드값이 없어요");
+  fill("schedules", s.schedules.map((x) => line(shortTime(x.at) + "  " + x.to, el("span", "mono", won(x.amount) + "원"))), "걸어 둔 예약이 없어요");
+  fill("requests", s.requests.map((r) => line(r.task, el("span", "badge " + (REQUEST_BADGE[r.status] || "b-plain"), r.status))), "아직 처리한 업무가 없어요");
+}
+
+function showSteps(pending) {
+  const now = NOW_STEP[pending];
+  if (now === undefined) {
+    fill("steps", [], "진행 중인 업무가 없어요");
+    return;
+  }
+  fill("steps", STEPS.map((name, i) => {
+    if (i < now) return el("div", "", "✓ " + name);
+    if (i === now) return el("div", "now", "‖ " + name + (pending === "question" ? " (질문에 답해 주세요)" : ""));
+    return el("div", "todo", "○ " + name);
+  }));
+}
+
+function showAlerts(lines) {
+  // 예약 이체·분할 회차가 실행된 결과를 오른쪽 알림에 쌓습니다. (최근 것이 위, 5개까지)
+  if (!lines.length) return;
+  const box = document.getElementById("alerts");
+  for (const text of lines) box.prepend(el("div", "alert", text));
+  while (box.children.length > 5) box.lastChild.remove();
+  document.getElementById("alerts-box").hidden = false;
+}
+
+// ---------------------------------------------------------------- 보내기
 async function submit(text, cardLabel) {
   if (busy) return;
   busy = true;
@@ -106,10 +174,13 @@ async function submit(text, cardLabel) {
     });
     const data = await res.json();
     waiting.remove();
-    for (const line of data.notices) add(line, "notice");
+    for (const text of data.notices) add(text, "notice");
+    showAlerts(data.notices);
     if (data.proposal) addCard(data.proposal);
     else add(data.answer, "bot");
     input.type = data.pending === "secret" ? "password" : "text";
+    showSteps(data.pending);
+    await loadSummary();
   } catch (e) {
     waiting.remove();
     add("서버에 연결하지 못했습니다. 서버가 켜져 있는지 확인해 주세요.", "notice");
@@ -124,3 +195,5 @@ form.addEventListener("submit", (event) => {
   const text = input.value.trim();
   if (text) submit(text);
 });
+
+loadSummary();

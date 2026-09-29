@@ -5,40 +5,72 @@
 <title>가상은행 에이전트</title>
 <style>
   :root {
-    --canvas: #F7F6F3; --surface: #FFFFFF; --line: #EAEAEA;
+    --canvas: #F7F6F3; --surface: #FFFFFF; --line: #EAEAEA; --hover: #F1F0ED;
     --text: #2F3437; --muted: #787774; --primary: #111111; --on-primary: #FFFFFF;
     --warn-bg: #FBF3DB; --warn-text: #956400;
+    --ok-bg: #EDF3EC; --ok-text: #346538;
+    --bad-bg: #FDEBEC; --bad-text: #9F2F2D;
+    --info-bg: #E1F3FE; --info-text: #1F6C9F;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --canvas: #191919; --surface: #202020; --line: #2F2F2F;
+      --canvas: #191919; --surface: #202020; --line: #2F2F2F; --hover: #2A2A2A;
       --text: #E6E6E4; --muted: #9B9A97; --primary: #E6E6E4; --on-primary: #191919;
       --warn-bg: #35301C; --warn-text: #D9B45A;
+      --ok-bg: #1F2E22; --ok-text: #8FBF95;
+      --bad-bg: #3A2224; --bad-text: #E8A09C;
+      --info-bg: #1B2C38; --info-text: #8CC2E6;
     }
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; min-height: 100dvh; background: var(--canvas); color: var(--text);
     font-family: "Geist", "SF Pro Display", "Pretendard", "Noto Sans KR", sans-serif;
-    display: flex; justify-content: center; padding: 24px;
+    padding: 20px; min-width: 1100px;
   }
+  .mono { font-family: "Geist Mono", "SF Mono", "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 9999px; white-space: nowrap; }
+  .b-warn { background: var(--warn-bg); color: var(--warn-text); }
+  .b-ok { background: var(--ok-bg); color: var(--ok-text); }
+  .b-bad { background: var(--bad-bg); color: var(--bad-text); }
+  .b-plain { background: var(--canvas); color: var(--muted); }
+
+  /* 화면 틀 : 왼쪽 메뉴 | 가운데 (잔액 + 대화) | 오른쪽 패널 */
   .app {
-    width: 100%; max-width: 760px; background: var(--surface);
-    border: 1px solid var(--line); border-radius: 12px;
-    display: flex; flex-direction: column; height: calc(100dvh - 48px);
+    display: grid; grid-template-columns: 190px minmax(0, 1fr) 270px;
+    height: calc(100dvh - 40px); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
   }
-  header { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
-  header b { font-size: 14px; font-weight: 500; }
-  .badge { font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: var(--warn-bg); color: var(--warn-text); }
-  #log { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* 왼쪽 메뉴 */
+  .side { background: var(--canvas); border-right: 1px solid var(--line); padding: 18px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .brand { font-size: 15px; font-weight: 500; padding: 0 10px 16px; }
+  .nav { font-size: 13px; padding: 8px 10px; border-radius: 6px; color: var(--muted); }
+  .nav.on { background: var(--hover); color: var(--text); font-weight: 500; }
+  .me-box { margin-top: auto; padding: 10px; font-size: 12px; line-height: 1.6; }
+  .me-box b { font-weight: 500; }
+
+  /* 가운데 */
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .top { padding: 20px 24px 18px; border-bottom: 1px solid var(--line); }
+  .top-label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  .total { font-size: 30px; font-weight: 500; letter-spacing: -.02em; margin: 4px 0 14px; }
+  .total small { font-size: 15px; font-family: inherit; margin-left: 3px; }
+  .accounts { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .acc { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .acc div:first-child { font-size: 12px; color: var(--muted); }
+  .acc div:last-child { font-size: 14px; margin-top: 3px; }
+
+  #log { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
   #log > * { flex-shrink: 0; }    /* 대화가 길어져도 말풍선·카드가 눌려 잘리지 않게 */
-  .msg { font-size: 13px; line-height: 1.6; white-space: pre-wrap; max-width: 85%; }
+  .msg { font-size: 13px; line-height: 1.6; white-space: pre-wrap; max-width: 80%; }
   .me { align-self: flex-end; background: var(--canvas); border: 1px solid var(--line); padding: 8px 12px; border-radius: 12px; }
   .bot { align-self: flex-start; }
   .notice { align-self: flex-start; font-size: 12px; color: var(--muted); }
-  form { display: flex; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--line); }
+  form { display: flex; gap: 8px; padding: 14px 24px 18px; }
   input {
-    flex: 1; font: inherit; font-size: 13px; padding: 9px 12px; color: var(--text);
+    flex: 1; font: inherit; font-size: 13px; padding: 10px 12px; color: var(--text);
     background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
   }
   button {
@@ -46,10 +78,10 @@
     background: var(--primary); color: var(--on-primary); cursor: pointer;
   }
   button:disabled { opacity: .5; cursor: default; }
+  button:active:not(:disabled) { transform: scale(.98); }
 
   /* 처리안 확인 카드 (2단계) */
-  .mono { font-family: "Geist Mono", "SF Mono", "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; }
-  .card { align-self: flex-start; width: 100%; max-width: 440px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .card { align-self: flex-start; width: 100%; max-width: 460px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .card-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--canvas); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 500; }
   .card-head .badge { margin-left: auto; font-weight: 400; }
   .card-body { padding: 12px 14px; }
@@ -64,19 +96,76 @@
   .actions button { padding: 8px 12px; }
   .actions .primary { flex: 1; }
   .actions .ghost { background: var(--surface); color: var(--text); border: 1px solid var(--line); }
-  .done-badge { background: var(--canvas); color: var(--muted); }
+
+  /* 오른쪽 패널 */
+  .panel { border-left: 1px solid var(--line); padding: 20px 18px; overflow-y: auto; }
+  .panel h3 { font-size: 12px; font-weight: 400; color: var(--muted); margin: 0 0 10px; }
+  .panel section + section { margin-top: 22px; }
+  .line { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+  .steps div { font-size: 13px; line-height: 2; }
+  .steps .now { font-weight: 500; }
+  .steps .todo { color: var(--muted); }
+  .empty { font-size: 12px; color: var(--muted); }
+  .alert { font-size: 12px; line-height: 1.5; background: var(--info-bg); color: var(--info-text); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
 </style>
 </head>
 <body>
 <div class="app">
-  <header><b>가상은행 에이전트</b><span class="badge">가상 데이터</span></header>
-  <div id="log">
-    <div class="msg bot">무엇을 도와드릴까요? 예: 내 계좌 목록과 잔액 보여줘</div>
-  </div>
-  <form id="form">
-    <input id="text" autocomplete="off" placeholder="요청을 입력하세요">
-    <button id="send">보내기</button>
-  </form>
+
+  <aside class="side">
+    <div class="brand">가상은행</div>
+    <div class="nav on">에이전트</div>
+    <div class="nav">계좌</div>
+    <div class="nav">거래 내역</div>
+    <div class="nav">카드</div>
+    <div class="nav">카드값</div>
+    <div class="nav">예약 이체</div>
+    <div class="nav">처리 기록</div>
+    <div class="me-box"><b id="user">-</b><br><span class="muted" id="auth">본인 확인 전</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div class="top-label">내 계좌 총 잔액 <span class="badge b-warn">가상 데이터</span></div>
+      <div class="total"><span class="mono" id="total">-</span><small>원</small></div>
+      <div class="accounts" id="accounts"></div>
+    </div>
+    <div id="log">
+      <div class="msg bot">무엇을 도와드릴까요? 예: 내 계좌 목록과 잔액 보여줘</div>
+    </div>
+    <form id="form">
+      <input id="text" autocomplete="off" placeholder="요청을 입력하세요">
+      <button id="send">보내기</button>
+    </form>
+  </main>
+
+  <aside class="panel">
+    <section>
+      <h3>진행 상황</h3>
+      <div class="steps" id="steps"><div class="empty">진행 중인 업무가 없어요</div></div>
+    </section>
+    <section>
+      <h3>카드</h3>
+      <div id="cards"></div>
+    </section>
+    <section>
+      <h3>카드값</h3>
+      <div id="bills"></div>
+    </section>
+    <section>
+      <h3>예약 이체</h3>
+      <div id="schedules"></div>
+    </section>
+    <section>
+      <h3>최근 처리</h3>
+      <div id="requests"></div>
+    </section>
+    <section id="alerts-box" hidden>
+      <h3>알림</h3>
+      <div id="alerts"></div>
+    </section>
+  </aside>
+
 </div>
 <script src="/static/app.js"></script>
 </body>
