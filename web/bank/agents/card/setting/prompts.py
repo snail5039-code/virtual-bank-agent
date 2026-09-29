@@ -19,7 +19,7 @@ extract_prompt = """
 - address: reissue 가 true 일 때 받을 곳 (예: 집, 회사). 말하지 않았으면 비운다.
 - new_name: 별칭 변경일 때 새 별칭, 등록일 때 붙일 별칭. 말하지 않았으면 비운다.
 - 등록일 때
-  - bank_name: 카드 은행 이름 (예: 미래은행)
+  - bank_name: 카드 은행 이름 (예: 신한은행)
   - card_number: 카드 번호. 사용자가 말한 그대로
   - card_type: 체크 / 신용 중 하나
   - account_name: 결제 계좌 이름 (예: 생활비)

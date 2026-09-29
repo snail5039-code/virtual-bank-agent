@@ -4,6 +4,7 @@
 #              ↑     └─ 변경·등록·삭제 → check ─┬─ 할 수 없음 → fail → END
 #              │                                ├─ 여러 개   → confirm (번호 고르기) → check 로
 #              │                                ├─ 값 빠짐   → ask (계좌 / 항목 / 새 값 / 등록 정보) → 답을 들고 extract 로
+#              │                                ├─ 등록 은행 못 정함 → common_pick_bank (목록에서 번호로) → check 로
 #              │                                └─ 할 수 있음 → authenticate → propose → approve → interpret
 #              │                                                                           ↑         │
 #              │                                                                           └─ 모름 ──┤
@@ -14,7 +15,7 @@
 from langgraph.graph import END, START, StateGraph
 
 from agents.common.nodes import (common_approve_node, common_authenticate_node, common_interpret_node,
-                                 common_log_request_node, common_reject_node,
+                                 common_log_request_node, common_pick_bank_node, common_reject_node, route_after_pick_bank,
                                  common_report_node, common_save_node)
 from agents.account.setting.nodes import (route_after_authenticate, route_after_check, route_after_extract,
                                   route_after_interpret, route_after_confirm, route_after_ask, setting_ask_node, setting_confirm_node,
@@ -29,6 +30,7 @@ builder.add_node("setting_list", setting_list_node)
 builder.add_node("setting_check", setting_check_node)
 builder.add_node("setting_confirm", setting_confirm_node)
 builder.add_node("setting_ask", setting_ask_node)
+builder.add_node("common_pick_bank", common_pick_bank_node)
 builder.add_node("common_authenticate", common_authenticate_node)
 builder.add_node("setting_propose", setting_propose_node)
 builder.add_node("common_approve", common_approve_node)
@@ -44,7 +46,8 @@ builder.add_edge(START, "setting_extract")
 builder.add_conditional_edges("setting_extract", route_after_extract, ["setting_list", "setting_check"])
 builder.add_edge("setting_list", END)
 builder.add_conditional_edges("setting_check", route_after_check,
-                              ["setting_fail", "setting_confirm", "setting_ask", "common_authenticate"])
+                              ["setting_fail", "setting_confirm", "setting_ask", "common_pick_bank", "common_authenticate"])
+builder.add_conditional_edges("common_pick_bank", route_after_pick_bank, {"fail": "setting_fail", "check": "setting_check"})
 builder.add_conditional_edges("setting_confirm", route_after_confirm, ["setting_fail", "setting_check"])
 builder.add_conditional_edges("setting_ask", route_after_ask, ["setting_fail", "setting_extract"])
 builder.add_conditional_edges("common_authenticate", route_after_authenticate,

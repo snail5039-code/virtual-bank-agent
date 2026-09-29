@@ -113,10 +113,17 @@ def card_setting_check_node(state: BankState):
                 if len(found) != 1:
                     return {"error": "결제 계좌 '%s' 를 하나로 정할 수 없습니다. 정확한 계좌 이름으로 다시 요청해 주세요." % reg["account_name"]}
                 reg["account_id"] = found[0]["account_id"]
-            # 별칭을 안 말하면 "은행 이름 + 체크/신용카드" 로 붙입니다. 예) 미래은행 체크카드
+            # 은행은 목록에서 고릅니다. 다른 칸이 다 있는데 은행을 못 정했으면 common_pick_bank 로 보냅니다.
+            # (다른 칸이 빠졌으면 아래 check_card_register 가 무엇이 필요한지 알려줍니다)
+            bank = functions.match_bank(reg.get("bank_name"))
+            if bank:
+                reg["bank_name"] = bank
+            elif reg.get("card_number") and reg.get("card_type") and reg.get("account_id"):
+                return {"confirm_for": "bank"}
+            # 별칭을 안 말하면 "은행 이름 + 체크/신용카드" 로 붙입니다. 예) 신한은행 체크카드
             reg.setdefault("name", "%s %s카드" % (reg.get("bank_name", ""), reg.get("card_type", "")))
             error = functions.check_card_register(state["owner_id"], reg)
-            return {"error": error} if error else {"reg_info": reg}
+            return {"error": error} if error else {"reg_info": reg, "confirm_for": None}
 
         if not state.get("target_name"):
             return {"error": "어느 카드인지 말해 주세요. (예: 여행 카드 잠가줘 / 생활비 카드 분실 신고해줘)"}
@@ -241,6 +248,8 @@ def route_after_check(state: BankState):
         return "card_setting_fail"
     if state.get("candidates"):
         return "common_pick_card"
+    if state.get("confirm_for") == "bank":
+        return "common_pick_bank"
     return "common_authenticate"
 
 

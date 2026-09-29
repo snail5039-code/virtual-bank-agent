@@ -632,7 +632,8 @@ const PAGES = {
   accounts: {
     title: "계좌",
     also: "registered",     // 아래에 등록 계좌(상대 계좌)도 같이 보여줍니다
-    tools: () => [button("내 계좌 만들기", () => openForm(OPEN_FORM)), button("상대 계좌 등록", () => openForm(ACCOUNT_FORM))],
+    tools: () => [button("내 계좌 만들기", () => openForm(OPEN_FORM)), button("상대 계좌 등록", () => openForm(ACCOUNT_FORM)),
+                  button("가상 입금", () => quickAction("deposit"))],
     draw: (rows, registered) => {
       const box = el("div");
       box.appendChild(table(

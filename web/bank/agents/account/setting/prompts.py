@@ -16,7 +16,7 @@ extract_prompt = """
   - field: 별명 / 용도 중 하나. "이름" 은 별명이다.
   - new_value: 새 값 (예: 휴가비)
 - 등록일 때
-  - bank_name: 은행 이름 (예: 미래은행)
+  - bank_name: 은행 이름 (예: 신한은행)
   - account_number: 계좌번호. 사용자가 말한 그대로 (예: 210-11-223344)
   - holder_name: 예금주 이름 (예: 이영희)
   - nickname: 붙일 별명. 말하지 않았으면 비운다.

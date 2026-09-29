@@ -107,7 +107,7 @@ def check_card_register(owner_id, info):
     # info : {bank_name, card_number, card_type(체크/신용), account_id(결제 계좌), name}
     if not info.get("bank_name") or not info.get("card_number") or not info.get("card_type") or not info.get("account_id"):
         return ("등록하려면 은행, 카드 번호, 체크/신용, 결제 계좌가 필요합니다.\n"
-                "(예: 미래은행 체크카드 1234-5678-1234-5678 생활비 계좌로 등록해줘)")
+                "(예: 신한은행 체크카드 1234-5678-1234-5678 생활비 계좌로 등록해줘)")
     if not re.fullmatch(r"\d{4}-\d{4}-\d{4}-\d{4}", info["card_number"]):
         return "카드 번호는 16자리 숫자입니다. (예: 1234-5678-1234-5678)"
     if not 1 <= len(info["name"]) <= MAX_SETTING_LEN:

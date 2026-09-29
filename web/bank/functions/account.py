@@ -97,6 +97,44 @@ def find_registered(owner_id, name):
     return [r for r in get_registered(owner_id) if name and (name in r["nickname"] or name in r["holder_name"])]
 
 
+# 고를 수 있는 은행과 은행 코드입니다. (계좌 만들기, 상대 계좌 등록, 카드 등록)
+# 실제 은행처럼 보이게 실제 은행 이름과 표준 은행 코드를 씁니다. 가상은행은 처음 데이터가 쓰는 이 앱의 은행입니다.
+# 실제 은행과 연결되지는 않습니다. 이름과 계좌번호 모양만 빌려 씁니다.
+BANKS = {
+    "가상은행": "001",
+    "KB국민은행": "004",
+    "신한은행": "088",
+    "우리은행": "020",
+    "하나은행": "081",
+    "NH농협은행": "011",
+    "IBK기업은행": "003",
+    "SC제일은행": "023",
+    "카카오뱅크": "090",
+    "케이뱅크": "089",
+    "토스뱅크": "092",
+    "iM뱅크": "031",
+    "부산은행": "032",
+    "우체국": "071",
+}
+
+
+def match_bank(text):
+    # 말한 은행 이름을 목록(BANKS)의 이름 하나로 맞춥니다. 못 맞추면 None.
+    #   "신한은행" → 신한은행 (그대로),  "국민" / "kb" → KB국민은행 (한 곳에만 들어 있으면)
+    # 두 곳 이상에 들어 있거나 없는 은행이면 None 이고, 그때는 에이전트가 목록을 보여주고 고르게 합니다.
+    if not text:
+        return None
+    key = text.replace(" ", "").casefold()
+    names = {name.casefold(): name for name in BANKS}
+    if key in names:
+        return names[key]
+    short = key.replace("은행", "")
+    if not short:
+        return None
+    found = [name for folded, name in names.items() if short in folded]
+    return found[0] if len(found) == 1 else None
+
+
 REGISTER_FIELDS = {"bank_name": "은행", "account_number": "계좌번호", "holder_name": "예금주 이름"}
 
 
@@ -108,7 +146,7 @@ def register_missing(info):
 def check_register(owner_id, info):
     # 계좌를 등록할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
     if register_missing(info):
-        return "등록하려면 은행, 계좌번호, 예금주 이름이 필요합니다. (예: 미래은행 210-11-223344 이영희 계좌 등록해줘)"
+        return "등록하려면 은행, 계좌번호, 예금주 이름이 필요합니다. (예: 신한은행 210-11-223344 이영희 계좌 등록해줘)"
     if not 1 <= len(info["nickname"].strip()) <= MAX_SETTING_LEN:
         return "별명은 1~%d자로 정해 주세요." % MAX_SETTING_LEN
     for r in get_registered(owner_id):

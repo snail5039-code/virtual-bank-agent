@@ -18,7 +18,7 @@ from agents.card.setting.nodes import (card_setting_check_node, card_setting_exe
                                        route_after_authenticate, route_after_check, route_after_interpret, route_after_pick,
                                        route_after_password)
 from agents.common.nodes import (common_approve_node, common_authenticate_node, common_interpret_node, common_pick_card_node,
-                                 common_log_request_node, common_reject_node,
+                                 common_log_request_node, common_pick_bank_node, common_reject_node, route_after_pick_bank,
                                  common_report_node, common_save_node)
 from state import BankState
 
@@ -27,6 +27,7 @@ builder = StateGraph(BankState)
 builder.add_node("card_setting_extract", card_setting_extract_node)
 builder.add_node("card_setting_check", card_setting_check_node)
 builder.add_node("common_pick_card", common_pick_card_node)
+builder.add_node("common_pick_bank", common_pick_bank_node)
 builder.add_node("common_authenticate", common_authenticate_node)
 builder.add_node("card_setting_password", card_setting_password_node)
 builder.add_node("card_setting_propose", card_setting_propose_node)
@@ -41,7 +42,8 @@ builder.add_node("card_setting_fail", card_setting_fail_node)
 
 builder.add_edge(START, "card_setting_extract")
 builder.add_edge("card_setting_extract", "card_setting_check")
-builder.add_conditional_edges("card_setting_check", route_after_check, ["card_setting_fail", "common_pick_card", "common_authenticate"])
+builder.add_conditional_edges("card_setting_check", route_after_check, ["card_setting_fail", "common_pick_card", "common_pick_bank", "common_authenticate"])
+builder.add_conditional_edges("common_pick_bank", route_after_pick_bank, {"fail": "card_setting_fail", "check": "card_setting_check"})
 builder.add_conditional_edges("common_pick_card", route_after_pick, ["card_setting_fail", "card_setting_check"])
 builder.add_conditional_edges("common_authenticate", route_after_authenticate,
                               ["card_setting_fail", "card_setting_password", "card_setting_propose", "common_authenticate"])

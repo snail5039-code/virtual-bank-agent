@@ -95,6 +95,37 @@ def pick_warning(task):
     return {"pick_warning": "현재 '%s' 업무 중입니다. 번호로 골라 주세요. 다른 요청은 '취소' 후 다시 입력해 주세요." % task}
 
 
+def common_pick_bank_node(state: BankState):
+    # 등록(상대 계좌 / 카드)할 은행을 목록에서 번호로 고르게 합니다. 계좌 설정·카드 설정이 같이 씁니다.
+    # check 가 은행을 못 정하면(안 말했거나 목록에 없는 은행) confirm_for = "bank" 로 여기로 보냅니다.
+    # 번호나 은행 이름("국민", "신한")으로 답하면 reg_info 의 bank_name 에 넣고 check 로 돌아갑니다.
+    reg = dict(state.get("reg_info") or {})
+    names = list(functions.BANKS)
+    lines = []
+    if reg.get("bank_name"):
+        lines.append("'%s' 은(는) 고를 수 있는 은행이 아니에요." % reg["bank_name"])
+    lines.append("은행을 골라 주세요. (번호나 은행 이름)")
+    lines += ["%d. %s" % (number, name) for number, name in enumerate(names, start=1)]
+
+    with logger.get_logger().node("common_pick_bank"):
+        logger.get_logger().interrupt_pause("은행 고르기 (%d곳)" % len(names))
+
+    answer = interrupt(question(pick_text(state, lines) + "\n(그만두려면 '취소')")).strip()
+
+    if is_cancel(answer):
+        return {"error": "요청을 취소했습니다."}
+    bank = picked(answer, names) or functions.match_bank(answer)
+    if bank:
+        reg["bank_name"] = bank
+        return {"reg_info": reg, "confirm_for": None, "pick_warning": None}
+    return pick_warning("카드 등록" if state.get("domain") == "카드" else "계좌 등록")
+
+
+def route_after_pick_bank(state: BankState):
+    # 그래프마다 실패·검사 노드 이름이 달라서 "fail" / "check" 로 돌려주고, 그래프가 자기 노드로 잇습니다.
+    return "fail" if state.get("error") else "check"
+
+
 def common_pick_card_node(state: BankState):
     # 이름에 맞는 카드가 여러 장이면 번호로 고르게 합니다. 카드 설정·재발급이 같이 씁니다. (이체 transfer_confirm 과 같은 방식)
     # 고른 카드의 정확한 이름을 target_name 에 넣고 check 로 돌아갑니다.

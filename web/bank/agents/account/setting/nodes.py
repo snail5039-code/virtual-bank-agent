@@ -131,14 +131,21 @@ def setting_check_node(state: BankState):
     with log.node("setting_check"):
         action = state.get("setting_action")
         target_id = state.get("target_account")
-        update = {"candidates": None, "question": None}
+        update = {"candidates": None, "question": None, "confirm_for": None}
 
         if action == "등록":
-            reg = state.get("reg_info") or {}
-            missing = functions.register_missing(reg)
+            reg = dict(state.get("reg_info") or {})
+            # 은행 말고 빠진 칸은 글로 묻고, 은행은 목록에서 고르게 합니다 (common_pick_bank).
+            missing = [label for label in functions.register_missing(reg) if label != "은행"]
             if missing:
-                update["question"] = "[등록] 알려주세요 : %s  (예: 미래은행 210-11-223344 이영희)" % ", ".join(missing)
+                update["question"] = "[등록] 알려주세요 : %s  (예: 신한은행 210-11-223344 이영희)" % ", ".join(missing)
                 return update
+            bank = functions.match_bank(reg.get("bank_name"))
+            if not bank:
+                update["confirm_for"] = "bank"
+                return update
+            reg["bank_name"] = bank      # "국민" → KB국민은행 처럼 목록 이름으로 맞춥니다
+            update["reg_info"] = reg
             error = functions.check_register(state["owner_id"], reg)
             if error:
                 update["error"] = error
@@ -329,6 +336,8 @@ def route_after_check(state: BankState):
         return "setting_confirm"
     if state.get("question"):
         return "setting_ask"
+    if state.get("confirm_for") == "bank":
+        return "common_pick_bank"
     return "common_authenticate"
 
 
