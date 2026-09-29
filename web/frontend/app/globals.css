@@ -1,0 +1,72 @@
+/* 화면 전체에 쓰는 색과 기본 모양입니다. (예전 web/static/index.html 의 디자인을 그대로 옮김)
+   색은 이름(--canvas 등)으로만 쓰고, 라이트/다크에서 값만 바꿉니다.
+   다크가 되는 경우 : 컴퓨터 설정이 다크인데 사용자가 라이트를 고르지 않았을 때 / 사용자가 다크를 골랐을 때 */
+:root {
+  --canvas: #F7F6F3; --surface: #FFFFFF; --line: #EAEAEA; --hover: #F1F0ED;
+  --text: #2F3437; --muted: #787774; --primary: #111111; --on-primary: #FFFFFF;
+  --warn-bg: #FBF3DB; --warn-text: #956400;
+  --ok-bg: #EDF3EC; --ok-text: #346538;
+  --bad-bg: #FDEBEC; --bad-text: #9F2F2D;
+  --info-bg: #E1F3FE; --info-text: #1F6C9F;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #191919; --surface: #202020; --line: #2F2F2F; --hover: #2A2A2A;
+    --text: #E6E6E4; --muted: #9B9A97; --primary: #E6E6E4; --on-primary: #191919;
+    --warn-bg: #35301C; --warn-text: #D9B45A;
+    --ok-bg: #1F2E22; --ok-text: #8FBF95;
+    --bad-bg: #3A2224; --bad-text: #E8A09C;
+    --info-bg: #1B2C38; --info-text: #8CC2E6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --canvas: #191919; --surface: #202020; --line: #2F2F2F; --hover: #2A2A2A;
+  --text: #E6E6E4; --muted: #9B9A97; --primary: #E6E6E4; --on-primary: #191919;
+  --warn-bg: #35301C; --warn-text: #D9B45A;
+  --ok-bg: #1F2E22; --ok-text: #8FBF95;
+  --bad-bg: #3A2224; --bad-text: #E8A09C;
+  --info-bg: #1B2C38; --info-text: #8CC2E6;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; min-height: 100dvh; background: var(--canvas); color: var(--text);
+  font-family: var(--font-geist-sans), "Pretendard", "Noto Sans KR", sans-serif;
+}
+.mono { font-family: var(--font-geist-mono), "SF Mono", monospace; font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+
+input, select {
+  font: inherit; font-size: 13px; padding: 10px 12px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px;
+}
+button {
+  font: inherit; font-size: 13px; padding: 0 16px; border: none; border-radius: 6px;
+  background: var(--primary); color: var(--on-primary); cursor: pointer;
+}
+button:disabled { opacity: .5; cursor: default; }
+button:active:not(:disabled) { transform: scale(.98); }
+
+/* 화면 색 고르기 (자동 / 라이트 / 다크) */
+.theme-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.theme-toggle button { font-size: 11px; padding: 4px 9px; border-radius: 0; background: var(--surface); color: var(--muted); }
+.theme-toggle button + button { border-left: 1px solid var(--line); }
+.theme-toggle button.on { background: var(--hover); color: var(--text); font-weight: 500; }
+
+/* 로그인 · 회원가입 */
+.auth-page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.auth-corner { position: fixed; top: 16px; right: 16px; }
+.auth-form {
+  width: 320px; max-width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 28px 24px; display: flex; flex-direction: column; gap: 10px;
+}
+.auth-form h1 { font-size: 17px; font-weight: 500; margin: 0 0 2px; }
+.auth-form p { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+.auth-form label { font-size: 12px; color: var(--muted); }
+.auth-form button[type="submit"] { padding: 10px 12px; margin-top: 6px; }
+.auth-form .switch { margin: 6px 0 0; text-align: center; }
+.auth-form .switch a { color: var(--text); }
+.form-error { font-size: 12px; background: var(--bad-bg); color: var(--bad-text); border-radius: 6px; padding: 7px 9px; }
