@@ -18,7 +18,7 @@ WEB_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(WEB_DIR.parent / "src"))     # src 의 모듈(main, data_store …)을 불러오기 위해
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -92,6 +92,49 @@ def summary():
         "requests": [{"task": r["task_type"], "status": r["status"], "at": r["created_at"]}
                      for r in mine(data["requests"])[-5:][::-1]],
     }
+
+
+TX_TYPE = {"deposit": "입금", "withdrawal": "출금"}
+CARD_TYPE = {"credit": "신용", "debit": "체크"}
+
+
+@app.get("/api/view/{name}")
+def view(name: str):
+    # 왼쪽 메뉴 화면(계좌, 거래 내역, 카드, 카드값, 예약 이체, 처리 기록)에 쓸 목록입니다.
+    # LLM 을 거치지 않고 data.json 을 읽기만 합니다. 바꾸는 일은 에이전트(승인 흐름)로만 합니다.
+    with bank.work_lock:
+        data = data_store.load()
+    me = functions.CURRENT_USER
+    mine = lambda key: [item for item in data[key] if item["owner_id"] == me]
+    nick = {a["account_id"]: a["nickname"] for a in data["accounts"]}
+    card_names = {c["card_id"]: c["name"] for c in data["cards"]}
+
+    if name == "accounts":
+        return [{"name": a["nickname"], "bank": a["bank_name"], "number": a["account_number"],
+                 "purpose": a.get("purpose"), "balance": a["balance"]} for a in mine("accounts")]
+    if name == "transactions":
+        rows = sorted(mine("transactions"), key=lambda t: t["occurred_at"], reverse=True)
+        return [{"at": t["occurred_at"], "account": nick.get(t["account_id"], t["account_id"]),
+                 "type": TX_TYPE.get(t["type"], t["type"]), "amount": t["amount"], "merchant": t.get("merchant"),
+                 "card": card_names.get(t.get("card_id"))} for t in rows]
+    if name == "cards":
+        return [{"name": c["name"], "type": CARD_TYPE.get(c.get("card_type"), c.get("card_type")),
+                 "bank": c.get("bank_name"), "account": nick.get(c.get("account_id")),
+                 "status": c["status"], "label": functions.CARD_STATUS[c["status"]]} for c in mine("cards")]
+    if name == "bills":
+        rows = sorted(mine("card_statements"), key=lambda s: s["billing_month"], reverse=True)
+        return [{"card": card_names.get(s["card_id"], s["card_id"]), "month": s["billing_month"],
+                 "total": s["total_amount"], "remaining": s["remaining_amount"], "due": s["due_date"],
+                 "status": s["status"], "label": functions.STATEMENT_STATUS[s["status"]]} for s in rows]
+    if name == "schedules":
+        rows = sorted(mine("scheduled_transfers"), key=lambda s: s["scheduled_at"], reverse=True)
+        return [{"id": s["schedule_id"], "at": s["scheduled_at"], "from": nick.get(s["from_account"]),
+                 "to": functions.target_name(data, s["to_account"]), "amount": s["amount"], "status": s["status"]}
+                for s in rows]
+    if name == "requests":
+        return [{"id": r["request_id"], "at": r["created_at"], "task": r["task_type"], "status": r["status"],
+                 "content": r["content"]} for r in mine("requests")[::-1]]
+    raise HTTPException(status_code=404, detail="없는 화면입니다")
 
 
 def state_values():
