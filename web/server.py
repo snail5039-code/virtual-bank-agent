@@ -16,7 +16,8 @@
 #     jiho    / jiho1234     → user-003 박지호
 #   회원가입 : /signup 화면. 이름·휴대전화번호·아이디·비밀번호·PIN(본인 확인용 4자리)을 받아 users 에 새 사람을 넣고 바로 로그인합니다.
 #   화면(요약·메뉴)과 버튼 업무는 로그인한 사람 것만 보여주고 바꿉니다. (3단계)
-#   에이전트는 아직 하나라서 user-001 만 씁니다. 다른 사람에게는 안내만 합니다 (4~5단계에서 사람별로 바꿈).
+#   에이전트도 사람마다 세션(thread_id)·최근 대화가 따로입니다. 요청마다 로그인한 사람을 State 의 owner_id 로 넣습니다. (4단계)
+#   재시작 복구·스케줄러 알림은 아직 한 사람(user-001)만 받습니다 (5단계에서 사람별로 바꿈).
 
 import re
 import secrets
@@ -213,9 +214,8 @@ class ActionIn(BaseModel):
 AUTH_TRIES = 3
 button_auth = {}
 
-# 에이전트(그래프·대화 기록)는 아직 하나라서 이 사람만 씁니다. (4단계에서 사람별로 바꿈)
-AGENT_USER = functions.CURRENT_USER
-AGENT_ONLY = "에이전트는 아직 김도윤 계정에서만 쓸 수 있어요. 메뉴 화면의 버튼으로 업무를 해 주세요."
+# 재시작 복구 기록(진행 중 업무)과 스케줄러 알림은 아직 누구 것인지 적혀 있지 않아서 이 사람만 받습니다. (5단계에서 사람별로 바꿈)
+ONE_USER = functions.CURRENT_USER
 
 
 def auth_of(me):
@@ -223,8 +223,8 @@ def auth_of(me):
 
 
 def agent_pending(me):
-    # 에이전트가 이 사람 업무로 질문·승인을 기다리는 중이면 그 종류, 아니면 None.
-    return common_pending_check(bank_graph, bank.config) if me == AGENT_USER else None
+    # 이 사람의 에이전트가 질문·승인을 기다리는 중이면 그 종류, 아니면 None.
+    return common_pending_check(bank_graph, bank.config_of(me))
 
 
 @app.get("/")
@@ -320,11 +320,9 @@ def view(name: str, request: Request):
 
 
 def is_authenticated(me):
-    # 버튼에서 본인 확인을 했거나, 에이전트에서 했으면 True 입니다. (에이전트 쪽은 에이전트를 쓰는 사람일 때만)
+    # 버튼에서 본인 확인을 했거나, 이 사람의 에이전트 세션에서 했으면 True 입니다.
     # 업무 중간(멈춘 동안)에는 에이전트의 본인 확인 결과가 안쪽 그래프 State 에만 있어서 안쪽까지 봅니다.
-    if auth_of(me)["ok"]:
-        return True
-    return me == AGENT_USER and any(values.get("authenticated") for values in state_values())
+    return auth_of(me)["ok"] or any(values.get("authenticated") for values in state_values(me))
 
 
 # ---------------------------------------------------------------- 메뉴 화면 버튼 업무
@@ -369,7 +367,7 @@ def action_run(body: ActionIn, request: Request):
         if error:
             return action_reply(error=error)
         task = proposal["task"]
-        log.turn_start("[버튼 %s] %s %s" % (me, task, "승인" if body.approve else "거절"), bank.thread_id)
+        log.turn_start("[버튼 %s] %s %s" % (me, task, "승인" if body.approve else "거절"), bank.session(me)["thread_id"])
 
         if not body.approve:
             answer = "%s 요청을 진행하지 않았습니다. 바뀐 것은 없습니다." % task
@@ -409,10 +407,10 @@ def action_run(body: ActionIn, request: Request):
     return action_reply(answer=answer, result=result)
 
 
-def state_values():
+def state_values(me):
     # 바깥(1단) State 부터 멈춘 안쪽 그래프(2단, 3단) State 까지의 값을 차례로 돌려줍니다.
     # 그래프가 멈춰 있는 동안 안쪽에서 바뀐 값(처리안, 본인 확인)은 바깥 State 에 아직 없기 때문입니다.
-    snapshot = bank_graph.get_state(bank.config, subgraphs=True)
+    snapshot = bank_graph.get_state(bank.config_of(me), subgraphs=True)
     values = []
     while snapshot:
         values.append(snapshot.values)
@@ -421,12 +419,12 @@ def state_values():
     return values
 
 
-def waiting_proposal():
+def waiting_proposal(me):
     # 승인을 기다리는 처리안을 꺼냅니다. 화면이 글자 상자 대신 카드로 그리게 합니다.
     # 처리안은 3단 그래프(안쪽) State 에만 있어서, 가장 안쪽 값을 씁니다.
     #   {"task": "이체", "rows": [["출금", "생활비 (…)"], …], "retry": 답을 못 알아들어 다시 묻는 중인지}
     found = None
-    for values in state_values():
+    for values in state_values(me):
         if values.get("proposal"):
             found = {**values["proposal"], "retry": values.get("approval") == "모름"}
     return found
@@ -434,29 +432,28 @@ def waiting_proposal():
 
 @app.post("/api/chat")
 def chat(body: ChatIn, request: Request):
-    if login_user(request) != AGENT_USER:
-        return {"answer": AGENT_ONLY, "pending": None, "proposal": None, "notices": []}
-    return run_turn(body.text.strip())
+    return run_turn(login_user(request), body.text.strip())
 
 
 @app.get("/api/waiting")
 def waiting(request: Request):
     # 화면을 새로 열었을 때(새로고침) 그래프가 멈춰 있으면, 멈춘 질문이나 처리안을 다시 그리게 알려줍니다.
     # 그래프는 서버에 그대로 멈춰 있으므로 다음 입력은 그 답으로 들어갑니다.
+    me = login_user(request)
     with bank.work_lock:
-        pending = agent_pending(login_user(request))
+        pending = agent_pending(me)
         if not pending:
             return {"pending": None, "answer": None, "proposal": None}
-        text = bank_graph.get_state(bank.config).interrupts[0].value["text"]
-        proposal = waiting_proposal() if pending == APPROVAL else None
+        text = bank_graph.get_state(bank.config_of(me)).interrupts[0].value["text"]
+        proposal = waiting_proposal(me) if pending == APPROVAL else None
     return {"pending": pending, "answer": text, "proposal": proposal}
 
 
 @app.get("/api/alerts")
 def alerts(request: Request):
     # 스케줄러가 입력 없이 실행한 예약 이체·분할 회차 결과를 꺼내 줍니다. 화면이 몇 초마다 부릅니다. (4단계)
-    # 결과 줄에 누구 것인지가 없어서, 아직은 에이전트를 쓰는 사람에게만 줍니다. (5단계에서 사람별로)
-    if login_user(request) != AGENT_USER:
+    # 결과 줄에 누구 것인지가 없어서, 아직은 한 사람에게만 줍니다. (5단계에서 사람별로)
+    if login_user(request) != ONE_USER:
         return {"alerts": []}
     lines = []
     while not bank.outbox.empty():
@@ -467,7 +464,7 @@ def alerts(request: Request):
 @app.get("/api/recovery")
 def recovery(request: Request):
     # 켤 때 남아 있던 진행 중 업무를 알려줍니다. 없으면 None. (main.recover_pending 과 같은 내용)
-    if not interrupted or login_user(request) != AGENT_USER:
+    if not interrupted or login_user(request) != ONE_USER:
         return {"record": None}
     return {"record": {**interrupted, "when": functions.when_text(interrupted["created_at"])}}
 
@@ -477,8 +474,8 @@ def recover(body: RecoveryIn, request: Request):
     # 다시 하면 원래 요청 문장으로 처음부터 돌립니다. 잔액·상태를 다시 검사하고 승인도 다시 받습니다.
     # 이전 승인만으로 자동 실행하지 않습니다.
     global interrupted
-    if login_user(request) != AGENT_USER:
-        return {"answer": AGENT_ONLY, "pending": None, "proposal": None, "notices": []}
+    if login_user(request) != ONE_USER:
+        return {"answer": "다시 진행할 업무가 없습니다.", "pending": None, "proposal": None, "notices": []}
     record, interrupted = interrupted, None
     if not record:
         return {"answer": "다시 진행할 업무가 없습니다.", "pending": None, "proposal": None, "notices": []}
@@ -486,11 +483,11 @@ def recover(body: RecoveryIn, request: Request):
         log.note("재시작 복구  '%s' → %s" % (record["request_text"], "다시" if body.again else "지움"))
         functions.clear_pending()
     if body.again:
-        return run_turn(record["request_text"])
+        return run_turn(ONE_USER, record["request_text"])
     return {"answer": "진행 중이던 업무를 지웠습니다. 바뀐 것은 없습니다.", "pending": None, "proposal": None, "notices": []}
 
 
-def run_turn(user_input):
+def run_turn(me, user_input):
     # main.handle_turn 과 같은 순서로 입력 한 번을 처리하고, 화면에 보여줄 것을 돌려줍니다.
     #   answer   : 답이나 질문·처리안 (글자)
     #   pending  : 멈춰 있으면 그 종류 (approval / question / secret), 끝났으면 None
@@ -498,19 +495,20 @@ def run_turn(user_input):
     #   notices  : 처리 전에 실행된 예약 이체·분할 회차 결과
     proposal = None
     with bank.work_lock:
-        secret = common_pending_check(bank_graph, bank.config) == SECRET
-        log.turn_start("****" if secret else user_input, bank.thread_id)
+        secret = agent_pending(me) == SECRET
+        log.turn_start("****" if secret else user_input, bank.session(me)["thread_id"])
         notices = bank.run_due(log)
         try:
-            answer = bank.respond(user_input, log)
-            pending = common_pending_check(bank_graph, bank.config)
-            try:
-                bank.remember_pending(pending)
-            except data_store.DataStoreError:
-                pass
-            bank.remember_turn(pending)
+            answer = bank.respond(me, user_input, log)
+            pending = agent_pending(me)
+            if me == ONE_USER:      # 재시작 복구 기록은 아직 한 사람 것만 (5단계)
+                try:
+                    bank.remember_pending(me, pending)
+                except data_store.DataStoreError:
+                    pass
+            bank.remember_turn(me, pending)
             if pending == APPROVAL:
-                proposal = waiting_proposal()
+                proposal = waiting_proposal(me)
             log.turn_end(bank.turn_result(pending))
         except Exception as e:
             log.error(e)

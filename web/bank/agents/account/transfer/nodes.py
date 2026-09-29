@@ -122,9 +122,9 @@ def transfer_check_node(state: BankState):
 
             # 출금은 내 계좌에서만, 입금은 내 계좌와 등록 계좌(상대 계좌)에서 찾습니다.
             if slot == "from":
-                found = functions.find_accounts(functions.CURRENT_USER, name)
+                found = functions.find_accounts(state["owner_id"], name)
             else:
-                found = functions.find_targets(functions.CURRENT_USER, name)
+                found = functions.find_targets(state["owner_id"], name)
             log.resolve(name, len(found), found[0]["account_id"] if found else None)
 
             if len(found) == 0:
@@ -146,7 +146,7 @@ def transfer_check_node(state: BankState):
             update["error"] = functions.SCHEDULE_ONE_ONLY
             return update
         if splits:
-            splits, index, candidates, error = functions.resolve_splits(functions.CURRENT_USER, splits)
+            splits, index, candidates, error = functions.resolve_splits(state["owner_id"], splits)
             update["splits"] = splits
             if error:
                 update["error"] = error
@@ -166,11 +166,11 @@ def transfer_check_node(state: BankState):
 
         # 입금 목록을 만들고, 실행할 수 있는지 봅니다. 계산은 functions 가 합니다 (원칙 6).
         targets, error = functions.build_targets(
-            functions.CURRENT_USER, from_account, to_account,
+            state["owner_id"], from_account, to_account,
             update.get("to_name") or state.get("to_name"), state.get("amount"),
             state.get("keep_amount"), splits)
         if targets and not error:
-            error = functions.check_transfer(functions.CURRENT_USER, from_account, targets, state.get("keep_amount"))
+            error = functions.check_transfer(state["owner_id"], from_account, targets, state.get("keep_amount"))
         if targets and not error and state.get("scheduled_at"):
             error = functions.check_schedule(state["scheduled_at"], targets, state.get("keep_amount"))
         if error:
@@ -257,7 +257,7 @@ def transfer_propose_node(state: BankState):
     # 처리안을 만듭니다. 잔액은 읽기만 합니다. 저장은 승인된 뒤에만 합니다.
     log = logger.get_logger()
     with log.node("transfer_propose"):
-        from_account = functions.get_account(functions.CURRENT_USER, state["from_account"])
+        from_account = functions.get_account(state["owner_id"], state["from_account"])
         data = data_store.load()
         targets = state["targets"]
         total = sum(target["amount"] for target in targets)
@@ -321,7 +321,7 @@ def transfer_execute_node(state: BankState):
         # 예약 이체 : 돈은 옮기지 않고 예약만 남깁니다. 시각이 되면 main.py 가 실행합니다.
         if state.get("scheduled_at"):
             target = state["targets"][0]
-            functions.add_schedule(data, functions.CURRENT_USER, state["from_account"], target, state["scheduled_at"])
+            functions.add_schedule(data, state["owner_id"], state["from_account"], target, state["scheduled_at"])
             answer = "%s → %s  %s원\n%s 에 이체하도록 예약했습니다." % (
                 state["from_name"], target["to_name"], format(target["amount"], ","),
                 functions.when_text(state["scheduled_at"]))

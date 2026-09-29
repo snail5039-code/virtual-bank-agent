@@ -91,20 +91,20 @@ def card_query_node(state: BankState):
         other_filter = f["card_name"] or f["card_type"] or f["status"]
         parts = []
         if exclude and not f["bank_names"]:
-            cards = functions.find_cards(functions.CURRENT_USER, None, f["card_name"], f["card_type"], f["status"], exclude)
+            cards = functions.find_cards(state["owner_id"], None, f["card_name"], f["card_type"], f["status"], exclude)
             if not cards:
                 return {"answer": "%s 말고 다른 은행%s 없습니다." % (
                     ", ".join(exclude), "에는 조건에 맞는 카드가" if other_filter else " 카드는")}
             banks = list(dict.fromkeys(c["bank_name"] for c in cards))     # 남은 카드의 은행 (나온 순서대로, 겹치지 않게)
             for bank in banks:
-                lines = card_lines(f, [c for c in cards if c["bank_name"] == bank])
+                lines = card_lines(state["owner_id"], f, [c for c in cards if c["bank_name"] == bank])
                 lines[0] = "[%s] %s" % (bank, lines[0])
                 parts.append("\n".join(lines))
             return {"answer": "\n\n".join(parts)}
 
         banks = f["bank_names"] or [None]
         for bank in banks:
-            cards = functions.find_cards(functions.CURRENT_USER, bank, f["card_name"], f["card_type"], f["status"], exclude)
+            cards = functions.find_cards(state["owner_id"], bank, f["card_name"], f["card_type"], f["status"], exclude)
             if not cards:
                 if not bank:
                     parts.append("조건에 맞는 카드가 없습니다.")
@@ -113,7 +113,7 @@ def card_query_node(state: BankState):
                 else:
                     parts.append("%s 카드는 없습니다." % bank)
                 continue
-            lines = card_lines(f, cards)
+            lines = card_lines(state["owner_id"], f, cards)
             if len(banks) > 1:
                 lines[0] = "[%s] %s" % (bank, lines[0])     # 여러 은행이면 은행 이름을 앞에 붙입니다
             parts.append("\n".join(lines))
@@ -121,9 +121,9 @@ def card_query_node(state: BankState):
     return {"answer": "\n\n".join(parts)}
 
 
-def card_lines(f, cards):
+def card_lines(owner_id, f, cards):
     # 걸러 낸 카드로 볼 것(info)에 맞춘 답을 줄 목록으로 만듭니다. 은행마다 한 번씩 부릅니다.
-    accounts = {a["account_id"]: a for a in functions.get_accounts(functions.CURRENT_USER)}
+    accounts = {a["account_id"]: a for a in functions.get_accounts(owner_id)}
     names = {c["card_id"]: c["name"] for c in cards}
     info = f["info"]
 
@@ -141,7 +141,7 @@ def card_lines(f, cards):
             lines.append("- %s : %s  [%s]" % (card["name"], card["card_number"], functions.CARD_STATUS[card["status"]]))
 
     elif info == "멤버십":
-        memberships = functions.get_memberships(functions.CURRENT_USER, list(names))
+        memberships = functions.get_memberships(owner_id, list(names))
         if not memberships:
             return ["멤버십이 연결된 카드가 없습니다."]
         lines = ["멤버십 %d개입니다." % len(memberships)]
@@ -150,7 +150,7 @@ def card_lines(f, cards):
 
     elif info == "이용 내역":
         start, end = functions.date_range(f["period"], f["start_date"], f["end_date"])
-        found = functions.get_card_history(functions.CURRENT_USER, list(names), start, end)
+        found = functions.get_card_history(owner_id, list(names), start, end)
         if not found:
             return ["조건에 맞는 카드 이용 내역이 없습니다."]
         lines = ["카드 이용 내역 %d건 (최근순)" % len(found)]

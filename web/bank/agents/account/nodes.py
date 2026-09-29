@@ -43,7 +43,7 @@ def account_router_node(state: BankState):
 
 def account_query_node(state: BankState):
     with logger.get_logger().node("account_query"):
-        accounts = functions.get_accounts(functions.CURRENT_USER)
+        accounts = functions.get_accounts(state["owner_id"])
 
         lines = ["보유 계좌 %d개입니다." % len(accounts)]
         for account in accounts:
@@ -90,9 +90,9 @@ def account_history_node(state: BankState):
         log.detail("조건  계좌=%s 기간=%s %s~%s 종류=%s 금액=%s~%s" % (
             f.account_name, f.period, f.start_date, f.end_date, f.kind, f.min_amount, f.max_amount))
 
-        accounts = functions.get_accounts(functions.CURRENT_USER)
+        accounts = functions.get_accounts(state["owner_id"])
         if f.account_name:
-            accounts = functions.find_accounts(functions.CURRENT_USER, f.account_name)
+            accounts = functions.find_accounts(state["owner_id"], f.account_name)
             if not accounts:
                 return {"answer": "'%s' 계좌를 찾을 수 없습니다." % f.account_name}
 
@@ -100,7 +100,7 @@ def account_history_node(state: BankState):
         start, end = functions.date_range(f.period, f.start_date, f.end_date)
 
         found = functions.get_transactions(
-            functions.CURRENT_USER, [a["account_id"] for a in accounts],
+            state["owner_id"], [a["account_id"] for a in accounts],
             start, end, f.kind, f.min_amount, f.max_amount)
         log.detail("기간 %s ~ %s / %d건" % (start, end, len(found)))
 
@@ -108,7 +108,7 @@ def account_history_node(state: BankState):
             return {"answer": "조건에 맞는 거래 내역이 없습니다."}
 
         nicknames = {a["account_id"]: a["nickname"] for a in accounts}
-        cards = {c["card_id"]: c["name"] for c in functions.get_cards(functions.CURRENT_USER)}
+        cards = {c["card_id"]: c["name"] for c in functions.get_cards(state["owner_id"])}
         lines = ["거래 내역 %d건 (최근순)" % len(found)]
         for tx in found:
             line = "- %s  %s  %s  %s원" % (

@@ -5,11 +5,15 @@
 # 그래서 새 요청을 시작할 때는 new_request() 로 이번 업무 칸을 비웁니다.
 # last_transfer 와 authenticated 는 비우지 않습니다. 맥락과 세션 인증이라 요청이 바뀌어도 남아야 합니다.
 # history(최근 대화)는 main.py 가 세션 동안 들고 있다가 새 요청마다 넣어 줍니다.
+# owner_id(누구의 업무인지)도 새 요청마다 넣어 줍니다. 노드는 이 사람의 계좌·카드만 찾고 바꿉니다. (웹 여러 사람용)
 
 from typing import TypedDict
 
+import functions
+
 
 class BankState(TypedDict):
+    owner_id: str           # 요청한 사람 (로그인한 사람). 노드가 functions 에 이 값을 넘깁니다
     query: str              # 사용자 입력 (질문에 답하면 그 답으로 바뀝니다)
     request_text: str       # 이번 요청의 처음 문장 ("그거" 를 풀었으면 푼 문장). 재시작 복구 때 이 문장으로 다시 돌립니다
     history: list           # 최근 대화 [{request, answer}, ...]. 요청 다듬기(rewrite)가 "그거", "그 카드" 를 풀 때 봅니다
@@ -75,10 +79,11 @@ class BankState(TypedDict):
     authenticated: bool     # 본인 확인을 마쳤는지. 세션(thread_id) 동안 유지, 재시작하면 풀립니다
 
 
-def new_request(query, history=None):
+def new_request(query, history=None, owner_id=None):
     # 새 요청의 시작값입니다. 지난 업무의 값이 섞이지 않게 비웁니다.
     # history 는 비우지 않고 main.py 가 준 최근 대화를 넣습니다.
     return {
+        "owner_id": owner_id or functions.CURRENT_USER,
         "query": query, "request_text": query, "history": history or [],
         "domain": None, "reason": None, "task": None, "answer": None,
         "from_name": None, "to_name": None,

@@ -77,22 +77,22 @@ def application_text(app, cards, addresses):
 
 def reissue_list_node(state: BankState):
     with logger.get_logger().node("reissue_list"):
-        apps = functions.get_applications(functions.CURRENT_USER)
+        apps = functions.get_applications(state["owner_id"])
         # 카드를 말했으면 그 카드 신청만 봅니다.
         if state.get("target_name"):
-            card_ids = [c["card_id"] for c in functions.pick_cards(functions.CURRENT_USER, state["target_name"])]
+            card_ids = [c["card_id"] for c in functions.pick_cards(state["owner_id"], state["target_name"])]
             apps = [a for a in apps if a["card_id"] in card_ids]
         if not apps:
             return {"answer": "재발급 신청이 없습니다."}
         lines = ["재발급 신청 %d건입니다." % len(apps)]
-        cards = {c["card_id"]: c["name"] for c in functions.get_cards(functions.CURRENT_USER)}
-        addresses = {a["address_id"]: a for a in functions.get_addresses(functions.CURRENT_USER)}
+        cards = {c["card_id"]: c["name"] for c in functions.get_cards(state["owner_id"])}
+        addresses = {a["address_id"]: a for a in functions.get_addresses(state["owner_id"])}
         lines += ["- " + application_text(a, cards, addresses) for a in apps]
     return {"answer": "\n".join(lines)}
 
 
-def address_guide():
-    names = ", ".join("%s(%s)" % (a["label"], a["address"]) for a in functions.get_addresses(functions.CURRENT_USER))
+def address_guide(owner_id):
+    names = ", ".join("%s(%s)" % (a["label"], a["address"]) for a in functions.get_addresses(owner_id))
     return "받을 곳을 말해 주세요. 등록된 배송지 : %s\n(예: 생활비 카드 재발급해줘 집으로)" % names
 
 
@@ -104,7 +104,7 @@ def reissue_check_node(state: BankState):
             return {"error": "어느 카드인지 말해 주세요. (예: 생활비 카드 재발급해줘 집으로 / 구 생활비 카드 재발급 취소해줘)"}
 
         # 카드를 한 장으로 정합니다. 여러 장이면 common_pick_card 가 번호로 고르게 합니다. (카드 설정과 같은 방식)
-        found = functions.pick_cards(functions.CURRENT_USER, state["target_name"])
+        found = functions.pick_cards(state["owner_id"], state["target_name"])
         log.resolve(state["target_name"], len(found), found[0]["card_id"] if found else None)
         if not found:
             return {"error": "'%s' 카드를 찾을 수 없습니다." % state["target_name"]}
@@ -114,7 +114,7 @@ def reissue_check_node(state: BankState):
 
         if action == "신청 취소":
             # 이 카드의 진행 중인 신청이 접수 상태인지 봅니다.
-            app = functions.find_open_application(functions.CURRENT_USER, card["card_id"])
+            app = functions.find_open_application(state["owner_id"], card["card_id"])
             if not app:
                 return {"error": "진행 중인 재발급 신청이 없습니다. (%s)" % card["name"]}
             error = functions.check_application(app, action)
@@ -122,18 +122,18 @@ def reissue_check_node(state: BankState):
 
         if action == "신청":
             # 분실 정지 카드인지, 진행 중인 신청이 없는지 봅니다.
-            error = functions.check_reissue(functions.CURRENT_USER, card)
+            error = functions.check_reissue(state["owner_id"], card)
             if error:
                 return {"error": error}
 
         # 배송지를 하나로 정합니다. (신청, 배송지 수정)
-        addresses = functions.find_addresses(functions.CURRENT_USER, state.get("new_value"))
+        addresses = functions.find_addresses(state["owner_id"], state.get("new_value"))
         if len(addresses) != 1:
-            return {"error": address_guide()}
+            return {"error": address_guide(state["owner_id"])}
         address_id = addresses[0]["address_id"]
 
         if action == "배송지 수정":
-            app = functions.find_open_application(functions.CURRENT_USER, card["card_id"])
+            app = functions.find_open_application(state["owner_id"], card["card_id"])
             if not app:
                 return {"error": "진행 중인 재발급 신청이 없습니다. (%s)" % card["name"]}
             error = functions.check_application(app, action, address_id)
@@ -146,8 +146,8 @@ def reissue_check_node(state: BankState):
 def reissue_propose_node(state: BankState):
     with logger.get_logger().node("reissue_propose"):
         action = state["setting_action"]
-        card = functions.get_card(functions.CURRENT_USER, state["target_account"])
-        addresses = {a["address_id"]: a for a in functions.get_addresses(functions.CURRENT_USER)}
+        card = functions.get_card(state["owner_id"], state["target_account"])
+        addresses = {a["address_id"]: a for a in functions.get_addresses(state["owner_id"])}
         card_row = ["카드", "%s (%s)" % (card["name"], card["card_number"])]
 
         if action == "신청":
@@ -161,7 +161,7 @@ def reissue_propose_node(state: BankState):
             if state.get("reissue_next"):
                 rows.insert(0, ["앞 단계", "분실 신고 완료 (재발급을 거절해도 분실 정지는 유지)"])
         else:
-            app = functions.find_open_application(functions.CURRENT_USER, card["card_id"])
+            app = functions.find_open_application(state["owner_id"], card["card_id"])
             rows = [["신청", app["application_id"]], card_row, ["신청 상태", functions.REISSUE_STATUS[app["status"]]]]
             if action == "배송지 수정":
                 old, new = addresses[app["address_id"]], addresses[state["address_id"]]
@@ -179,10 +179,10 @@ def reissue_execute_node(state: BankState):
         data = data_store.load()
         action = state["setting_action"]
         if action == "신청":
-            app_id = functions.add_reissue(data, functions.CURRENT_USER, state["target_account"], state["address_id"])
+            app_id = functions.add_reissue(data, state["owner_id"], state["target_account"], state["address_id"])
             answer = "재발급을 신청했습니다. (%s  [접수])" % app_id
         else:
-            app = functions.find_open_application(functions.CURRENT_USER, state["target_account"])
+            app = functions.find_open_application(state["owner_id"], state["target_account"])
             functions.change_application(data, app["application_id"], action, state.get("address_id"))
             if action == "배송지 수정":
                 address = next(a for a in data["addresses"] if a["address_id"] == state["address_id"])

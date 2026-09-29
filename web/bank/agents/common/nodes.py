@@ -146,7 +146,7 @@ def common_authenticate_node(state: BankState):
 
     if is_cancel(answer):
         return {"error": "본인 확인을 취소했습니다."}
-    if functions.authenticate(functions.CURRENT_USER, answer):
+    if functions.authenticate(state["owner_id"], answer):
         log.note("본인 확인 성공")
         return {"authenticated": True, "auth_tries": 0}
     tries += 1
@@ -233,7 +233,7 @@ def common_log_request_node(state: BankState):
     with log.node("common_log_request"):
         # 업무 노드가 바꾼 데이터가 있으면 거기에, 없으면(거절) 지금 파일 내용에 덧붙입니다.
         data = state.get("new_data") or data_store.load()
-        functions.add_request(data, functions.CURRENT_USER, state["proposal"]["task"],
+        functions.add_request(data, state["owner_id"], state["proposal"]["task"],
                               dict(state["proposal"]["rows"]), state["result"], datetime.now().astimezone())
         record = data["requests"][-1]
         log.detail("처리 기록 %s  %s / %s" % (record["request_id"], record["task_type"], record["status"]))

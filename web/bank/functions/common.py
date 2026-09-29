@@ -9,7 +9,8 @@ from typing import Literal
 
 import data_store
 
-# 로그인한 사용자입니다. 로그인 기능은 없어서 한 명으로 고정합니다. (본인 확인은 authenticate 가 따로 합니다)
+# 기본 사용자입니다. 웹은 로그인한 사람을 State 의 owner_id 로 넘기고, 이 값은 owner_id 가 없을 때(터미널 main)만 씁니다.
+# (본인 확인은 authenticate 가 따로 합니다)
 CURRENT_USER = "user-001"
 
 

@@ -99,9 +99,9 @@ def schedule_text(data, s):
         format(s["amount"], ","), s["status"])
 
 
-def schedule_list_text():
+def schedule_list_text(owner_id):
     data = data_store.load()
-    schedules = [s for s in data["scheduled_transfers"] if s["owner_id"] == functions.CURRENT_USER]
+    schedules = [s for s in data["scheduled_transfers"] if s["owner_id"] == owner_id]
     if not schedules:
         return "예약 이체가 없습니다."
     lines = ["예약 이체 %d건입니다." % len(schedules)]
@@ -112,8 +112,8 @@ def schedule_list_text():
 def setting_list_node(state: BankState):
     with logger.get_logger().node("setting_list"):
         if state.get("setting_action") == "예약조회":
-            return {"answer": schedule_list_text()}
-        registered = functions.get_registered(functions.CURRENT_USER)
+            return {"answer": schedule_list_text(state["owner_id"])}
+        registered = functions.get_registered(state["owner_id"])
         if not registered:
             return {"answer": "등록한 계좌가 없습니다."}
         lines = ["등록 계좌 %d개입니다." % len(registered)]
@@ -139,17 +139,17 @@ def setting_check_node(state: BankState):
             if missing:
                 update["question"] = "[등록] 알려주세요 : %s  (예: 미래은행 210-11-223344 이영희)" % ", ".join(missing)
                 return update
-            error = functions.check_register(functions.CURRENT_USER, reg)
+            error = functions.check_register(state["owner_id"], reg)
             if error:
                 update["error"] = error
             return update
 
         if action == "예약취소":
             if not target_id:
-                found = functions.find_schedules(functions.CURRENT_USER, state.get("target_name"))
+                found = functions.find_schedules(state["owner_id"], state.get("target_name"))
                 log.resolve(state.get("target_name") or "(말 안 함)", len(found), found[0]["schedule_id"] if found else None)
                 if not found:
-                    update["error"] = "취소할 예약을 찾을 수 없습니다.\n" + schedule_list_text()
+                    update["error"] = "취소할 예약을 찾을 수 없습니다.\n" + schedule_list_text(state["owner_id"])
                     return update
                 if len(found) > 1:
                     data = data_store.load()
@@ -167,7 +167,7 @@ def setting_check_node(state: BankState):
 
         if action == "삭제":
             if not target_id:
-                found = functions.find_registered(functions.CURRENT_USER, state["target_name"])
+                found = functions.find_registered(state["owner_id"], state["target_name"])
                 log.resolve(state["target_name"], len(found), found[0]["registered_id"] if found else None)
                 if not found:
                     update["error"] = "'%s' 등록 계좌를 찾을 수 없습니다." % state["target_name"]
@@ -181,7 +181,7 @@ def setting_check_node(state: BankState):
 
         # 변경 : 내 계좌의 별명·용도. 계좌를 먼저 정하고, 그다음 무엇을 무엇으로 바꿀지 봅니다.
         if not target_id:
-            found = functions.find_accounts(functions.CURRENT_USER, state["target_name"])
+            found = functions.find_accounts(state["owner_id"], state["target_name"])
             log.resolve(state["target_name"], len(found), found[0]["account_id"] if found else None)
             if not found:
                 update["error"] = "'%s' 계좌를 찾을 수 없습니다." % state["target_name"]
@@ -197,10 +197,10 @@ def setting_check_node(state: BankState):
             update["question"] = "[항목] 별명과 용도 중 무엇을 바꿀까요?"
             return update
         if not state.get("new_value"):
-            account = functions.get_account(functions.CURRENT_USER, target_id)
+            account = functions.get_account(state["owner_id"], target_id)
             update["question"] = "[새 값] 무엇으로 바꿀까요? (지금 %s : %s)" % (field, account[functions.SETTING_FIELDS[field]])
             return update
-        error = functions.check_setting(functions.CURRENT_USER, target_id, field, state["new_value"])
+        error = functions.check_setting(state["owner_id"], target_id, field, state["new_value"])
         if error:
             update["error"] = error
 
@@ -261,14 +261,14 @@ def setting_propose_node(state: BankState):
             s = next(s for s in data["scheduled_transfers"] if s["schedule_id"] == state["target_account"])
             proposal = {"task": "예약 이체 취소", "rows": [["예약", schedule_text(data, s)]]}
         elif action == "삭제":
-            r = next(r for r in functions.get_registered(functions.CURRENT_USER)
+            r = next(r for r in functions.get_registered(state["owner_id"])
                      if r["registered_id"] == state["target_account"])
             proposal = {"task": "등록 계좌 삭제", "rows": [
                 ["별명", r["nickname"]],
                 ["계좌", "%s %s (예금주 %s)" % (r["bank_name"], r["account_number"], r["holder_name"])],
             ]}
         else:
-            account = functions.get_account(functions.CURRENT_USER, state["target_account"])
+            account = functions.get_account(state["owner_id"], state["target_account"])
             field = state["setting_field"]
             proposal = {"task": "계좌 %s 변경" % field, "rows": [
                 ["계좌", "%s (%s)" % (account["nickname"], account["account_number"])],
@@ -285,7 +285,7 @@ def setting_execute_node(state: BankState):
         action = state["setting_action"]
 
         if action == "등록":
-            functions.register_account(data, functions.CURRENT_USER, state["reg_info"])
+            functions.register_account(data, state["owner_id"], state["reg_info"])
             answer = "계좌를 등록했습니다. (%s)" % state["reg_info"]["nickname"]
         elif action == "예약취소":
             functions.cancel_schedule(data, state["target_account"])
@@ -294,7 +294,7 @@ def setting_execute_node(state: BankState):
             functions.delete_registered(data, state["target_account"])
             answer = "등록 계좌를 삭제했습니다. (%s)" % state["proposal"]["rows"][0][1]
         else:
-            old = functions.get_account(functions.CURRENT_USER, state["target_account"])
+            old = functions.get_account(state["owner_id"], state["target_account"])
             field = state["setting_field"]
             functions.change_setting(data, state["target_account"], field, state["new_value"])
             answer = "계좌 %s 변경 완료 : %s → %s" % (

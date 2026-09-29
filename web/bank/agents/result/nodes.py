@@ -57,7 +57,7 @@ def result_query_node(state: BankState):
         log.detail("추출  업무=%s  기간=%s %s~%s  대상=%s  여러 건=%s" % (
             r.keyword, r.period, start, end, r.target_name, r.show_all))
 
-        records = functions.find_requests(functions.CURRENT_USER, r.keyword, start, end, r.target_name)
+        records = functions.find_requests(state["owner_id"], r.keyword, start, end, r.target_name)
         log.detail("처리 기록 %d건" % len(records))
 
         # 답에 붙일 조건 설명. 예) "어제 '여행 카드' '잠금' "

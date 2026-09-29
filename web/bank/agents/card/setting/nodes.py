@@ -109,20 +109,20 @@ def card_setting_check_node(state: BankState):
             reg = dict(state.get("reg_info") or {})
             # 결제 계좌는 내 계좌여야 하므로 이름으로 찾아 한 개로 정합니다.
             if reg.get("account_name"):
-                found = functions.find_accounts(functions.CURRENT_USER, reg["account_name"])
+                found = functions.find_accounts(state["owner_id"], reg["account_name"])
                 if len(found) != 1:
                     return {"error": "결제 계좌 '%s' 를 하나로 정할 수 없습니다. 정확한 계좌 이름으로 다시 요청해 주세요." % reg["account_name"]}
                 reg["account_id"] = found[0]["account_id"]
             # 별칭을 안 말하면 "은행 이름 + 체크/신용카드" 로 붙입니다. 예) 미래은행 체크카드
             reg.setdefault("name", "%s %s카드" % (reg.get("bank_name", ""), reg.get("card_type", "")))
-            error = functions.check_card_register(functions.CURRENT_USER, reg)
+            error = functions.check_card_register(state["owner_id"], reg)
             return {"error": error} if error else {"reg_info": reg}
 
         if not state.get("target_name"):
             return {"error": "어느 카드인지 말해 주세요. (예: 여행 카드 잠가줘 / 생활비 카드 분실 신고해줘)"}
 
         # 카드를 한 장으로 정합니다. 여러 장이면 후보를 넘겨 common_pick_card 가 번호로 고르게 합니다.
-        found = functions.pick_cards(functions.CURRENT_USER, state["target_name"])
+        found = functions.pick_cards(state["owner_id"], state["target_name"])
         log.resolve(state["target_name"], len(found), found[0]["card_id"] if found else None)
         if not found:
             return {"error": "'%s' 카드를 찾을 수 없습니다." % state["target_name"]}
@@ -133,7 +133,7 @@ def card_setting_check_node(state: BankState):
         # 상태 전이 검사. 할 수 없는 변경이면 여기서 끝냅니다 (인증·승인까지 가지 않습니다).
         error = functions.check_card_status(card, action)
         if not error and action == "별칭 변경":
-            error = functions.check_card_alias(functions.CURRENT_USER, card, state.get("new_value"))
+            error = functions.check_card_alias(state["owner_id"], card, state.get("new_value"))
         if error:
             return {"error": error}
 
@@ -150,15 +150,15 @@ def card_setting_password_node(state: BankState):
 
     if is_cancel(answer):
         return {"error": "비밀번호 변경을 취소했습니다."}
-    card = functions.get_card(functions.CURRENT_USER, state["target_account"])
+    card = functions.get_card(state["owner_id"], state["target_account"])
     error = functions.check_card_password(card, answer)
     if error:
         return {"error": error}
     return {"new_value": answer}
 
 
-def card_row(card_id):
-    card = functions.get_card(functions.CURRENT_USER, card_id)
+def card_row(owner_id, card_id):
+    card = functions.get_card(owner_id, card_id)
     return card,["카드", "%s (%s)" % (card["name"], card["card_number"])]
 
 
@@ -168,7 +168,7 @@ def card_setting_propose_node(state: BankState):
 
         if action == "등록":
             reg = state["reg_info"]
-            account = functions.get_account(functions.CURRENT_USER, reg["account_id"])
+            account = functions.get_account(state["owner_id"], reg["account_id"])
             rows = [
                 ["은행", reg["bank_name"]],
                 ["카드 번호", reg["card_number"]],
@@ -177,13 +177,13 @@ def card_setting_propose_node(state: BankState):
                 ["별칭", reg["name"]],
             ]
         elif action == "별칭 변경":
-            card, row = card_row(state["target_account"])
+            card, row = card_row(state["owner_id"], state["target_account"])
             rows = [row, ["지금 별칭", card["name"]], ["새 별칭", state["new_value"].strip()]]
         elif action == "비밀번호 변경":
-            _, row = card_row(state["target_account"])
+            _, row = card_row(state["owner_id"], state["target_account"])
             rows = [row, ["새 비밀번호", "****"]]     # 처리안과 처리 기록에 비밀번호를 남기지 않습니다
         else:
-            card, row = card_row(state["target_account"])
+            card, row = card_row(state["owner_id"], state["target_account"])
             rows = [
                 row,
                 ["지금 상태", functions.CARD_STATUS[card["status"]]],
@@ -208,7 +208,7 @@ def card_setting_execute_node(state: BankState):
         action = state["setting_action"]
 
         if action == "등록":
-            functions.register_card(data, functions.CURRENT_USER, state["reg_info"])
+            functions.register_card(data, state["owner_id"], state["reg_info"])
             answer = "카드를 등록했습니다. (%s)\n카드 비밀번호는 '비밀번호 변경' 으로 정해 주세요." % state["reg_info"]["name"]
             return {"new_data": data, "answer": answer, "result": "완료"}
 

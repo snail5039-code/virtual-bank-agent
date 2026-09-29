@@ -69,10 +69,10 @@ def billing_extract_node(state: BankState):
     return {"billing_info": info}
 
 
-def credit_cards(card_name):
+def credit_cards(owner_id, card_name):
     # 청구서가 있는 신용카드만 봅니다. 카드를 말했으면 그 카드만 봅니다.
     # (카드 목록, 안내) 를 돌려줍니다. 볼 카드가 없으면 목록은 비고 안내에 사유가 들어갑니다.
-    cards = functions.pick_cards(functions.CURRENT_USER, card_name) if card_name else functions.get_cards(functions.CURRENT_USER)
+    cards = functions.pick_cards(owner_id, card_name) if card_name else functions.get_cards(owner_id)
     credit = {c["card_id"]: c for c in cards if c["card_type"] == "credit"}
     if credit:
         return credit, None
@@ -93,12 +93,12 @@ def statement_line(statement, cards):
 def billing_fee_node(state: BankState):
     with logger.get_logger().node("billing_fee"):
         info = state["billing_info"]
-        cards, error = credit_cards(info.get("card_name"))
+        cards, error = credit_cards(state["owner_id"], info.get("card_name"))
         if error:
             return {"answer": error}
 
         # 낼 돈이 남은 청구서만 봅니다 (미납, 일부 납부).
-        found = [s for s in functions.get_statements(functions.CURRENT_USER, list(cards), info.get("billing_month"))
+        found = [s for s in functions.get_statements(state["owner_id"], list(cards), info.get("billing_month"))
                  if s["remaining_amount"] > 0]
         if not found:
             return {"answer": "낼 카드값이 없습니다."}
@@ -113,11 +113,11 @@ def billing_fee_node(state: BankState):
 def billing_statement_node(state: BankState):
     with logger.get_logger().node("billing_statement"):
         info = state["billing_info"]
-        cards, error = credit_cards(info.get("card_name"))
+        cards, error = credit_cards(state["owner_id"], info.get("card_name"))
         if error:
             return {"answer": error}
 
-        statements = functions.get_statements(functions.CURRENT_USER, list(cards), info.get("billing_month"))
+        statements = functions.get_statements(state["owner_id"], list(cards), info.get("billing_month"))
         if not statements:
             return {"answer": "조건에 맞는 명세서가 없습니다."}
         # 청구 월을 말하지 않았으면 가장 최근 달 명세서를 보여줍니다.
@@ -128,7 +128,7 @@ def billing_statement_node(state: BankState):
         lines = []
         for s in statements:
             lines.append(statement_line(s, cards))
-            for u in functions.get_statement_items(functions.CURRENT_USER, s):
+            for u in functions.get_statement_items(state["owner_id"], s):
                 lines.append("  - %s  %-6s %s원" % (u["occurred_at"][5:10], u["merchant"], format(u["amount"], ",")))
             lines.append("")
     return {"answer": "\n".join(lines).strip()}
@@ -140,7 +140,7 @@ def billing_check_node(state: BankState):
     log = logger.get_logger()
     with log.node("billing_check"):
         info = dict(state["billing_info"])
-        cards, error = credit_cards(info.get("card_name"))
+        cards, error = credit_cards(state["owner_id"], info.get("card_name"))
         if error:
             return {"error": error}
 
@@ -149,7 +149,7 @@ def billing_check_node(state: BankState):
         info["method"] = method
 
         # 낼 돈이 남은 청구서만 후보입니다. 일괄이 아니면 하나로 정해야 합니다.
-        statements = functions.get_statements(functions.CURRENT_USER, list(cards), info.get("billing_month"))
+        statements = functions.get_statements(state["owner_id"], list(cards), info.get("billing_month"))
         unpaid = [s for s in statements if s["remaining_amount"] > 0]
         if not unpaid:
             return {"error": "이미 납부 완료된 청구서입니다." if statements else "조건에 맞는 청구서가 없습니다."}
@@ -163,7 +163,7 @@ def billing_check_node(state: BankState):
         # 계좌 : 말했으면 그 계좌, 안 말했으면 카드마다 그 카드의 결제 계좌입니다.
         said_account = None
         if info.get("account_name"):
-            found = functions.find_accounts(functions.CURRENT_USER, info["account_name"])
+            found = functions.find_accounts(state["owner_id"], info["account_name"])
             if len(found) != 1:
                 return {"error": "'%s' 계좌를 하나로 정할 수 없습니다. 정확한 계좌 이름으로 다시 요청해 주세요." % info["account_name"]}
             said_account = found[0]["account_id"]
@@ -173,7 +173,7 @@ def billing_check_node(state: BankState):
             account_id = said_account or cards[s["card_id"]]["account_id"]
             if method == "분할":
                 # 분할은 첫 회차를 지금 냅니다. 나머지 회차는 계획으로만 남깁니다.
-                error = functions.check_installment(functions.CURRENT_USER, s, info.get("months"))
+                error = functions.check_installment(state["owner_id"], s, info.get("months"))
                 if error:
                     return {"error": error}
                 amount = functions.installment_amounts(s["remaining_amount"], info["months"])[0]
@@ -182,7 +182,7 @@ def billing_check_node(state: BankState):
             else:   # 전체, 일괄 : 남은 금액 전부
                 amount = s["remaining_amount"]
             # 일괄도 승인 전에 건마다 한 번 봅니다. 실제로 낼 때 잔액을 다시 봅니다 (앞 건을 내면 잔액이 줄기 때문).
-            error = functions.check_payment(functions.CURRENT_USER, s, account_id, amount)
+            error = functions.check_payment(state["owner_id"], s, account_id, amount)
             if error:
                 return {"error": error if method != "일괄" else "%s %s분 : %s" % (
                     cards[s["card_id"]]["name"], s["billing_month"], error)}
@@ -277,7 +277,7 @@ def billing_execute_node(state: BankState):
                 continue
             data = data_store.load()        # 앞 건을 저장한 뒤의 최신 데이터로 봅니다
             statement = next(s for s in data["card_statements"] if s["statement_id"] == t["statement_id"])
-            error = functions.check_payment(functions.CURRENT_USER, statement, t["account_id"], t["amount"])
+            error = functions.check_payment(state["owner_id"], statement, t["account_id"], t["amount"])
             if error:
                 results.append(("실패", "%s : %s" % (name, error)))
                 continue
