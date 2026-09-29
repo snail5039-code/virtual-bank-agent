@@ -23,7 +23,7 @@ from pydantic import BaseModel
 import data_store
 import logger
 import main as bank     # src/main.py
-from agents.common.nodes import SECRET, common_pending_check
+from agents.common.nodes import APPROVAL, SECRET, common_pending_check
 from agents.supervisor.graph import bank_graph
 
 log = logger.setup()
@@ -42,13 +42,29 @@ def index():
     return FileResponse(WEB_DIR / "static" / "index.html")
 
 
+def waiting_proposal():
+    # 승인을 기다리는 처리안을 꺼냅니다. 화면이 글자 상자 대신 카드로 그리게 합니다.
+    # 처리안은 3단 그래프(안쪽) State 에만 있어서, 안쪽 State 까지 따라 들어가 가장 안쪽 값을 씁니다.
+    #   {"task": "이체", "rows": [["출금", "생활비 (…)"], …], "retry": 답을 못 알아들어 다시 묻는 중인지}
+    snapshot = bank_graph.get_state(bank.config, subgraphs=True)
+    found = None
+    while snapshot:
+        if snapshot.values.get("proposal"):
+            found = {**snapshot.values["proposal"], "retry": snapshot.values.get("approval") == "모름"}
+        inner = [task.state for task in snapshot.tasks if task.state]
+        snapshot = inner[0] if inner else None
+    return found
+
+
 @app.post("/api/chat")
 def chat(body: ChatIn):
     # main.handle_turn 과 같은 순서로 입력 한 번을 처리하고, 화면에 보여줄 것을 돌려줍니다.
-    #   answer  : 답이나 질문·처리안
-    #   pending : 멈춰 있으면 그 종류 (approval / question / secret), 끝났으면 None
-    #   notices : 처리 전에 실행된 예약 이체·분할 회차 결과
+    #   answer   : 답이나 질문·처리안 (글자)
+    #   pending  : 멈춰 있으면 그 종류 (approval / question / secret), 끝났으면 None
+    #   proposal : 승인 대기면 처리안 값 (카드로 그림), 아니면 None
+    #   notices  : 처리 전에 실행된 예약 이체·분할 회차 결과
     user_input = body.text.strip()
+    proposal = None
     with bank.work_lock:
         secret = common_pending_check(bank_graph, bank.config) == SECRET
         log.turn_start("****" if secret else user_input, bank.thread_id)
@@ -61,12 +77,14 @@ def chat(body: ChatIn):
             except data_store.DataStoreError:
                 pass
             bank.remember_turn(pending)
+            if pending == APPROVAL:
+                proposal = waiting_proposal()
             log.turn_end(bank.turn_result(pending))
         except Exception as e:
             log.error(e)
             log.turn_end("오류")
             answer, pending = "처리 중 오류가 발생했습니다.", None
-    return {"answer": answer, "pending": pending, "notices": notices}
+    return {"answer": answer, "pending": pending, "proposal": proposal, "notices": notices}
 
 
 if __name__ == "__main__":
