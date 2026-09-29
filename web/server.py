@@ -138,7 +138,7 @@ def view(name: str):
                  "status": c["status"], "label": functions.CARD_STATUS[c["status"]]} for c in mine("cards")]
     if name == "bills":
         rows = sorted(mine("card_statements"), key=lambda s: s["billing_month"], reverse=True)
-        return [{"card": card_names.get(s["card_id"], s["card_id"]), "month": s["billing_month"],
+        return [{"id": s["statement_id"], "card": card_names.get(s["card_id"], s["card_id"]), "month": s["billing_month"],
                  "total": s["total_amount"], "remaining": s["remaining_amount"], "due": s["due_date"],
                  "status": s["status"], "label": functions.STATEMENT_STATUS[s["status"]]} for s in rows]
     if name == "schedules":

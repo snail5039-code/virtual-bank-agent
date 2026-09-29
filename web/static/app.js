@@ -371,7 +371,6 @@ function action(label, request) {
   return b;
 }
 function stamp(iso) { return iso.slice(0, 10) + " " + iso.slice(11, 16); }     // "2026-09-30 09:00"
-function monthName(ym) { return Number(ym.slice(5, 7)) + "월"; }               // "2026-08" → "8월"
 
 const PAGES = {
   accounts: {
@@ -417,7 +416,7 @@ const PAGES = {
       [["카드", ""], ["청구 월", ""], ["청구액", "num"], ["남은 금액", "num"], ["기한", ""], ["상태", ""], ["", "num"]],
       rows.map((s) => [s.card, s.month, el("span", "mono", won(s.total)), el("span", "mono", won(s.remaining)),
                        el("span", "mono", s.due), badge(s.label, s.status === "paid" ? "b-ok" : s.status === "partial" ? "b-warn" : "b-bad"),
-                       s.remaining > 0 ? action("내기", monthName(s.month) + " " + s.card + " 값 내줘") : ""])),
+                       s.remaining > 0 ? button("전체 내기", () => openAction("bill_pay", s.id)) : ""])),
   },
   schedules: {
     title: "예약 이체",

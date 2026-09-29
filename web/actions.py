@@ -50,7 +50,53 @@ def card_status_action(action):
     return {"preview": preview, "apply": apply}
 
 
+# ---------------------------------------------------------------- 카드값 전체 결제
+# 남은 금액 전부를 그 카드의 결제 계좌에서 냅니다. (에이전트에서 방식·계좌를 말하지 않았을 때와 같음)
+# 부분·분할·일괄은 금액·개월 수·대상을 골라야 해서 에이전트로 합니다.
+def bill_target(data, statement_id):
+    statement = next((s for s in data["card_statements"]
+                      if s["statement_id"] == statement_id and s["owner_id"] == ME), None)
+    if not statement:
+        return None, None, None
+    card = next(c for c in data["cards"] if c["card_id"] == statement["card_id"])
+    account = next(a for a in data["accounts"] if a["account_id"] == card["account_id"])
+    return statement, card, account
+
+
+def bill_preview(data, statement_id):
+    statement, card, account = bill_target(data, statement_id)
+    if not statement:
+        return "청구서를 찾지 못했습니다.", None
+    amount = statement["remaining_amount"]
+    error = functions.check_payment(ME, statement, account["account_id"], amount)
+    if error:
+        return error, None
+    # 에이전트 billing_propose 의 전체 결제 처리안과 같은 모양입니다.
+    rows = [
+        ["청구서", "%s %s분 (기한 %s)" % (card["name"], statement["billing_month"], statement["due_date"])],
+        ["방식", "전체 결제"],
+        ["낼 금액", "%s원" % format(amount, ",")],
+        ["남은 금액", "%s원 → 0원" % format(amount, ",")],
+        ["결제 계좌", "%s (%s)  잔액 %s원 → %s원" % (
+            account["nickname"], account["account_number"],
+            format(account["balance"], ","), format(account["balance"] - amount, ","))],
+    ]
+    return None, {"task": "카드값 전체 결제", "rows": rows}
+
+
+def bill_apply(data, statement_id):
+    # 에이전트 pay_one(전체) 과 같습니다. 잔액 출금, 청구서 납부 처리, 거래 내역 한 줄.
+    statement, card, account = bill_target(data, statement_id)
+    amount = statement["remaining_amount"]
+    memo = "카드값 %s %s분" % (card["name"], statement["billing_month"])
+    functions.pay_statement(data, statement_id, account["account_id"], amount, memo)
+    return "카드값을 냈습니다.\n%s  %s원  → 남은 금액 %s원 [%s]" % (
+        memo, format(amount, ","), format(statement["remaining_amount"], ","),
+        functions.STATEMENT_STATUS[statement["status"]])
+
+
 ACTIONS = {
     "card_lock": card_status_action("일시 잠금"),
     "card_unlock": card_status_action("잠금 해제"),
+    "bill_pay": {"preview": bill_preview, "apply": bill_apply},
 }
