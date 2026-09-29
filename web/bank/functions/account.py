@@ -25,6 +25,80 @@ def find_accounts(owner_id, name):
             if name in account["nickname"] or name in account["bank_name"]]
 
 
+# ---------------------------------------------------------------- 계좌 상태 (정지 / 정지 해제) · 해지
+# 계좌마다 status 를 둡니다. 예전 데이터처럼 없으면 사용 가능으로 봅니다.
+# 정지된 계좌는 돈이 나가는 일(이체 출금, 예약 이체 출금, 카드값·분할 회차 결제)을 막고, 들어오는 돈은 받습니다. (실제 은행의 지급정지)
+ACCOUNT_STATUS = {"active": "사용 가능", "suspended": "정지"}
+ACCOUNT_ACTIONS = {"정지": "suspended", "정지 해제": "active"}     # 할 일 → 바뀔 상태
+
+
+def account_status(account):
+    return account.get("status") or "active"
+
+
+def suspended_error(account):
+    # 이 계좌에서 돈이 나가면 안 되는 사유. 정지된 계좌면 문구, 아니면 None.
+    if account_status(account) == "suspended":
+        return "정지된 계좌라 출금할 수 없습니다. (%s)  정지를 푼 뒤 다시 해 주세요." % account["nickname"]
+    return None
+
+
+def check_account_status(account, action):
+    # 정지 / 정지 해제를 할 수 있는지 봅니다. 이미 그 상태면 사유를 돌려줍니다.
+    if account_status(account) == ACCOUNT_ACTIONS[action]:
+        return "이미 %s 상태인 계좌입니다. (%s)" % (ACCOUNT_STATUS[ACCOUNT_ACTIONS[action]], account["nickname"])
+    return None
+
+
+def change_account_status(data, account_id, action):
+    account = next(a for a in data["accounts"] if a["account_id"] == account_id)
+    account["status"] = ACCOUNT_ACTIONS[action]
+
+
+def check_close(data, owner_id, account_id, to_id):
+    # 내 계좌를 해지할 수 있는지 봅니다. 안 되면 사유를, 되면 None. (버튼과 에이전트가 같이 씁니다)
+    #   아래가 남아 있으면 안 됩니다 : 이 계좌를 결제 계좌로 쓰는 카드 (해지된 카드는 괜찮음) / 이 계좌의 예약 이체 / 이 계좌로 내는 분할 결제
+    #   잔액이 남아 있으면 받을 계좌(to_id : 내 다른 계좌나 등록 계좌)로 보내고 해지합니다. (정지된 계좌도 해지할 때는 옮길 수 있음)
+    account = next((a for a in data["accounts"] if a["account_id"] == account_id and a["owner_id"] == owner_id), None)
+    if not account:
+        return "계좌를 찾지 못했습니다."
+    cards = [c["name"] for c in data["cards"] if c.get("account_id") == account_id and c["status"] != "cancelled"]
+    if cards:
+        return "이 계좌를 결제 계좌로 쓰는 카드가 있어요. (%s) 카드를 먼저 해지해 주세요." % ", ".join(cards)
+    if any(s["status"] == "예약" and account_id in (s["from_account"], s["to_account"]) for s in data["scheduled_transfers"]):
+        return "이 계좌의 예약 이체가 있어요. 예약을 먼저 취소해 주세요."
+    paying = {s["statement_id"] for s in data["card_statements"] if s.get("paid_account") == account_id}
+    if any(i["status"] == "active" and i["statement_id"] in paying for i in data["card_installments"]):
+        return "이 계좌로 내는 분할 결제가 끝나지 않았어요."
+    if account["balance"] > 0:
+        mine = [a["account_id"] for a in data["accounts"] if a["owner_id"] == owner_id]
+        mine += [r["registered_id"] for r in data["registered_accounts"] if r["owner_id"] == owner_id]
+        if not to_id or to_id not in mine:
+            return "남은 돈 %s원을 받을 계좌를 골라 주세요. (내 다른 계좌나 등록 계좌)" % format(account["balance"], ",")
+        target = next((r for r in data["registered_accounts"] if r["registered_id"] == to_id), None)
+        if to_id == account_id or (target and target.get("account_id") == account_id):
+            return "해지할 계좌와 받을 계좌가 같습니다."
+    return None
+
+
+def close_account(data, account_id, to_id):
+    # 해지합니다. 파일에 저장하지는 않습니다. 잔액이 있으면 먼저 받을 계좌로 보냅니다 (거래 내역이 남음).
+    # 계좌는 목록에서 빼고 지난 거래 내역은 그대로 둡니다.
+    # 다른 사람이 이 계좌를 등록 계좌로 이어 두었으면 연결만 끊습니다 (다른 은행 계좌처럼 됨. 끊지 않으면 그쪽 이체가 오류가 남).
+    from functions.transfer import transfer      # transfer.py 가 이 파일을 불러오므로 여기서 불러옵니다
+    account = next(a for a in data["accounts"] if a["account_id"] == account_id)
+    moved = account["balance"]
+    if moved > 0:
+        error = transfer(data, account_id, to_id, moved)
+        if error:
+            raise ValueError("해지하지 않았습니다. " + error)
+    data["accounts"].remove(account)
+    for r in data["registered_accounts"]:
+        if r.get("account_id") == account_id:
+            r["account_id"] = None
+    return moved
+
+
 def get_account(owner_id, account_id):
     # ID 로 계좌 하나를 찾습니다. 없거나 다른 사람 계좌면 None 입니다.
     for account in get_accounts(owner_id):
@@ -176,6 +250,14 @@ def account_number_rule(bank_name):
     # 안내 문구. 예) "신한은행 계좌번호는 12자리예요. (예: 110-123-456789)"
     example = ACCOUNT_EXAMPLES[bank_name]
     return "%s 계좌번호는 %d자리예요. (예: %s)" % (bank_name, len(example.replace("-", "")), example)
+
+
+def account_rules_text():
+    # 은행별 계좌번호 규칙 전체. 에이전트에서 "계좌번호 규칙 보여줘" 라고 하면 보여줍니다.
+    lines = ["은행별 계좌번호 규칙입니다. 숫자만 적어도 '-' 자리는 맞춰 드려요."]
+    for name, example in ACCOUNT_EXAMPLES.items():
+        lines.append("- %s : %d자리  (예: %s)" % (name, len(example.replace("-", "")), example))
+    return "\n".join(lines)
 
 
 REGISTER_FIELDS = {"bank_name": "은행", "account_number": "계좌번호", "holder_name": "예금주 이름"}

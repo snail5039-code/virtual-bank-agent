@@ -294,7 +294,8 @@ def view(name: str, request: Request):
 
     if name == "accounts":
         return [{"id": a["account_id"], "name": a["nickname"], "bank": a["bank_name"], "number": a["account_number"],
-                 "purpose": a.get("purpose"), "balance": a["balance"]} for a in mine("accounts")]
+                 "purpose": a.get("purpose"), "balance": a["balance"], "status": functions.account_status(a),
+                 "label": functions.ACCOUNT_STATUS[functions.account_status(a)]} for a in mine("accounts")]
     if name == "transactions":
         rows = sorted(mine("transactions"), key=lambda t: t["occurred_at"], reverse=True)
         return [{"at": t["occurred_at"], "account": nick.get(t["account_id"], t["account_id"]),

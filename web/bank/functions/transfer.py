@@ -4,7 +4,7 @@ from datetime import datetime
 
 import data_store
 import logger
-from functions.account import find_accounts, find_registered, get_account
+from functions.account import find_accounts, find_registered, get_account, suspended_error
 from functions.billing import pay_due_installments
 from functions.common import add_request, add_transaction, next_id, now_text, parse_time, when_text
 
@@ -118,6 +118,9 @@ def build_targets(owner_id, from_account, to_account, to_name, amount, keep, spl
 
 def check_transfer(owner_id, from_account, targets, keep):
     # [분기 2] 실행할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
+    error = suspended_error(get_account(owner_id, from_account))     # 정지된 계좌는 출금 안 됨
+    if error:
+        return error
     balance = get_account(owner_id, from_account)["balance"]
     total = sum(target["amount"] for target in targets)
     if keep is not None and keep < 0:
@@ -221,7 +224,9 @@ def run_due_schedules():
     for s in data["scheduled_transfers"]:
         if s["status"] != "예약" or parse_time(s["scheduled_at"]) > now:
             continue
-        error = transfer(data, s["from_account"], s["to_account"], s["amount"])
+        # 예약을 건 뒤에 출금 계좌를 정지했으면 보내지 않고 실패로 남깁니다.
+        from_account = next(a for a in data["accounts"] if a["account_id"] == s["from_account"])
+        error = suspended_error(from_account) or transfer(data, s["from_account"], s["to_account"], s["amount"])
         s["status"] = "실패" if error else "완료"
         when = when_text(s["scheduled_at"])
         to_name = target_name(data, s["to_account"])

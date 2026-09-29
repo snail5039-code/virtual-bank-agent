@@ -106,8 +106,14 @@ def check_card_register(owner_id, info):
     # 카드를 등록할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다. (계좌 등록 check_register 와 같은 방식)
     # info : {bank_name, card_number, card_type(체크/신용), account_id(결제 계좌), name}
     if not info.get("bank_name") or not info.get("card_number") or not info.get("card_type") or not info.get("account_id"):
-        return ("등록하려면 은행, 카드 번호, 체크/신용, 결제 계좌가 필요합니다.\n"
-                "(예: 신한은행 체크카드 1234-5678-1234-5678 생활비 계좌로 등록해줘)")
+        # 무엇이 빠졌는지와 말하는 형식을 같이 알려줍니다.
+        labels = {"bank_name": "은행", "card_number": "카드 번호", "card_type": "체크/신용", "account_id": "결제 계좌"}
+        missing = [label for key, label in labels.items() if not info.get(key)]
+        accounts = ", ".join(a["nickname"] for a in data_store.load()["accounts"] if a["owner_id"] == owner_id) or "없음"
+        return ("카드 등록에 빠진 것 : %s\n"
+                "이렇게 말해 주세요 : [은행] [체크/신용]카드 [카드 번호 16자리] [결제 계좌] 계좌로 등록해줘\n"
+                "  예) 신한은행 체크카드 1234-5678-1234-5678 생활비 계좌로 등록해줘\n"
+                "결제 계좌로 쓸 수 있는 내 계좌 : %s" % (", ".join(missing), accounts))
     if not re.fullmatch(r"\d{4}-\d{4}-\d{4}-\d{4}", info["card_number"]):
         return "카드 번호는 16자리 숫자입니다. (예: 1234-5678-1234-5678)"
     if not 1 <= len(info["name"]) <= MAX_SETTING_LEN:

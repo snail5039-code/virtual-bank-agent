@@ -1,5 +1,6 @@
 # 계좌 설정 에이전트(3단)의 노드 함수입니다.
-# 계좌 별명·용도 변경, 등록 계좌(상대 계좌 주소록) 등록·조회·삭제, 예약 이체 조회·취소를 맡습니다.
+# 계좌 별명·용도 변경, 등록 계좌(상대 계좌 주소록) 등록·조회·삭제, 예약 이체 조회·취소,
+# 내 계좌 정지·정지 해제·해지, 은행별 계좌번호 규칙 안내를 맡습니다.
 #
 #   setting_extract : 사용자 말에서 할 일(변경/등록/삭제/조회/예약조회/예약취소)과 필요한 값을 뽑습니다 (LLM)
 #   setting_list    : 등록 계좌나 예약 이체 목록을 보여줍니다. 읽기만 하므로 승인 없이 끝납니다
@@ -28,7 +29,8 @@ from state import BankState
 
 
 class SettingInfo(BaseModel):
-    action: Optional[Literal["변경", "등록", "삭제", "조회", "예약조회", "예약취소"]] = Field(default=None, description="할 일")
+    action: Optional[Literal["변경", "등록", "삭제", "조회", "예약조회", "예약취소", "정지", "정지 해제", "해지", "규칙", "개설"]] = Field(
+        default=None, description="할 일")
     account_name: Optional[str] = Field(default=None, description="변경·삭제할 계좌의 지금 이름, 또는 취소할 예약의 단서")
     field: Optional[Literal["별명", "용도"]] = Field(default=None, description="변경할 항목")
     new_value: Optional[str] = Field(default=None, description="변경할 새 값")
@@ -36,6 +38,7 @@ class SettingInfo(BaseModel):
     account_number: Optional[str] = Field(default=None, description="등록할 계좌번호")
     holder_name: Optional[str] = Field(default=None, description="등록할 계좌의 예금주 이름")
     nickname: Optional[str] = Field(default=None, description="등록할 계좌에 붙일 별명")
+    to_account_name: Optional[str] = Field(default=None, description="해지할 때 남은 돈을 받을 계좌 이름")
     other_request: bool = Field(default=False, description="방금 한 질문의 답이 아니라 계좌 설정과 관계없는 다른 요청이면 true")
 
 
@@ -62,6 +65,9 @@ def setting_extract_node(state: BankState):
         log.detail("추출  할 일=%s  계좌=%s  항목=%s  새 값=%s  등록=%s %s %s %s" % (
             r.action, r.account_name, r.field, r.new_value, r.bank_name, r.account_number, r.holder_name, r.nickname))
 
+        # 진행 중에 은행별 계좌번호 규칙을 물으면 멈추지 않고, 규칙을 보여준 뒤 같은 질문을 다시 합니다.
+        if state.get("setting_action") and r.action == "규칙":
+            return {"notice": functions.account_rules_text()}
         # 질문(빠진 값)에 답하는 대신 다른 요청을 쳤으면 멈춥니다. (이체와 같은 방식)
         if state.get("question") and r.other_request:
             return {"error": "진행 중이던 계좌 설정을 멈췄습니다. 새 요청을 다시 입력해 주세요."}
@@ -75,6 +81,9 @@ def setting_extract_node(state: BankState):
             update["setting_field"] = r.field
         if r.new_value:
             update["new_value"] = r.new_value
+        if r.to_account_name:       # 해지할 때 남은 돈을 받을 계좌. 다시 말하면 새로 찾습니다
+            update["to_name"] = r.to_account_name
+            update["to_account"] = None
 
         # 등록할 계좌 정보는 한 묶음(reg_info)으로 둡니다. 말한 칸만 덮어씁니다.
         reg = dict(state.get("reg_info") or {})
@@ -109,8 +118,17 @@ def schedule_list_text(owner_id):
     return "\n".join(lines)
 
 
+# 에이전트에서는 상대 계좌만 등록합니다. 내 계좌 만들기는 계좌 페이지(웹 버튼)에서 합니다.
+OWN_ACCOUNT_GUIDE = "상대 계좌만 등록할 수 있습니다. 본인 계좌의 경우 계좌 페이지에서 진행하세요."
+
+
 def setting_list_node(state: BankState):
     with logger.get_logger().node("setting_list"):
+        if state.get("setting_action") == "규칙":
+            return {"answer": functions.account_rules_text()}
+        if state.get("setting_action") == "개설":
+            # 내 계좌 새로 만들기는 계좌 비밀번호를 정해야 해서 웹 화면에서만 합니다.
+            return {"answer": OWN_ACCOUNT_GUIDE}
         if state.get("setting_action") == "예약조회":
             return {"answer": schedule_list_text(state["owner_id"])}
         registered = functions.get_registered(state["owner_id"])
@@ -131,14 +149,31 @@ def setting_check_node(state: BankState):
     with log.node("setting_check"):
         action = state.get("setting_action")
         target_id = state.get("target_account")
-        update = {"candidates": None, "question": None, "confirm_for": None}
+        update = {"candidates": None, "question": None, "confirm_for": None, "notice": None}
+        notice = state.get("notice")        # 진행 중에 물어본 규칙 등 : 이번 질문 위에 한 번 붙입니다
+
+        # "비상금 계좌 삭제해줘" 처럼 내 계좌를 지우려고 하면(등록 계좌가 아니면) 해지로 바꿉니다.
+        if (action == "삭제" and not target_id and state.get("target_name")
+                and not functions.find_registered(state["owner_id"], state["target_name"])
+                and functions.find_accounts(state["owner_id"], state["target_name"])):
+            action = update["setting_action"] = "해지"
 
         if action == "등록":
             reg = dict(state.get("reg_info") or {})
             # 은행 말고 빠진 칸은 글로 묻고, 은행은 목록에서 고르게 합니다 (common_pick_bank).
+            # 묻는 말에 말하는 형식과, 은행을 알면 그 은행의 계좌번호 자릿수도 같이 알려줍니다.
             missing = [label for label in functions.register_missing(reg) if label != "은행"]
             if missing:
-                update["question"] = "[등록] 알려주세요 : %s  (예: 신한은행 110-123-456789 이영희)" % ", ".join(missing)
+                bank = functions.match_bank(reg.get("bank_name"))
+                lines = [notice] if notice else []
+                lines.append("[등록] 알려주세요 : %s" % ", ".join(missing))
+                lines.append(OWN_ACCOUNT_GUIDE)
+                lines.append("말하는 형식 : [은행] [계좌번호] [예금주 이름]  (예: 신한은행 110-123-456789 이영희)")
+                if bank:
+                    lines.append("%s 을(를) 골랐어요. %s" % (bank, functions.account_number_rule(bank)))
+                else:
+                    lines.append("계좌번호는 은행마다 자릿수가 달라요. ('계좌번호 규칙 보여줘' 라고 하면 알려드려요)")
+                update["question"] = "\n".join(lines)
                 return update
             bank = functions.match_bank(reg.get("bank_name"))
             if not bank:
@@ -148,7 +183,8 @@ def setting_check_node(state: BankState):
             # 계좌번호는 그 은행 모양으로 맞춥니다. 모양이 틀리면 규칙을 알려주고 계좌번호만 다시 묻습니다.
             number = functions.normalize_account_number(bank, reg["account_number"])
             if not number:
-                update["question"] = "[등록] %s 계좌번호를 다시 알려주세요." % functions.account_number_rule(bank)
+                update["question"] = ("%s\n" % notice if notice else "") + \
+                    "[등록] %s 계좌번호를 다시 알려주세요." % functions.account_number_rule(bank)
                 reg["account_number"] = None
                 update["reg_info"] = reg
                 return update
@@ -158,6 +194,9 @@ def setting_check_node(state: BankState):
             if error:
                 update["error"] = error
             return update
+
+        if action in ("정지", "정지 해제", "해지"):
+            return account_state_check(state, action, target_id, update)
 
         if action == "예약취소":
             if not target_id:
@@ -185,11 +224,6 @@ def setting_check_node(state: BankState):
                 found = functions.find_registered(state["owner_id"], state["target_name"])
                 log.resolve(state["target_name"], len(found), found[0]["registered_id"] if found else None)
                 if not found:
-                    # 내 계좌 이름이면, 삭제는 등록 계좌만 된다고 알려줍니다. 내 계좌 해지는 웹 계좌 화면의 버튼으로 합니다.
-                    if functions.find_accounts(state["owner_id"], state["target_name"]):
-                        update["error"] = ("'%s' 은(는) 내 계좌예요. 여기서 지우는 것은 등록 계좌(상대 계좌)만 됩니다.\n"
-                                           "내 계좌는 계좌 화면의 '해지' 버튼으로 해지해 주세요. (잔액이 0원이어야 합니다)" % state["target_name"])
-                        return update
                     update["error"] = "'%s' 등록 계좌를 찾을 수 없습니다." % state["target_name"]
                     return update
                 if len(found) > 1:
@@ -227,8 +261,58 @@ def setting_check_node(state: BankState):
     return update
 
 
+def account_state_check(state, action, target_id, update):
+    # 내 계좌 정지 / 정지 해제 / 해지 : 계좌를 하나로 정하고 할 수 있는지 봅니다.
+    # 해지할 때 잔액이 남아 있으면 받을 계좌(to_name → to_account)를 묻고 찾습니다. 여러 개면 번호로 고르게 합니다.
+    log = logger.get_logger()
+    owner = state["owner_id"]
+    if not target_id:
+        if not state.get("target_name"):
+            update["question"] = "[계좌] 어느 계좌를 %s할까요?" % action
+            return update
+        found = functions.find_accounts(owner, state["target_name"])
+        log.resolve(state["target_name"], len(found), found[0]["account_id"] if found else None)
+        if not found:
+            update["error"] = "'%s' 계좌를 찾을 수 없습니다." % state["target_name"]
+            return update
+        if len(found) > 1:
+            update["candidates"] = [{"id": a["account_id"], "text": "%s (%s %s)" % (a["nickname"], a["bank_name"], a["account_number"])}
+                                    for a in found]
+            return update
+        target_id = update["target_account"] = found[0]["account_id"]
+    account = functions.get_account(owner, target_id)
+
+    if action != "해지":
+        error = functions.check_account_status(account, action)
+        if error:
+            update["error"] = error
+        return update
+
+    data = data_store.load()
+    to_id = state.get("to_account")
+    if account["balance"] > 0 and not to_id:
+        if not state.get("to_name"):
+            update["question"] = "[받을 계좌] 남은 돈 %s원을 받을 계좌를 알려주세요. (내 다른 계좌나 등록 계좌)" % format(account["balance"], ",")
+            return update
+        found = [t for t in functions.find_targets(owner, state["to_name"]) if t["account_id"] != target_id]
+        log.resolve(state["to_name"], len(found), found[0]["account_id"] if found else None)
+        if not found:
+            update["error"] = "받을 계좌 '%s' 를 찾을 수 없습니다." % state["to_name"]
+            return update
+        if len(found) > 1:
+            update["candidates"] = [{"id": t["account_id"], "text": "%s (%s)" % (t["nickname"], t["account_number"])} for t in found]
+            update["confirm_for"] = "to"       # 고른 번호를 받을 계좌(to_account)에 넣게 합니다
+            return update
+        to_id = update["to_account"] = found[0]["account_id"]
+    error = functions.check_close(data, owner, target_id, to_id)
+    if error:
+        update["error"] = error
+    return update
+
+
 # 번호 고르기에서 번호가 아닌 답을 받았을 때 보여줄 업무 이름입니다.
-SETTING_TASKS = {"변경": "계좌 별명·용도 변경", "삭제": "등록 계좌 삭제", "예약취소": "예약 이체 취소"}
+SETTING_TASKS = {"변경": "계좌 별명·용도 변경", "삭제": "등록 계좌 삭제", "예약취소": "예약 이체 취소",
+                 "정지": "계좌 정지", "정지 해제": "계좌 정지 해제", "해지": "계좌 해지"}
 
 
 def setting_confirm_node(state: BankState):
@@ -246,6 +330,8 @@ def setting_confirm_node(state: BankState):
     if is_cancel(answer):
         return {"error": "요청을 취소했습니다."}
     choice = picked(answer, candidates)
+    if choice and state.get("confirm_for") == "to":      # 해지할 때 받을 계좌를 고른 경우
+        return {"to_account": choice["id"], "candidates": None, "confirm_for": None, "pick_warning": None}
     if choice:
         return {"target_account": choice["id"], "candidates": None, "pick_warning": None}
     # 번호가 아니면 지금 하는 업무를 알려주고 check 로 돌아가 다시 고르게 합니다.
@@ -280,6 +366,25 @@ def setting_propose_node(state: BankState):
             data = data_store.load()
             s = next(s for s in data["scheduled_transfers"] if s["schedule_id"] == state["target_account"])
             proposal = {"task": "예약 이체 취소", "rows": [["예약", schedule_text(data, s)]]}
+        elif action in ("정지", "정지 해제"):
+            account = functions.get_account(state["owner_id"], state["target_account"])
+            rows = [
+                ["계좌", "%s (%s %s)" % (account["nickname"], account["bank_name"], account["account_number"])],
+                ["지금 상태", functions.ACCOUNT_STATUS[functions.account_status(account)]],
+                ["바뀔 상태", functions.ACCOUNT_STATUS[functions.ACCOUNT_ACTIONS[action]]],
+            ]
+            if action == "정지":
+                rows.append(["주의", "정지를 풀기 전까지 이 계좌에서 돈이 나가지 않습니다 (입금은 받습니다)"])
+            proposal = {"task": "계좌 " + action, "rows": rows}
+        elif action == "해지":
+            data = data_store.load()
+            account = functions.get_account(state["owner_id"], state["target_account"])
+            rows = [["계좌", "%s (%s %s)" % (account["nickname"], account["bank_name"], account["account_number"])],
+                    ["잔액", format(account["balance"], ",") + "원"]]
+            if account["balance"] > 0:
+                rows.append(["남은 돈 보낼 곳", functions.get_target(data, state["to_account"])["text"]])
+            rows.append(["주의", "해지하면 되돌릴 수 없습니다"])
+            proposal = {"task": "계좌 해지", "rows": rows}
         elif action == "삭제":
             r = next(r for r in functions.get_registered(state["owner_id"])
                      if r["registered_id"] == state["target_account"])
@@ -310,6 +415,20 @@ def setting_execute_node(state: BankState):
         elif action == "예약취소":
             functions.cancel_schedule(data, state["target_account"])
             answer = "예약 이체를 취소했습니다. (%s)" % state["target_account"]
+        elif action in ("정지", "정지 해제"):
+            account = functions.get_account(state["owner_id"], state["target_account"])
+            functions.change_account_status(data, state["target_account"], action)
+            answer = "계좌 %s 완료 : %s  %s → %s" % (action, account["nickname"], functions.ACCOUNT_STATUS[functions.account_status(account)],
+                                                functions.ACCOUNT_STATUS[functions.ACCOUNT_ACTIONS[action]])
+        elif action == "해지":
+            account = functions.get_account(state["owner_id"], state["target_account"])
+            try:
+                moved = functions.close_account(data, state["target_account"], state.get("to_account"))
+            except ValueError as e:         # 실행 직전에 이체가 막힌 경우 : 바꾸지 않고 실패로 남깁니다
+                return {"answer": str(e), "result": "실패", "new_data": data_store.load()}
+            answer = "계좌를 해지했습니다. (%s  %s %s)" % (account["nickname"], account["bank_name"], account["account_number"])
+            if moved:
+                answer += "\n남은 돈 %s원은 %s(으)로 보냈습니다." % (format(moved, ","), functions.target_name(data, state["to_account"]))
         elif action == "삭제":
             functions.delete_registered(data, state["target_account"])
             answer = "등록 계좌를 삭제했습니다. (%s)" % state["proposal"]["rows"][0][1]
@@ -332,7 +451,7 @@ def setting_fail_node(state: BankState):
 # ---------------------------------------------------------------- 분기
 def route_after_extract(state: BankState):
     # 조회는 읽기만 하므로 인증·승인 없이 바로 보여줍니다.
-    if state.get("setting_action") in ("조회", "예약조회"):
+    if state.get("setting_action") in ("조회", "예약조회", "규칙", "개설"):
         return "setting_list"
     return "setting_check"
 

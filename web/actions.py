@@ -362,45 +362,62 @@ def account_open_apply(data, me, target, params):
     return "계좌를 만들었습니다. (%s  %s %s)" % (info["nickname"], info["bank_name"], number)
 
 
-# ---------------------------------------------------------------- 내 계좌 해지 (웹에만 있는 기능)
-# 에이전트의 "삭제" 는 등록 계좌(상대 계좌)만 지웁니다. 내 계좌를 없애는 것은 이 버튼으로 합니다.
-# 실제 은행처럼 아래가 남아 있으면 해지할 수 없습니다.
-#   잔액 (0원이어야 함) / 이 계좌를 결제 계좌로 쓰는 카드 (해지된 카드는 괜찮음) / 이 계좌의 예약 이체 / 이 계좌로 내는 분할 결제
-# 해지하면 계좌를 목록에서 뺍니다. 지난 거래 내역은 그대로 둡니다.
-# 다른 사람이 이 계좌를 등록 계좌로 이어 두었으면 연결만 끊습니다 (다른 은행 계좌처럼 됨. 끊지 않으면 그쪽 이체가 오류가 남).
+# ---------------------------------------------------------------- 내 계좌 정지 / 정지 해제 / 해지
+# 에이전트(계좌 설정)와 같은 functions 를 씁니다. 처리안 모양·안내 문구도 같게 맞춥니다.
+#   정지 : 돈이 나가는 일을 막고, 들어오는 돈은 받습니다.
+#   해지 : 잔액이 있으면 params["to"](내 다른 계좌나 등록 계좌)로 보내고 해지합니다.
 def my_account(data, me, account_id):
     return next((a for a in data["accounts"] if a["account_id"] == account_id and a["owner_id"] == me), None)
 
 
+def account_label(account):
+    return "%s (%s %s)" % (account["nickname"], account["bank_name"], account["account_number"])
+
+
+def account_status_action(action):
+    # action : "정지" / "정지 해제" (functions.ACCOUNT_ACTIONS 의 이름)
+    def preview(data, me, account_id, params):
+        account = my_account(data, me, account_id)
+        if not account:
+            return "계좌를 찾지 못했습니다.", None
+        error = functions.check_account_status(account, action)
+        if error:
+            return error, None
+        rows = [["계좌", account_label(account)],
+                ["지금 상태", functions.ACCOUNT_STATUS[functions.account_status(account)]],
+                ["바뀔 상태", functions.ACCOUNT_STATUS[functions.ACCOUNT_ACTIONS[action]]]]
+        if action == "정지":
+            rows.append(["주의", "정지를 풀기 전까지 이 계좌에서 돈이 나가지 않습니다 (입금은 받습니다)"])
+        return None, {"task": "계좌 " + action, "rows": rows}
+
+    def apply(data, me, account_id, params):
+        account = my_account(data, me, account_id)
+        old = functions.ACCOUNT_STATUS[functions.account_status(account)]
+        functions.change_account_status(data, account_id, action)
+        return "계좌 %s 완료 : %s  %s → %s" % (action, account["nickname"], old, functions.ACCOUNT_STATUS[functions.account_status(account)])
+
+    return {"preview": preview, "apply": apply}
+
+
 def account_close_preview(data, me, account_id, params):
+    error = functions.check_close(data, me, account_id, params.get("to"))
+    if error:
+        return error, None
     account = my_account(data, me, account_id)
-    if not account:
-        return "계좌를 찾지 못했습니다.", None
+    rows = [["계좌", account_label(account)], ["잔액", format(account["balance"], ",") + "원"]]
     if account["balance"] > 0:
-        return "잔액이 %s원 남아 있어요. 다른 계좌로 옮긴 뒤 해지해 주세요." % format(account["balance"], ","), None
-    cards = [c["name"] for c in data["cards"] if c.get("account_id") == account_id and c["status"] != "cancelled"]
-    if cards:
-        return "이 계좌를 결제 계좌로 쓰는 카드가 있어요. (%s) 카드를 먼저 해지해 주세요." % ", ".join(cards), None
-    if any(s["status"] == "예약" and account_id in (s["from_account"], s["to_account"]) for s in data["scheduled_transfers"]):
-        return "이 계좌의 예약 이체가 있어요. 예약을 먼저 취소해 주세요.", None
-    paying = {s["statement_id"] for s in data["card_statements"] if s.get("paid_account") == account_id}
-    if any(i["status"] == "active" and i["statement_id"] in paying for i in data["card_installments"]):
-        return "이 계좌로 내는 분할 결제가 끝나지 않았어요.", None
-    rows = [
-        ["계좌", "%s (%s %s)" % (account["nickname"], account["bank_name"], account["account_number"])],
-        ["잔액", "0원"],
-        ["주의", "해지하면 되돌릴 수 없습니다"],
-    ]
+        rows.append(["남은 돈 보낼 곳", functions.get_target(data, params["to"])["text"]])
+    rows.append(["주의", "해지하면 되돌릴 수 없습니다"])
     return None, {"task": "계좌 해지", "rows": rows}
 
 
 def account_close_apply(data, me, account_id, params):
     account = my_account(data, me, account_id)
-    data["accounts"].remove(account)
-    for r in data["registered_accounts"]:
-        if r.get("account_id") == account_id:
-            r["account_id"] = None
-    return "계좌를 해지했습니다. (%s  %s %s)" % (account["nickname"], account["bank_name"], account["account_number"])
+    moved = functions.close_account(data, account_id, params.get("to"))     # 막히면 ValueError → server.py 가 저장하지 않음
+    answer = "계좌를 해지했습니다. (%s)" % account_label(account)
+    if moved:
+        answer += "\n남은 돈 %s원은 %s(으)로 보냈습니다." % (format(moved, ","), functions.target_name(data, params["to"]))
+    return answer
 
 
 # ---------------------------------------------------------------- 가상 입금 (웹에만 있는 기능)
@@ -446,6 +463,8 @@ def deposit_apply(data, me, target, params):
 
 ACTIONS = {
     "account_close": {"preview": account_close_preview, "apply": account_close_apply},
+    "account_suspend": account_status_action("정지"),
+    "account_resume": account_status_action("정지 해제"),
     "deposit": {"preview": deposit_preview, "apply": deposit_apply},
     "account_open": {"preview": account_open_preview, "apply": account_open_apply},
     "registered_delete": {"preview": registered_delete_preview, "apply": registered_delete_apply},

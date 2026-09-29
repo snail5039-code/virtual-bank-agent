@@ -557,10 +557,11 @@ async function openForm(form) {
   next.onclick = async () => {
     const params = Object.fromEntries(Object.entries(inputs).map(([k, c]) => [k, c.value]));
     next.disabled = true;
-    const pre = await postJSON("/api/action/preview", { kind: form.kind, target: "", params });
+    const target = form.target || "";       // 해지처럼 대상이 정해진 창이면 그 ID
+    const pre = await postJSON("/api/action/preview", { kind: form.kind, target, params });
     next.disabled = false;
     if (pre.error) { formError.textContent = pre.error; return; }     // 창은 그대로 두고 고치게 합니다
-    showConfirm(form.kind, "", params, pre);
+    showConfirm(form.kind, target, params, pre);
   };
 }
 
@@ -573,10 +574,32 @@ function button(label, onClick) {
 function badge(text, cls) { return el("span", "badge " + cls, text); }
 
 function accountButtons(a) {
-  // 내 계좌 한 줄의 버튼 : 이체, 해지 (해지는 잔액 0원 등 조건을 서버가 검사합니다)
+  // 내 계좌 한 줄의 버튼 : 이체, 정지 / 정지 풀기, 해지 (할 수 있는지는 서버가 검사합니다)
   const box = el("span", "btns");
-  box.append(button("이체", () => openTransfer({ from: a.id })), button("해지", () => openAction("account_close", a.id)));
+  box.append(button("이체", () => openTransfer({ from: a.id })));
+  box.append(a.status === "suspended" ? button("정지 풀기", () => openAction("account_resume", a.id))
+                                      : button("정지", () => openAction("account_suspend", a.id)));
+  box.append(button("해지", () => closeAccount(a)));
   return box;
+}
+
+function accountName(a) {
+  // 정지된 계좌는 이름 옆에 "정지" 표시를 붙입니다.
+  if (a.status !== "suspended") return a.name;
+  const box = el("span", "", a.name + " ");
+  box.appendChild(badge("정지", "b-bad"));
+  return box;
+}
+
+async function closeAccount(a) {
+  // 잔액이 없으면 바로 확인으로, 남아 있으면 먼저 남은 돈을 받을 계좌(내 다른 계좌 / 등록 계좌)를 고르게 합니다.
+  if (a.balance <= 0) { openAction("account_close", a.id); return; }
+  const opt = await (await fetch("/api/view/transfer_options")).json();
+  openForm({
+    title: "계좌 해지", kind: "account_close", target: a.id,
+    fields: [{ key: "to", label: "남은 돈 " + won(a.balance) + "원을 받을 계좌",
+               options: opt.targets.filter((t) => t.id !== a.id).map((t) => [t.id, t.name]) }],
+  });
 }
 
 function cardButtons(c) {
@@ -650,7 +673,8 @@ const PAGES = {
       const box = el("div");
       box.appendChild(table(
         [["계좌", ""], ["은행 / 계좌번호", ""], ["용도", ""], ["잔액", "num"], ["", "num"]],
-        rows.map((a) => [a.name, a.bank + " " + a.number, a.purpose, el("span", "mono", won(a.balance) + "원"),
+        rows.map((a) => [accountName(a),
+                         a.bank + " " + a.number, a.purpose, el("span", "mono", won(a.balance) + "원"),
                          accountButtons(a)])));
       box.appendChild(el("h3", "sub-title", "등록 계좌"));
       box.appendChild(registered.length ? table(

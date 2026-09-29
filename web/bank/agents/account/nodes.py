@@ -47,12 +47,13 @@ def account_query_node(state: BankState):
 
         lines = ["보유 계좌 %d개입니다." % len(accounts)]
         for account in accounts:
-            lines.append("- %s (%s %s) : %s원  [%s]" % (
+            lines.append("- %s (%s %s) : %s원%s%s" % (
                 account["nickname"],
                 account["bank_name"],
                 account["account_number"],
                 format(account["balance"], ","),
-                account["purpose"],
+                "  [%s]" % account["purpose"] if account.get("purpose") else "",     # 용도가 없으면 붙이지 않음
+                "  [정지]" if functions.account_status(account) == "suspended" else "",
             ))
         # 합계는 Python 이 더합니다. LLM 이 계산하지 않습니다 (원칙 6).
         lines.append("총 잔액 : %s원" % format(sum(account["balance"] for account in accounts), ","))

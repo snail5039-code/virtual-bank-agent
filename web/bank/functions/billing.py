@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 
 import data_store
-from functions.account import get_account
+from functions.account import get_account, suspended_error
 from functions.common import add_month, add_request, add_transaction, next_id, now_text, parse_time
 
 # 청구서는 신용카드에만 있습니다. 체크카드는 쓰는 즉시 계좌에서 빠지므로 낼 돈이 따로 없습니다.
@@ -44,6 +44,8 @@ def check_payment(owner_id, statement, account_id, amount):
                         "남은 금액 %s원을 한 번에 다 낼 때만 결제할 수 있습니다." % (
                             i["installment_id"], i["paid_count"], i["months"], format(statement["remaining_amount"], ",")))
     account = get_account(owner_id, account_id)
+    if suspended_error(account):        # 정지된 계좌로는 카드값을 낼 수 없음
+        return suspended_error(account)
     if account["balance"] < amount:
         return "잔액이 부족합니다. (%s 잔액 %s원)" % (account["nickname"], format(account["balance"], ","))
     return None
@@ -134,9 +136,9 @@ def pay_due_installments(data, now):
         amount = min(amount, statement["remaining_amount"])
         name = "%s %s분 분할 %d/%d회" % (cards.get(i["card_id"], i["card_id"]), statement["billing_month"], number, i["months"])
 
-        if account["balance"] < amount:
+        if suspended_error(account) or account["balance"] < amount:
             status = "실패"
-            reason = "잔액이 부족합니다. (%s 잔액 %s원)" % (account["nickname"], format(account["balance"], ","))
+            reason = suspended_error(account) or "잔액이 부족합니다. (%s 잔액 %s원)" % (account["nickname"], format(account["balance"], ","))
             i["next_due_at"] = (now + timedelta(days=1)).isoformat(timespec="seconds")
             lines.append((statement["owner_id"], "[분할 회차 실패] %s  %s원  %s 내일 다시 시도합니다." % (name, format(amount, ","), reason)))
         else:
