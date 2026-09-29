@@ -147,6 +147,10 @@ def view(name: str):
         return [{"id": s["schedule_id"], "at": s["scheduled_at"], "from": nick.get(s["from_account"]),
                  "to": functions.target_name(data, s["to_account"]), "amount": s["amount"], "status": s["status"]}
                 for s in rows]
+    if name == "registered":
+        # 등록 계좌 (돈을 보낼 상대 계좌 주소록)
+        return [{"id": r["registered_id"], "name": r["nickname"], "bank": r["bank_name"], "number": r["account_number"],
+                 "holder": r["holder_name"]} for r in mine("registered_accounts")]
     if name == "addresses":
         # 재발급 창의 배송지 고르기 목록 (집 / 회사)
         return [{"id": a["address_id"], "label": a["label"], "address": a["address"]} for a in mine("addresses")]

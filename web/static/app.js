@@ -470,6 +470,67 @@ async function openReissue(card) {
   };
 }
 
+// 입력 창 (등록처럼 칸만 채우면 되는 업무) : 칸을 채우고 다음을 누르면 서버가 검사하고, 되면 처리안 확인으로 넘어갑니다.
+//   fields : [{key, label, placeholder, optional, options:[[값, 보이는 글], …] (있으면 고르기)}]
+const ACCOUNT_FORM = {
+  title: "상대 계좌 등록", kind: "account_register",
+  fields: [
+    { key: "bank_name", label: "은행", placeholder: "예: 미래은행" },
+    { key: "account_number", label: "계좌번호", placeholder: "예: 210-11-223344" },
+    { key: "holder_name", label: "예금주", placeholder: "예: 이영희" },
+    { key: "nickname", label: "별명 (안 쓰면 예금주 이름)", placeholder: "예: 친구 영희", optional: true },
+  ],
+};
+const CARD_FORM = {
+  title: "카드 등록", kind: "card_register",
+  fields: [
+    { key: "bank_name", label: "은행", placeholder: "예: 미래은행" },
+    { key: "card_number", label: "카드 번호 (16자리)", placeholder: "예: 1234-5678-1234-5678" },
+    { key: "card_type", label: "종류", options: [["체크", "체크카드"], ["신용", "신용카드"]] },
+    { key: "account_id", label: "결제 계좌", options: [] },
+    { key: "name", label: "별칭 (안 쓰면 은행 + 종류)", placeholder: "예: 장보기 카드", optional: true },
+  ],
+};
+
+function openForm(form) {
+  if (busy) return;
+  modal.hidden = false;
+  const inputs = {};
+  const parts = [el("div", "modal-head", form.title)];
+  for (const f of form.fields) {
+    let control;
+    if (f.options) {
+      control = el("select");
+      for (const [value, text] of f.options) control.appendChild(new Option(text, value));
+    } else {
+      control = el("input");
+      control.placeholder = f.placeholder || "";
+      control.autocomplete = "off";
+    }
+    inputs[f.key] = control;
+    const box = el("label", "field");
+    box.append(el("span", "", f.label), control);
+    parts.push(box);
+  }
+  const formError = el("div", "auth-error");
+  const next = el("button", "primary", "다음");
+  const cancel = el("button", "ghost", "닫기");
+  cancel.onclick = closeModal;
+  const actionsRow = el("div", "actions");
+  actionsRow.append(next, cancel);
+  modalBody.replaceChildren(...parts, formError, actionsRow);
+  inputs[form.fields[0].key].focus();
+
+  next.onclick = async () => {
+    const params = Object.fromEntries(Object.entries(inputs).map(([k, c]) => [k, c.value]));
+    next.disabled = true;
+    const pre = await postJSON("/api/action/preview", { kind: form.kind, target: "", params });
+    next.disabled = false;
+    if (pre.error) { formError.textContent = pre.error; return; }     // 창은 그대로 두고 고치게 합니다
+    showConfirm(form.kind, "", params, pre);
+  };
+}
+
 function button(label, onClick) {
   const b = el("button", "act", label);
   b.onclick = onClick;
@@ -482,10 +543,20 @@ function stamp(iso) { return iso.slice(0, 10) + " " + iso.slice(11, 16); }     /
 const PAGES = {
   accounts: {
     title: "계좌",
-    draw: (rows) => table(
-      [["계좌", ""], ["은행 / 계좌번호", ""], ["용도", ""], ["잔액", "num"], ["", "num"]],
-      rows.map((a) => [a.name, a.bank + " " + a.number, a.purpose, el("span", "mono", won(a.balance) + "원"),
-                       button("이체", () => openTransfer({ from: a.id }))])),
+    also: "registered",     // 아래에 등록 계좌(상대 계좌)도 같이 보여줍니다
+    tools: () => [button("상대 계좌 등록", () => openForm(ACCOUNT_FORM))],
+    draw: (rows, registered) => {
+      const box = el("div");
+      box.appendChild(table(
+        [["계좌", ""], ["은행 / 계좌번호", ""], ["용도", ""], ["잔액", "num"], ["", "num"]],
+        rows.map((a) => [a.name, a.bank + " " + a.number, a.purpose, el("span", "mono", won(a.balance) + "원"),
+                         button("이체", () => openTransfer({ from: a.id }))])));
+      box.appendChild(el("h3", "sub-title", "등록 계좌"));
+      box.appendChild(registered.length ? table(
+        [["별명", ""], ["은행 / 계좌번호", ""], ["예금주", ""]],
+        registered.map((r) => [r.name, r.bank + " " + r.number, r.holder])) : el("div", "empty", "등록한 상대 계좌가 없어요"));
+      return box;
+    },
   },
   transactions: {
     title: "거래 내역",
@@ -509,6 +580,11 @@ const PAGES = {
   },
   cards: {
     title: "카드",
+    tools: () => [button("카드 등록", async () => {
+      const opt = await (await fetch("/api/view/transfer_options")).json();     // 결제 계좌 = 내 계좌
+      openForm({ ...CARD_FORM, fields: CARD_FORM.fields.map((f) => f.key === "account_id"
+        ? { ...f, options: opt.accounts.map((a) => [a.id, a.name]) } : f) });
+    })],
     draw: (rows) => table(
       [["카드", ""], ["종류", ""], ["연결 계좌", ""], ["상태", ""], ["", "num"]],
       rows.map((c) => [c.name, c.type + (c.bank ? " / " + c.bank : ""), c.account,
@@ -553,8 +629,9 @@ async function renderPage(name) {
   pageTools.replaceChildren();
   pageBody.replaceChildren(el("div", "empty", "불러오는 중..."));
   const rows = await (await fetch("/api/view/" + name)).json();
+  const also = page.also ? await (await fetch("/api/view/" + page.also)).json() : null;
   if (currentView !== name) return;       // 불러오는 사이에 다른 메뉴로 갔으면 그리지 않습니다
-  const redraw = (list) => pageBody.replaceChildren(list.length ? page.draw(list) : el("div", "empty", EMPTY[name]));
+  const redraw = (list) => pageBody.replaceChildren(list.length ? page.draw(list, also) : el("div", "empty", EMPTY[name]));
   if (page.tools) pageTools.replaceChildren(...page.tools(rows, redraw));
   redraw(rows);
 }

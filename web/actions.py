@@ -219,7 +219,66 @@ def reissue_apply(data, card_id, params):
     return "재발급을 신청했습니다. (%s  [접수])" % app_id
 
 
+# ---------------------------------------------------------------- 상대 계좌 등록
+# 돈을 보낼 상대 계좌를 주소록처럼 등록합니다. 별명을 안 쓰면 예금주 이름으로 붙입니다. (에이전트와 같음)
+#   params : {"bank_name", "account_number", "holder_name", "nickname"(선택)}
+def account_reg_info(params):
+    info = {key: (params.get(key) or "").strip() for key in ["bank_name", "account_number", "holder_name", "nickname"]}
+    info["nickname"] = info["nickname"] or info["holder_name"]
+    return info
+
+
+def account_register_preview(data, target, params):
+    info = account_reg_info(params)
+    error = functions.check_register(ME, info)
+    if error:
+        return error, None
+    # 에이전트 setting_propose 의 등록 처리안과 같은 모양입니다.
+    rows = [["은행", info["bank_name"]], ["계좌번호", info["account_number"]],
+            ["예금주", info["holder_name"]], ["별명", info["nickname"]]]
+    return None, {"task": "계좌 등록", "rows": rows}
+
+
+def account_register_apply(data, target, params):
+    info = account_reg_info(params)
+    functions.register_account(data, ME, info)
+    return "계좌를 등록했습니다. (%s)" % info["nickname"]
+
+
+# ---------------------------------------------------------------- 카드 등록
+# 다른 은행 카드 등을 등록합니다. 별칭을 안 쓰면 "은행 이름 + 체크/신용카드" 로 붙입니다. (에이전트와 같음)
+#   params : {"bank_name", "card_number", "card_type"(체크 / 신용), "account_id"(결제 계좌), "name"(선택)}
+def card_reg_info(params):
+    info = {key: (params.get(key) or "").strip() for key in ["bank_name", "card_number", "card_type", "account_id", "name"]}
+    info["card_number"] = functions.normalize_card_number(info["card_number"])   # 숫자 16자리 → 1234-5678-…
+    info["name"] = info["name"] or "%s %s카드" % (info["bank_name"], info["card_type"])
+    return info
+
+
+def card_register_preview(data, target, params):
+    info = card_reg_info(params)
+    if info["account_id"] and not any(a["account_id"] == info["account_id"] and a["owner_id"] == ME
+                                      for a in data["accounts"]):
+        return "결제 계좌를 골라 주세요.", None
+    error = functions.check_card_register(ME, info)
+    if error:
+        return error, None
+    account = next(a for a in data["accounts"] if a["account_id"] == info["account_id"])
+    # 에이전트 card_setting_propose 의 등록 처리안과 같은 모양입니다.
+    rows = [["은행", info["bank_name"]], ["카드 번호", info["card_number"]], ["종류", info["card_type"]],
+            ["결제 계좌", "%s (%s)" % (account["nickname"], account["account_number"])], ["별칭", info["name"]]]
+    return None, {"task": "카드 등록", "rows": rows}
+
+
+def card_register_apply(data, target, params):
+    info = card_reg_info(params)
+    functions.register_card(data, ME, info)
+    return "카드를 등록했습니다. (%s)\n카드 비밀번호는 '비밀번호 변경' 으로 정해 주세요." % info["name"]
+
+
 ACTIONS = {
+    "account_register": {"preview": account_register_preview, "apply": account_register_apply},
+    "card_register": {"preview": card_register_preview, "apply": card_register_apply},
     "reissue": {"preview": reissue_preview, "apply": reissue_apply},
     "card_lock": card_status_action("일시 잠금"),
     "card_unlock": card_status_action("잠금 해제"),
