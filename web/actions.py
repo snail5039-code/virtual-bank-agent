@@ -230,6 +230,8 @@ def reissue_apply(data, me, card_id, params):
 def account_reg_info(params):
     info = {key: (params.get(key) or "").strip() for key in ["bank_name", "account_number", "holder_name", "nickname"]}
     info["nickname"] = info["nickname"] or info["holder_name"]
+    # 계좌번호는 그 은행 모양으로 맞춰 둡니다 (숫자만 적어도 됨). 모양이 틀리면 check_register 가 규칙을 알려줍니다.
+    info["account_number"] = functions.normalize_account_number(info["bank_name"], info["account_number"]) or info["account_number"]
     return info
 
 
@@ -313,21 +315,22 @@ def registered_delete_apply(data, me, registered_id, params):
 #   별명   : 앞뒤 공백을 뗀 1~20자, 내 다른 계좌와 겹치면 안 됨 (functions.check_setting 과 같은 기준)
 #   비밀번호 : 숫자 4자리, 평문이 아니라 해시로 저장 (functions.hash_secret). 처리안·처리 기록에는 **** 로만
 #   은행   : BANKS 에서 고릅니다
-#   계좌번호 : 110-은행 코드-번호. 번호는 그 은행 계좌 중 가장 큰 번호 + 1 (예: 110-001-100005 까지 있으면 110-001-100006), 잔액 0원
-#   params : {"bank_name", "nickname", "purpose"(선택), "password"}
-def new_account_number(data, bank_code):
-    numbers = [int(a["account_number"].split("-")[-1]) for a in data["accounts"] if a["bank_code"] == bank_code]
-    return "110-%s-%06d" % (bank_code, max(numbers, default=100000) + 1)
-
-
+#   계좌번호 : 직접 적습니다. 그 은행 모양(functions.ACCOUNT_EXAMPLES)만 맞으면 됩니다. 같은 은행에 같은 번호는 안 됨. 잔액 0원
+#   params : {"bank_name", "account_number", "nickname", "purpose"(선택), "password"}
 def account_open_info(params):
-    return {key: (params.get(key) or "").strip() for key in ["bank_name", "nickname", "purpose", "password"]}
+    info = {key: (params.get(key) or "").strip() for key in ["bank_name", "account_number", "nickname", "purpose", "password"]}
+    info["number"] = functions.normalize_account_number(info["bank_name"], info["account_number"]) if info["bank_name"] in BANKS else None
+    return info
 
 
 def account_open_preview(data, me, target, params):
     info = account_open_info(params)
     if info["bank_name"] not in BANKS:
         return "은행을 골라 주세요.", None
+    if not info["number"]:
+        return functions.account_number_rule(info["bank_name"]), None
+    if any(a["bank_name"] == info["bank_name"] and a["account_number"] == info["number"] for a in data["accounts"]):
+        return "이미 있는 계좌번호입니다. 다른 번호로 정해 주세요.", None
     if not 1 <= len(info["nickname"]) <= functions.MAX_SETTING_LEN:
         return "별명은 1~%d자로 정해 주세요." % functions.MAX_SETTING_LEN, None
     if any(a["owner_id"] == me and a["nickname"] == info["nickname"] for a in data["accounts"]):
@@ -336,7 +339,7 @@ def account_open_preview(data, me, target, params):
         return "용도는 %d자까지 쓸 수 있습니다." % functions.MAX_SETTING_LEN, None
     if not (len(info["password"]) == 4 and info["password"].isdigit()):
         return "계좌 비밀번호는 숫자 4자리여야 합니다.", None
-    rows = [["은행", info["bank_name"]], ["계좌번호", new_account_number(data, BANKS[info["bank_name"]])], ["별명", info["nickname"]],
+    rows = [["은행", info["bank_name"]], ["계좌번호", info["number"]], ["별명", info["nickname"]],
             ["용도", info["purpose"] or "-"], ["비밀번호", "****"], ["잔액", "0원으로 시작합니다"]]
     return None, {"task": "계좌 만들기", "rows": rows}
 
@@ -344,7 +347,7 @@ def account_open_preview(data, me, target, params):
 def account_open_apply(data, me, target, params):
     info = account_open_info(params)
     code = BANKS[info["bank_name"]]
-    number = new_account_number(data, code)
+    number = info["number"]
     data["accounts"].append({
         "account_id": functions.next_id(data["accounts"], "account_id", "acc"),
         "owner_id": me,

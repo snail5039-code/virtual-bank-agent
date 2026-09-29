@@ -138,13 +138,21 @@ def setting_check_node(state: BankState):
             # 은행 말고 빠진 칸은 글로 묻고, 은행은 목록에서 고르게 합니다 (common_pick_bank).
             missing = [label for label in functions.register_missing(reg) if label != "은행"]
             if missing:
-                update["question"] = "[등록] 알려주세요 : %s  (예: 신한은행 210-11-223344 이영희)" % ", ".join(missing)
+                update["question"] = "[등록] 알려주세요 : %s  (예: 신한은행 110-123-456789 이영희)" % ", ".join(missing)
                 return update
             bank = functions.match_bank(reg.get("bank_name"))
             if not bank:
                 update["confirm_for"] = "bank"
                 return update
             reg["bank_name"] = bank      # "국민" → KB국민은행 처럼 목록 이름으로 맞춥니다
+            # 계좌번호는 그 은행 모양으로 맞춥니다. 모양이 틀리면 규칙을 알려주고 계좌번호만 다시 묻습니다.
+            number = functions.normalize_account_number(bank, reg["account_number"])
+            if not number:
+                update["question"] = "[등록] %s 계좌번호를 다시 알려주세요." % functions.account_number_rule(bank)
+                reg["account_number"] = None
+                update["reg_info"] = reg
+                return update
+            reg["account_number"] = number
             update["reg_info"] = reg
             error = functions.check_register(state["owner_id"], reg)
             if error:

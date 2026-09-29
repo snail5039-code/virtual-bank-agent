@@ -319,8 +319,8 @@ def view(name: str, request: Request):
         return [{"id": r["registered_id"], "name": r["nickname"], "bank": r["bank_name"], "number": r["account_number"],
                  "holder": r["holder_name"]} for r in mine("registered_accounts")]
     if name == "banks":
-        # 계좌 만들기·상대 계좌 등록·카드 등록 창의 은행 고르기 목록
-        return list(actions.BANKS)
+        # 계좌 만들기·상대 계좌 등록·카드 등록 창의 은행 고르기 목록. 계좌번호 칸에 보여줄 예시도 같이 줍니다.
+        return [{"name": name, "example": functions.ACCOUNT_EXAMPLES[name]} for name in actions.BANKS]
     if name == "addresses":
         # 재발급 창의 배송지 고르기 목록 (집 / 회사)
         return [{"id": a["address_id"], "label": a["label"], "address": a["address"]} for a in mine("addresses")]

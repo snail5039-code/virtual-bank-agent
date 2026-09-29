@@ -17,7 +17,7 @@ extract_prompt = """
   - new_value: 새 값 (예: 휴가비)
 - 등록일 때
   - bank_name: 은행 이름 (예: 신한은행)
-  - account_number: 계좌번호. 사용자가 말한 그대로 (예: 210-11-223344)
+  - account_number: 계좌번호. 사용자가 말한 그대로 (예: 110-123-456789)
   - holder_name: 예금주 이름 (예: 이영희)
   - nickname: 붙일 별명. 말하지 않았으면 비운다.
 - 삭제일 때

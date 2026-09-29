@@ -135,6 +135,49 @@ def match_bank(text):
     return found[0] if len(found) == 1 else None
 
 
+# 은행별 계좌번호 모양입니다. 예시의 "-" 로 나뉜 칸 길이가 규칙입니다. (예: 신한은행 3-3-6 = 12자리)
+# 실제 은행은 계좌 종류·만든 때에 따라 모양이 여러 가지라, 은행마다 가장 흔한 모양 하나만 씁니다.
+ACCOUNT_EXAMPLES = {
+    "가상은행": "110-001-123456",
+    "KB국민은행": "123456-01-123456",
+    "신한은행": "110-123-456789",
+    "우리은행": "1002-123-456789",
+    "하나은행": "123-456789-12345",
+    "NH농협은행": "302-1234-5678-91",
+    "IBK기업은행": "123-456789-01-012",
+    "SC제일은행": "123-45-678901",
+    "카카오뱅크": "3333-01-1234567",
+    "케이뱅크": "100-123-456789",
+    "토스뱅크": "1000-1234-5678",
+    "iM뱅크": "508-10-123456-7",
+    "부산은행": "101-2345-6789-01",
+    "우체국": "123456-01-123456",
+}
+
+
+def normalize_account_number(bank_name, text):
+    # 적은 계좌번호를 그 은행 모양(예시와 같은 "-" 자리)으로 맞춥니다. 숫자만 적어도, "-" 를 넣어 적어도 됩니다.
+    # 숫자 개수가 모양과 다르거나 숫자가 아닌 글자가 있으면 None. 목록에 없는 은행(예전 데이터)은 적은 그대로 둡니다.
+    example = ACCOUNT_EXAMPLES.get(bank_name)
+    if not example:
+        return text
+    digits = (text or "").replace("-", "").replace(" ", "")
+    groups = [len(part) for part in example.split("-")]
+    if not digits.isdigit() or len(digits) != sum(groups):
+        return None
+    parts, start = [], 0
+    for size in groups:
+        parts.append(digits[start:start + size])
+        start += size
+    return "-".join(parts)
+
+
+def account_number_rule(bank_name):
+    # 안내 문구. 예) "신한은행 계좌번호는 12자리예요. (예: 110-123-456789)"
+    example = ACCOUNT_EXAMPLES[bank_name]
+    return "%s 계좌번호는 %d자리예요. (예: %s)" % (bank_name, len(example.replace("-", "")), example)
+
+
 REGISTER_FIELDS = {"bank_name": "은행", "account_number": "계좌번호", "holder_name": "예금주 이름"}
 
 
@@ -146,7 +189,9 @@ def register_missing(info):
 def check_register(owner_id, info):
     # 계좌를 등록할 수 있는지 봅니다. 안 되면 사유를, 되면 None 을 돌려줍니다.
     if register_missing(info):
-        return "등록하려면 은행, 계좌번호, 예금주 이름이 필요합니다. (예: 신한은행 210-11-223344 이영희 계좌 등록해줘)"
+        return "등록하려면 은행, 계좌번호, 예금주 이름이 필요합니다. (예: 신한은행 110-123-456789 이영희 계좌 등록해줘)"
+    if not normalize_account_number(info["bank_name"], info["account_number"]):
+        return account_number_rule(info["bank_name"])
     if not 1 <= len(info["nickname"].strip()) <= MAX_SETTING_LEN:
         return "별명은 1~%d자로 정해 주세요." % MAX_SETTING_LEN
     for r in get_registered(owner_id):

@@ -475,7 +475,7 @@ const ACCOUNT_FORM = {
   title: "상대 계좌 등록", kind: "account_register",
   fields: [
     { key: "bank_name", label: "은행", banks: true },
-    { key: "account_number", label: "계좌번호", placeholder: "예: 210-11-223344" },
+    { key: "account_number", label: "계좌번호 (은행마다 자릿수가 달라요)", bankExample: true },
     { key: "holder_name", label: "예금주", placeholder: "예: 이영희" },
     { key: "nickname", label: "별명 (안 쓰면 예금주 이름)", placeholder: "예: 친구 영희", optional: true },
   ],
@@ -484,6 +484,7 @@ const OPEN_FORM = {
   title: "내 계좌 만들기", kind: "account_open",
   fields: [
     { key: "bank_name", label: "은행", banks: true },
+    { key: "account_number", label: "계좌번호 (직접 정해요. 은행마다 자릿수가 달라요)", bankExample: true },
     { key: "nickname", label: "별명", placeholder: "예: 비상금" },
     { key: "purpose", label: "용도 (선택)", placeholder: "예: 급할 때 쓰는 돈", optional: true },
     { key: "password", label: "계좌 비밀번호 (숫자 4자리)", secret: true },
@@ -518,7 +519,7 @@ async function openForm(form) {
     let control;
     if (f.banks) {
       control = el("select");
-      for (const name of banks) control.appendChild(new Option(name, name));
+      for (const b of banks) control.appendChild(new Option(b.name, b.name));
     } else if (f.options) {
       control = el("select");
       for (const [value, text] of f.options) control.appendChild(new Option(text, value));
@@ -541,6 +542,17 @@ async function openForm(form) {
   actionsRow.append(next, cancel);
   modalBody.replaceChildren(...parts, formError, actionsRow);
   inputs[form.fields[0].key].focus();
+
+  // 계좌번호 칸(bankExample)은 고른 은행의 계좌번호 모양을 예시로 보여줍니다. 숫자만 적어도 서버가 모양에 맞춰 줍니다.
+  const numberField = form.fields.find((f) => f.bankExample);
+  if (numberField && inputs.bank_name) {
+    const showExample = () => {
+      const bank = banks.find((b) => b.name === inputs.bank_name.value);
+      inputs[numberField.key].placeholder = bank ? "예: " + bank.example : "";
+    };
+    inputs.bank_name.addEventListener("change", showExample);
+    showExample();
+  }
 
   next.onclick = async () => {
     const params = Object.fromEntries(Object.entries(inputs).map(([k, c]) => [k, c.value]));
