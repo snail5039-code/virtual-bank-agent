@@ -1,4 +1,4 @@
-virtual-bank-agent 설계 기획서
+virtual_bank_agent 설계 기획서
 
 기본 설계 원칙
 - supervisor 패턴으로 각 Agent로 나누어서 노드 및 그래프를 구현한다.
