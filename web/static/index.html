@@ -81,7 +81,7 @@
     font: inherit; font-size: 13px; padding: 0 16px; border: none; border-radius: 6px;
     background: var(--primary); color: var(--on-primary); cursor: pointer;
   }
-  button:disabled { opacity: .5; cursor: default; }
+  button:disabled, button.waiting { opacity: .5; cursor: default; }
   button:active:not(:disabled) { transform: scale(.98); }
 
   /* 처리안 확인 카드 (2단계) */

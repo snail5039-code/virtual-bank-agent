@@ -122,6 +122,19 @@ def chat(body: ChatIn):
     return run_turn(body.text.strip())
 
 
+@app.get("/api/waiting")
+def waiting():
+    # 화면을 새로 열었을 때(새로고침) 그래프가 멈춰 있으면, 멈춘 질문이나 처리안을 다시 그리게 알려줍니다.
+    # 그래프는 서버에 그대로 멈춰 있으므로 다음 입력은 그 답으로 들어갑니다.
+    with bank.work_lock:
+        pending = common_pending_check(bank_graph, bank.config)
+        if not pending:
+            return {"pending": None, "answer": None, "proposal": None}
+        text = bank_graph.get_state(bank.config).interrupts[0].value["text"]
+        proposal = waiting_proposal() if pending == APPROVAL else None
+    return {"pending": pending, "answer": text, "proposal": proposal}
+
+
 @app.get("/api/alerts")
 def alerts():
     # 스케줄러가 입력 없이 실행한 예약 이체·분할 회차 결과를 꺼내 줍니다. 화면이 몇 초마다 부릅니다. (4단계)

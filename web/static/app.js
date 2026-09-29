@@ -156,8 +156,14 @@ function showAlerts(lines) {
 }
 
 // ---------------------------------------------------------------- 보내기
+let busyNote = null;    // 처리 중에 또 보내려고 할 때 띄우는 안내 (하나만)
+
 async function submit(text, cardLabel) {
-  if (busy) return;
+  if (busy) {
+    // 보내지 않고 입력은 입력칸에 그대로 둡니다. 답이 오면 안내를 지웁니다.
+    if (!busyNote) busyNote = add("에이전트가 답하는 중이에요. 답이 오면 다시 보내 주세요. (입력한 내용은 그대로 있어요)", "notice");
+    return;
+  }
   add(input.type === "password" ? "****" : text, "me");
   closeCard(cardLabel || "수정 요청");
   await call("/api/chat", { text });
@@ -169,7 +175,8 @@ async function call(url, payload) {
   busy = true;
   input.value = "";
   input.placeholder = PLACEHOLDER;
-  send.disabled = true;
+  // 보내기 버튼은 흐리게만 합니다. disabled 로 막으면 Enter 가 아예 안 먹어서 "답하는 중" 안내도 못 띄웁니다.
+  send.classList.add("waiting");
   const waiting = add("에이전트가 작업 중입니다...", "notice");
 
   try {
@@ -182,19 +189,29 @@ async function call(url, payload) {
     waiting.remove();
     for (const text of data.notices) add(text, "notice");
     showAlerts(data.notices);
-    if (data.proposal) addCard(data.proposal);
-    else add(data.answer, "bot");
-    input.type = data.pending === "secret" ? "password" : "text";
-    lastPending = data.pending;
-    showSteps(data.pending);
+    showReply(data);
     await loadSummary();
   } catch (e) {
     waiting.remove();
     add("서버에 연결하지 못했습니다. 서버가 켜져 있는지 확인해 주세요.", "notice");
   }
   busy = false;
-  send.disabled = false;
+  if (busyNote) { busyNote.remove(); busyNote = null; }
+  send.classList.remove("waiting");
   input.focus();
+}
+
+function showReply(data) {
+  // 답(또는 멈춘 질문·처리안)을 대화에 붙이고, 입력칸과 진행 상황을 멈춘 종류에 맞춥니다.
+  if (data.proposal) addCard(data.proposal);
+  else add(data.answer, "bot");
+  const type = data.pending === "secret" ? "password" : "text";
+  // 입력칸 종류가 바뀌면(보통 칸 ↔ 비밀번호 칸) 기다리는 동안 쳐 둔 글자를 지웁니다.
+  // 그대로 두면 다른 요청으로 쓴 글이 비밀번호 답으로 들어갈 수 있습니다.
+  if (input.type !== type) input.value = "";
+  input.type = type;
+  lastPending = data.pending;
+  showSteps(data.pending);
 }
 
 form.addEventListener("submit", (event) => {
@@ -274,5 +291,16 @@ async function checkRecovery() {
   drop.onclick = () => choose(false);
 }
 
+// ---------------------------------------------------------------- 새로고침 뒤 이어서 보기
+// 업무 중간에 새로고침해도 서버의 그래프는 멈춘 채로 있습니다. 멈춘 질문이나 처리안을 다시 그려서
+// 다음 입력이 무엇의 답으로 들어가는지 보이게 합니다.
+async function restoreWaiting() {
+  const data = await (await fetch("/api/waiting")).json();
+  if (!data.pending) return;
+  add("새로고침 전에 진행하던 업무예요. 이어서 답해 주세요.", "notice");
+  showReply(data);
+}
+
 loadSummary();
 checkRecovery();
+restoreWaiting();
