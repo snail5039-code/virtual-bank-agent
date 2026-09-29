@@ -7,7 +7,9 @@
 #   - 30초 스케줄러  : main.scheduler_loop (결과는 main.outbox 에 쌓이고, /api/alerts 가 사람별로 나눠 줌)
 #   - 재시작 복구    : 켤 때 남아 있던 진행 중 업무를 화면이 처음 열릴 때 묻습니다 (/api/recovery)
 #
-# 실행 : uv run python web/server.py   → 브라우저에서 http://127.0.0.1:8000
+# 실행 : uv run python web/server.py   (http://127.0.0.1:8000, /api 만 있음)
+# 화면은 Next 앱(web/frontend)입니다 : npm --prefix web/frontend run dev → 브라우저에서 http://localhost:3000
+#   Next 가 /api/... 요청을 이 서버로 넘겨 줍니다 (web/frontend/next.config.ts).
 #
 # 로그인 (여러 사람용 2단계) : /login 화면에서 아이디·로그인 비밀번호로 들어옵니다. 로그인하지 않으면 화면과 /api 를 못 씁니다.
 #   시험용 계정 (web/data 에는 비밀번호가 해시로만 있음)
@@ -34,8 +36,7 @@ sys.path.insert(0, str(WEB_DIR / "bank"))     # web/bank : src 를 복사해 온
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from datetime import datetime
@@ -67,7 +68,6 @@ except data_store.DataStoreError:
 threading.Thread(target=bank.scheduler_loop, args=(log,), daemon=True).start()
 
 app = FastAPI()
-app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
 
 
 # ---------------------------------------------------------------- 로그인
@@ -84,26 +84,16 @@ def login_user(request: Request):
 
 @app.middleware("http")
 async def require_login(request: Request, call_next):
-    # 로그인 화면과 로그인 요청, 화면 파일(static) 말고는 로그인해야 씁니다.
-    # 화면(/)은 로그인 화면으로 보내고, /api 는 401 을 돌려줍니다 (app.js 가 로그인 화면으로 보냄).
-    path = request.url.path
-    if path in ("/login", "/api/login", "/signup", "/api/signup") or path.startswith("/static/") or login_user(request):
+    # 로그인·회원가입 요청 말고는 로그인해야 씁니다. 아니면 401 을 돌려줍니다.
+    # 화면(web/frontend/lib/api.ts)이 401 을 보면 로그인 화면으로 보냅니다.
+    if request.url.path in ("/api/login", "/api/signup") or login_user(request):
         return await call_next(request)
-    if path.startswith("/api/"):
-        return JSONResponse({"detail": "로그인이 필요합니다"}, status_code=401)
-    return RedirectResponse("/login")
+    return JSONResponse({"detail": "로그인이 필요합니다"}, status_code=401)
 
 
 class LoginIn(BaseModel):
     login_id: str
     password: str
-
-
-@app.get("/login")
-def login_page(request: Request):
-    if login_user(request):
-        return RedirectResponse("/")
-    return FileResponse(WEB_DIR / "static" / "login.html")
 
 
 @app.post("/api/login")
@@ -163,13 +153,6 @@ def check_signup(data, info):
     if not re.fullmatch(r"\d{7}", info["ssn_tail"]):
         return "주민등록번호 뒷자리는 숫자 7자리로 적어 주세요."
     return None
-
-
-@app.get("/signup")
-def signup_page(request: Request):
-    if login_user(request):
-        return RedirectResponse("/")
-    return FileResponse(WEB_DIR / "static" / "signup.html")
 
 
 @app.post("/api/signup")
@@ -320,11 +303,6 @@ def speaker(me):
     # 방금 답한(또는 멈춰 있는) 업무 분야 : 계좌 / 카드 / 결과 / 없음. 화면이 대화 옆 캐릭터를 고르는 데 씁니다.
     # 1단 supervisor 가 고른 값이라 바깥 State 에 있습니다. 새 요청마다 비워지므로 지난 업무 값이 남지 않습니다.
     return bank_graph.get_state(bank.config_of(me)).values.get("domain")
-
-
-@app.get("/")
-def index():
-    return FileResponse(WEB_DIR / "static" / "index.html")
 
 
 @app.get("/api/summary")
