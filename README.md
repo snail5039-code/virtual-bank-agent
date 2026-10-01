@@ -47,6 +47,8 @@
 | [financial-agent-mini-project.md](<docs/financial-agent-mini-project.md>) | 과제 안내문 (요구 사항, 제출물) |
 | [정리_계획.md](<docs/정리_계획.md>) | 기능 구현이 끝난 뒤 코드 · 폴더를 정리한 단계별 계획 |
 | [화면/](<docs/화면/>) | 웹 버전 화면 캡처 ([5장](#5-웹-버전-web)) |
+| [평가_실습_인수인계.md](<docs/평가_실습_인수인계.md>) | Golden Set 평가 실습 정리 ([6장](#6-평가-evaluation)) |
+| [평가/](<docs/평가/>) | 평가 · LangSmith 화면 캡처 ([6장](#6-평가-evaluation)) |
 
 ---
 
@@ -282,3 +284,119 @@ npm --prefix web/frontend run dev
 다크 모드 :
 
 ![다크 모드](docs/화면/07_다크.png)
+
+---
+
+## 6. 평가 (`evaluation/`)
+
+눈으로 대화 몇 번 해보는 테스트 대신, **Golden Set(입력과 기대 결과 모음)** 으로 같은 사례를 반복해서 채점하는 평가를 붙였다.
+은행 Agent는 답변이 자연스러워도 인증 · 승인을 건너뛰었거나 실제 잔액이 안 바뀌었으면 실패라서, 답변 하나가 아니라 아래 세 가지를 같이 본다.
+
+| 평가 | 보는 것 | 방법 |
+|---|---|---|
+| 답변 (`answer_correct`) | 사용자에게 맞게 안내했는가 | LLM Judge가 의미 기준으로 비교 (openevals `CORRECTNESS_PROMPT`, Gemini) |
+| interrupt (`interrupt_flow`) | 필요한 질문 · 본인 확인 · 승인을 **순서대로** 거쳤는가 | 리스트를 그대로 비교. `["secret", "approval"]` 인데 순서가 바뀌면 실패 |
+| 데이터 (`data_state`) | JSON 데이터가 기대한 값으로 바뀌었는가 (안 바뀌어야 하면 그대로인가) | 실행 전 · 후 데이터를 직접 비교 |
+
+**파일**
+
+| 파일 | 하는 일 |
+|---|---|
+| [golden_set.py](evaluation/golden_set.py) | 사례 40개. 사례마다 `inputs.turns`(여러 턴 입력)와 `reference`(`answer_criteria`, `expected_interrupts`, `expected_data`) |
+| [run_eval.py](evaluation/run_eval.py) | `run_agent()`로 Agent를 실제로 돌려 평가 재료를 모으고, 세 evaluator로 채점해 터미널에 출력 |
+| [run_langsmith_eval.py](evaluation/run_langsmith_eval.py) | Golden Set을 LangSmith 데이터셋으로 올리고, **같은 target과 evaluator**로 실험을 돌린다 |
+
+**사례 하나의 모양**
+
+```python
+{
+    "case_id": "transfer_approve",              # 결과 표에서 사례를 구분하는 이름
+    "inputs": {"turns": ["생활비에서 저축으로 10만원 보내줘", "1234", "승인"]},
+    "reference": {
+        "answer_criteria": "생활비에서 저축으로 100,000원 이체 완료를 안내한다.",
+        "expected_interrupts": ["secret", "approval"],
+        "expected_data": {
+            "accounts": {"acc-001": {"balance": 1331800}, "acc-002": {"balance": 2380000}},
+            "transactions_added": 2,
+            "last_request": {"task_type": "이체", "status": "완료"},
+        },
+    },
+}
+```
+
+- interrupt 종류 : `question`(빠진 정보 되묻기), `secret`(PIN 같은 본인 확인), `approval`(바꾸기 전 최종 승인). 조회는 interrupt 없이 끝난다.
+- `expected_data`의 키(`changed`, `accounts`, `cards`, `card_statements`, `transactions_added`, `last_request` …)는 LangGraph 예약어가 아니라 Golden Set과 `evaluate_data()`가 같이 쓰는 프로젝트 안 약속이다.
+- 예약 이체 취소, 재발급 배송지 수정처럼 대상이 먼저 있어야 하는 사례는 `fixture`에 준비 데이터를 적어 두고, `apply_fixture()`가 실행 직전 복사본에만 넣는다. 원본 `initial_data.json`은 안 건드린다.
+
+**실행 흐름 (`run_agent`)**
+
+```text
+initial_data.json 복사 (+ fixture) → 실행 전 데이터 저장
+→ 새 thread_id로 첫 턴 실행
+→ interrupt가 나오면 종류를 모으고 다음 턴으로 Command(resume=...)
+→ 최종 답변, interrupt 목록, 실행 후 데이터 반환
+→ 답변 / interrupt / 데이터 세 가지 채점
+```
+
+사례마다 새 `thread_id`와 초기 데이터에서 시작해서 앞 사례가 뒤 사례에 영향을 주지 않는다.
+
+**사례 구성 (40개)**
+
+| 분야 | 사례 |
+|---|---|
+| 계좌 · 이체 | 목록 조회, 이체 승인 · 거절, 금액 빠짐, 잔액 부족, 조건부 이체, 거래 내역, 예약 이체 등록 |
+| 계좌 설정 | 별명 변경, 용도 변경, 등록 계좌 목록 · 추가 · 삭제, 예약 이체 목록 · 취소 |
+| 카드 | 목록, 잠금 승인 · 거절, 분실 신고, 결제 계좌 · 카드 번호 · 멤버십 · 이용 내역, 잠금 해제, 해지, 별칭 · 비밀번호 변경, 카드 등록 |
+| 카드값 | 조회, 전체 결제, 명세서, 부분 결제, 분할 결제 |
+| 재발급 | 내역 조회, 이미 신청함, 새 신청, 배송지 수정, 신청 취소 |
+| 공통 | 최근 요청 결과 조회, 지원하지 않는 요청 안내 |
+
+처음엔 계좌 8개 → 카드 8개를 더해 16개, 그 뒤 `src/`를 다시 읽으면서 40개로 늘렸다.
+
+아래는 카드 8개를 더할 때 정리한 표다.
+
+![카드 Golden Set](docs/평가/day50-card-golden-set.png)
+
+**실행**
+
+1장처럼 `uv sync`와 `src/.env`(Google API 키)를 먼저 준비한다. 답변 평가에 LLM Judge를 쓰기 때문에 사례마다 Agent 실행 뒤 LLM을 한 번 더 부른다.
+
+로컬 평가 : 사례마다 입력, 실제 답변, 기대 · 실제 interrupt, 세 평가 PASS/FAIL, pending, Judge 코멘트를 찍고 마지막에 전체 표를 JSON으로 낸다.
+
+```bash
+uv run python evaluation/run_eval.py
+```
+
+LangSmith 평가 : `src/.env`(또는 환경 변수)에 `LANGSMITH_API_KEY`를 넣고 실행한다. 실행할 때마다 `virtual-bank-eval-xxxxxxxx` 데이터셋을 새로 만들고(`inputs` → 입력, `reference` → 정답 출력, `case_id` → metadata), `virtual-bank` 접두어로 실험을 등록한다.
+
+```bash
+uv run python evaluation/run_langsmith_eval.py
+```
+
+LangSmith `Datasets & Experiments`에서 사례마다 실제 답변과 세 evaluator 결과를 열어볼 수 있다. 아래는 처음 계좌 8개로 돌렸을 때 (8 / 8 runs, Error Rate 0%).
+
+![LangSmith 실험](docs/평가/day50-langsmith-experiment.png)
+
+**평가로 잡은 것 : Golden Set을 고친 경우**
+
+기대값은 기능 이름만 보고 정하면 틀린다. 실제 코드 경로와 초기 데이터를 같이 보고 맞췄다.
+
+| 사례 | 처음 생각 | 실제 |
+|---|---|---|
+| 재발급 신청 | secret → approval → 신청 추가 | 초기 데이터에 이미 신청이 있어서 중복 검사에서 안내하고 끝. interrupt 없음, 데이터 그대로 |
+| 카드값 결제 | `task_type` = 카드값 결제 | 실제 기록은 `카드값 전체 결제` |
+| 조건부 이체 | 대충 계산한 금액 | 생활비에 400,000원 남기고 1,031,800원 이체 |
+
+이 밖에 분할 결제, 카드 이용 내역도 기대값과 실제 흐름이 달랐다. 대화 몇 번으로는 놓치기 쉬운 차이다.
+
+**왜 LLM Judge를 쓰나, 평가는 왜 하나**
+
+- **LLM Judge는 꼭 필요한 건 아니다.** 답이 정해진 문구나 숫자라면 키워드 · 정규식 · JSON 비교만으로 충분하고, 그쪽이 더 빠르고 싸고 결과가 안 흔들린다.
+  그런데 Agent의 최종 답변은 자연어라 매번 표현이 다르다. "100,000원 이체가 완료되었습니다."와 "생활비 계좌에서 저축 계좌로 10만원을 보냈습니다."는 뜻이 같지만 문자열로 비교하면 실패한다.
+  그래서 **답변만** LLM Judge로 의미를 보고, interrupt와 데이터는 규칙으로 직접 비교하게 나눴다.
+- **AI가 코드를 잘 짜줘도 평가는 필요하다.** 코드를 잘 짜주는 것과 그 코드가 계속 맞게 동작하는 건 다른 문제다. 새 수정 때문에 기존 기능이 깨졌는지, 인증 · 승인을 건너뛰지 않았는지, 말로는 완료인데 데이터가 진짜 바뀌었는지, 프롬프트나 라우터를 고친 뒤에도 같은 입력이 통과하는지는 자동으로 보장되지 않는다.
+  평가는 AI를 못 믿어서가 아니라 **AI가 만들어 준 기능을 계속 믿을 수 있게 기준을 세우는 것**이다.
+- **모델을 바꿀 때 기준이 된다.** 실무에서는 비용 · 속도 때문에 운영 단계에서 더 가벼운 모델로 바꾸기도 한다. 가벼운 모델은 싸고 빠르지만 라우팅이나 추론이 흔들릴 수 있다. Golden Set이 있으면 모델을 바꿔도 핵심 업무 흐름이 그대로인지 같은 사례로 비교할 수 있다.
+
+> AI가 구현 속도를 올려 주고, 평가가 신뢰도를 지켜 준다. Golden Set은 그 신뢰도를 반복해서 확인하는 기준표다.
+> 은행 Agent처럼 상태 변경 · 인증 · 승인 · 잔액 · 카드 상태가 얽힌 시스템에서는 답변보다 **데이터와 흐름 검증**이 더 중요하다.
