@@ -377,6 +377,35 @@ LangSmith `Datasets & Experiments`에서 사례마다 실제 답변과 세 evalu
 
 ![LangSmith 실험](docs/평가/day50-langsmith-experiment.png)
 
+**LangSmith 실행 기록**
+
+Golden Set을 늘릴 때마다 데이터셋을 새로 만들어 돌렸다. (2026-10-01)
+
+| 데이터셋 | 실험 | 사례 수 | 결과 |
+|---|---|---|---|
+| `virtual-bank-eval-9ed95ba3` | `virtual-bank-4986c395` | 8 (계좌) | 8 / 8 runs, Error Rate 0%, 세 평가 모두 8 / 8 |
+| `virtual-bank-eval-792976dc` | `virtual-bank-99b05010` | 16 (계좌 + 카드) | 16 / 16 runs, Error Rate 0%, 세 평가 모두 16 / 16 |
+| `virtual-bank-eval-ec1a84a0` | `virtual-bank-f7c02742` | **40 (전체)** | **40 / 40 runs, Error Rate 0%** |
+
+**40개 최종 결과** (`virtual-bank-f7c02742`)
+
+| 평가 | 통과 |
+|---|---|
+| 답변 `answer_correct` | 40 / 40 |
+| interrupt `interrupt_flow` | 40 / 40 |
+| 데이터 `data_state` | 40 / 40 |
+
+- 지연 시간 : P50 9.5초, P99 13.4초 (Agent 실행 + Judge 호출 포함). 조회는 5~8초, 본인 확인 · 승인을 거치는 변경 업무는 9~12초, 가장 오래 걸린 건 부분 결제 18.3초
+- 토큰 98,434개, 비용 약 $0.17 (40개 전체 1회)
+- interrupt 모양별로 보면 `없음`(조회 · 안내) 15개, `secret → approval` 22개, `secret`만(카드 번호 조회) 1개, `secret → secret → approval`(카드 비밀번호 변경) 1개, `question`(금액 빠짐, 되묻고 멈춤 `pending`) 1개
+
+**통과했지만 짚어 둘 점**
+
+- `account_history` ("이번 달 생활비 출금 내역 보여줘") : 실행한 날이 10월 1일이라 이번 달 거래가 없어서 Agent는 "조건에 맞는 거래 내역이 없습니다."라고 답했다. 답 자체는 맞고, Judge도 "맞는 기록이 없을 때의 올바른 응답"이라며 통과시켰다.
+  다만 기준 문장이 "출금 내역을 안내한다"로 느슨해서 **실제 내역을 보여줬는지는 검사하지 못했다.** 날짜에 따라 결과가 바뀌는 사례는 "지난 달" 같은 고정된 기간으로 묻거나, 기준에 금액 · 건수를 적어야 더 단단해진다.
+- `card_history_query` ("지난 달 여행 카드 이용 내역")는 9월 3건, 합계 160,000원을 정확히 보여줬다. 같은 날짜 기준 사례라도 데이터가 있는 기간이면 제대로 검사된다.
+- 3개 평가가 모두 만점이라 "평가가 너무 쉬운 건 아닌가"도 같이 봐야 한다. interrupt와 데이터는 정확한 값 비교라 느슨할 수 없고, 느슨해질 수 있는 건 LLM Judge 쪽 `answer_criteria`다. 기준 문장에 금액이나 대상을 구체적으로 적은 사례(이체, 카드값, 멤버십 등)가 더 믿을 만하다.
+
 **평가로 잡은 것 : Golden Set을 고친 경우**
 
 기대값은 기능 이름만 보고 정하면 틀린다. 실제 코드 경로와 초기 데이터를 같이 보고 맞췄다.
