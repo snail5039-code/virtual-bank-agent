@@ -126,11 +126,11 @@ golden_set = [
         "case_id": "account_history",
         "inputs": {
             "turns": [
-                "이번 달 생활비 출금 내역 보여줘",
+                "지난 달 생활비 출금 내역 보여줘",
             ],
         },
         "reference": {
-            "answer_criteria": "이번 달 생활비 출금 내역을 안내한다",
+            "answer_criteria": "2026년 9월 생활비 계좌 출금 9건을 안내한다. 100,000원 출금, 마트 72,000원·48,000원, 서점 50,000원 등이 들어 있다.",
             "expected_interrupts": [],
             "expected_data": {
                 "changed" : False,
